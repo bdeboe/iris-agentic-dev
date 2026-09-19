@@ -102,7 +102,13 @@ tests/e2e/skill_eval/
 ├── triage.py           # NEW: flat and saturated task-set verdicts
 ├── lift.py             # MODIFIED: delegate to comparison.py, drop bare subtraction
 ├── reporter.py         # MODIFIED: item count and MDE beside every lift
-└── scoring.py          # MODIFIED: machine-check verdicts alongside judged ones
+├── graded_task.py      # NEW: the machine check — `check_verdict`, `CheckBroken`, two-stage
+│                       #      validation. This is where the machine verdict landed, and
+│                       #      `scoring.py` is deliberately untouched: routing a PASS/FAIL
+│                       #      check through the judge path would give a model a vote on a
+│                       #      question arithmetic already answered (analyze finding C3)
+└── cost_estimator.py   # NEW: the cap, asserted before a ladder spawns its first session
+                        #      rather than after the pilot has spent (analyze finding C5)
 
 benchmark/harbor/
 └── export.py           # from spec 120 Slice 1; consumed here, not built here
