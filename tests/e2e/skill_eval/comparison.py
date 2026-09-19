@@ -223,15 +223,24 @@ class Comparison:
         if lift is None or interval is None:
             return Verdict.NOT_COMPARABLE
 
-        # G2 / G7. A design decision is exempt from the floor: it is not a reported figure, and
-        # FR-024 requires it to state the counts it rests on instead.
-        if purpose == "result" and n_pairs < floor:
+        # G2 / G7. The declared floor is absolute: below it nothing publishes, whatever it found. A
+        # design decision is exempt — it is not a reported figure, and FR-024 requires it to state the
+        # counts it rests on instead.
+        if purpose == "result" and n_pairs < MINIMUM_FLOOR:
             return Verdict.UNDERPOWERED
 
-        # G4. The boundary counts as containing zero: a zero-width interval at zero discordance
-        # has shown no difference and no evidence about one.
+        # G4 / G8. The boundary counts as containing zero: a zero-width interval at zero discordance
+        # has shown no difference and no evidence about one. This is also the only place the
+        # discordance-recomputed floor belongs. An interval containing zero has two readings — no
+        # effect, or too few pairs to tell — and the floor is what separates them. An interval that
+        # excludes zero has already detected an effect, and refusing it for failing a power
+        # calculation about a *smaller* effect gets the logic backwards: since the floor rises with
+        # measured discordance, it would refuse the strongest results in a run and publish the nulls
+        # beside them.
         low, high = interval
         if purpose == "result" and low <= 0.0 <= high:
+            if n_pairs < floor:
+                return Verdict.UNDERPOWERED
             return Verdict.INDISTINGUISHABLE
 
         if lift < 0.0:

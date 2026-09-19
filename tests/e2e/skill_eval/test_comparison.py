@@ -479,3 +479,62 @@ def test_the_guard_accepts_an_explicit_split_for_a_corpus_that_is_not_the_commit
     own = Split(train=("t99",), holdout=tuple(ids))
     comparison = Comparison.from_pairs("bare", "tools", mixed_pairs(ids))
     assert assert_publishable_from_holdout(comparison, split=own) is comparison
+
+
+# ---------------------------------------------------------------------------
+# G8 — the power gate applies to a null, not to a result that already cleared zero
+# ---------------------------------------------------------------------------
+#
+# Found by running the graded ladder. 41 pairs, b=34, c=0: lift +0.829, McNemar interval
+# [+0.714, +0.944], p = 0.0000. The recomputed floor is 161, because detecting a *20-point* lift at a
+# measured discordance of 0.83 would need 161 pairs, and the old precedence refused the figure as
+# underpowered.
+#
+# That is backwards twice over. Power is the ability to detect an effect; this comparison detected one,
+# and the interval is what says how precisely. And because the floor is recomputed from discordance, the
+# larger the effect the higher the bar it must clear — so the strongest result in the run was the one
+# declared unpublishable while a null over the same 41 pairs published fine.
+#
+# The rule now: below MINIMUM_FLOOR nothing publishes, whatever it found. Above it, an interval that
+# excludes zero is a result and the MDE is printed beside it; an interval that contains zero has to
+# clear the recomputed floor before it may be called "no effect" rather than "could not tell".
+
+
+def test_a_significant_result_above_the_minimum_floor_is_not_called_underpowered():
+    comparison = build(b=34, c=0, both_pass=0, both_fail=7)  # the measured run
+    assert comparison.n_pairs == 41
+    assert comparison.floor == 161
+    assert comparison.interval[0] > 0.0
+    assert comparison.verdict == Verdict.PASSED
+    assert comparison.publishable
+
+
+def test_the_recomputed_floor_still_prints_beside_the_result_it_no_longer_blocks():
+    comparison = build(b=34, c=0, both_fail=7)
+    assert "161" in comparison.summary()
+    assert "mde" in comparison.summary().lower()
+
+
+def test_a_null_above_the_minimum_floor_still_has_to_clear_the_recomputed_one():
+    """b=10, c=6 over 40 pairs: the interval contains zero and the floor is 77. Unchanged — this is
+    the case the recomputation was written for."""
+    comparison = build(b=10, c=6, both_pass=14, both_fail=10)
+    assert comparison.floor == 77
+    assert comparison.interval[0] < 0.0 < comparison.interval[1]
+    assert comparison.verdict == Verdict.UNDERPOWERED
+
+
+def test_a_significant_result_below_the_minimum_floor_is_still_underpowered():
+    """Eight pairs is eight pairs. The change is about the recomputed floor, not the declared one."""
+    comparison = build(b=5, c=1, both_fail=2)
+    assert comparison.interval[0] > 0.0
+    assert comparison.verdict == Verdict.UNDERPOWERED
+
+
+def test_a_significant_result_smaller_than_the_mde_does_not_claim_a_pass():
+    """Significance is not size. The threshold stays clamped to the MDE, so a lift that cleared zero
+    but sits under what the corpus can reliably detect reports below-threshold rather than passed."""
+    comparison = build(b=12, c=2, both_pass=10, both_fail=26)  # 50 pairs, lift 0.20
+    assert comparison.interval[0] > 0.0
+    assert comparison.mde > comparison.lift
+    assert comparison.verdict == Verdict.BELOW_THRESHOLD
