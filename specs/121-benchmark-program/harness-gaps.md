@@ -95,3 +95,30 @@ REST, and `exec` in that mode cannot run `try {…}`. That is the documented `No
 designed, and it means a check written in block syntax silently loses the ability to run when REST
 goes away. Worth knowing before anyone points this corpus at an Enterprise 2026.2.0AI build, where
 `docker_only=true` is the normal configuration rather than the degraded one.
+
+## Two provenance fields described a run that did not happen
+
+The finished report said `driver: "unrecorded"` and `skills_installed: {"tools+skills": []}`. Both are
+false about the run they describe: opencode drove all 123 sessions, and the skills arm installed all 34
+shipped documents. Nothing was wrong with the code that writes either field.
+
+The cause is the same twice. A default was resolved in one module and read in another:
+
+- `pilot.run_one` defaulted `driver` to `OpencodeDriver()`. `ladder.report` was handed `None`, and
+  `provenance.driver_identity(None)` correctly answers `unrecorded` — it is documented as a stated fact
+  for a run nobody attributed. This run was attributed; the report just did not ask.
+- `run_one` reads an empty skill list as "install the whole pack" (`shipped_skills()`). `ladder.report`
+  read the same empty list as "no skills". `pilot.report` had it right, which is why nobody caught it.
+
+Fixed by removing the second opinion in each case. `opencode_driver.default_driver()` is now the one
+place the harness builds a driver — `arms._default_driver` had a third copy, and since the arm
+assertions decide what "the tools are absent" means, two that can drift is an arm checked under one
+driver and run under another. `ladder.report` resolves the installed list the same way `run_one` does,
+except on the pooled rung, where the empty list is the truth and `per_skill` carries the detail.
+
+Five tests, written first. The provenance block on the published figure is restamped: opencode 1.14.17,
+34 skills named.
+
+Worth stating plainly, because the whole program rests on it: a provenance field cannot be trusted
+because the function that formats it is correct. It can be trusted when something asserts it against
+the run. The tests that now do this assert on `report`'s output, not on `driver_identity`'s.

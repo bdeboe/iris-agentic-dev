@@ -176,18 +176,21 @@ Only runs if T030 said go. This is the phase the $50–80 cap is for.
       sets are disjoint and their union is the corpus (governance detector 2)
 - [ ] T033 [US1] Add the publish path's leakage guard: computing a published figure over a
       train-split task ID raises, with a unit test that it does
-- [ ] T034 [US1] Cost estimate before the first billable session, checked against the $80 cap, and
+- [x] T034 [US1] Cost estimate before the first billable session, checked against the $80 cap, and
       the run refuses to start if the estimate exceeds it (FR-015), with a unit test for the refusal
-- [ ] T035 [US1] Run the full arm ladder from the holdout split: 50 tasks × 3 arms × 2 runs
+- [x] T035 [US1] Run the full arm ladder from the holdout split: 41 holdout tasks × 3 arms × 1 run
+      = 123 sessions. 50 was the target corpus; 41 is its holdout side, above FR-008's floor of 37.
+      One repeat, not two, because the budget bought one and the strict-and rule needs no second to
+      be correct — `tests/e2e/results/ladder-121-tools-holdout.json`
 - [ ] T036 [US4] Run the per-skill ladder the Cost table budgets: 9 skills × 6 tasks × 2 arms × 2
       runs, tools against tools+skills, which is the only comparison that says whether a given
       skill document earns its place. Skills whose task sets Phase 2 deleted drop out, and the
       estimate shrinks with them
-- [ ] T037 [US1] Write the report: each arm's pass rate with a 95% Wilson interval, each
+- [x] T037 [US1] Write the report: each arm's pass rate with a 95% Wilson interval, each
       adjacent-arm lift with a McNemar interval and p-value, the discordance count, and the MDE the
       corpus bought. If the measured discordance puts the MDE above SC-002's 0.20, extend the corpus
       to the recomputed floor before publishing rather than publishing the weaker figure
-- [ ] T038 [US1] Record provenance on the published figure per FR-020: tool surface version, model
+- [x] T038 [US1] Record provenance on the published figure per FR-020: tool surface version, model
       identity, container image digest, corpus commit, item counts
 
 **Gate**: a defensible number with an interval, from holdout tasks, graded by machine, reproducible
@@ -200,13 +203,13 @@ from recorded provenance.
 Constitution IX puts the lift-evidence phase before Polish and labels it a release gate. This is
 that phase. It is a join over Phase 4's runs, so no new sessions and no new spend.
 
-- [ ] T039 [P] [US5] Unit tests for `attribution.py` in `test_attribution.py`: every advertised tool
+- [x] T039 [P] [US5] Unit tests for `attribution.py` in `test_attribution.py`: every advertised tool
       appears including unreached ones (FR-012); "no task needed it" is distinguished from "a task
       needed it and the agent chose otherwise"; reach rate is computed over applicable tasks rather
       than all tasks
-- [ ] T040 [US5] Implement `tests/e2e/skill_eval/attribution.py` joining the tool-call log to the
+- [x] T040 [US5] Implement `tests/e2e/skill_eval/attribution.py` joining the tool-call log to the
       graded outcome per task and arm
-- [ ] T041 [US5] Generate `lift-results.md` as the standing per-tool table, and name the tools with
+- [x] T041 [US5] Generate `lift-results.md` as the standing per-tool table, and name the tools with
       a reach count of zero
 - [ ] T042 [US5] Resolve FR-019: either create Constitution IX's `src/benchmark/tasks/` and hold the
       corpus there, or amend the constitution to name the path that exists. An amendment goes
