@@ -172,6 +172,33 @@ ladder from the holdout split, then the per-skill ladder the Cost table budgets 
 tools against tools+skills, per skill, which is the only thing that says whether a given skill
 document earns its place. This is the phase the $50–80 cap is for.
 
+### The per-skill stop rule, written before the sessions run
+
+The tools ladder publishes a lift with an interval. The skills ladder cannot: twelve purpose-built
+tasks per skill will never reach FR-008's floor of 37, and an interval over twelve items contains
+zero whatever happens. So the skills question is decided on discordant counts, like the pilot's
+go/no-go, and the rule is fixed here and in `ladder.skill_verdict` before any skill session runs.
+
+With `b` = pairs the skill arm passes and the tools arm fails, and `c` the reverse:
+
+| Counts              | Verdict                                                          |
+| ------------------- | ---------------------------------------------------------------- |
+| `c > b`             | **harmful** — the skill cost more tasks than it won              |
+| `b == c`            | **no effect**                                                    |
+| `b ≥ 4` and `c ≤ 1` | **helps**                                                        |
+| anything else       | **inconclusive** — say so, do not grow the corpus until it turns |
+
+`helps` needs a margin and not just a sign, because 3-2 over twelve items is noise and publishing it
+as a help is exactly the mistake `Comparison` exists to prevent.
+
+The reason the rule is written down first: the tempting move after a flat result is to add tasks
+until the sign changes. If twelve tasks built specifically to need a documented convention — storage
+blocks, `$LIST` traps, `%Status` propagation, `$$$OK`/`$$$ISERR`, the SQL restrictions — give
+`b ≤ c`, that is a real finding about the skill documents and it gets written up as one. Each rung
+installs exactly one skill (`arms.skill_arm`), because PILOT-03 passed in 3 tool calls with tools
+alone and failed after 41 calls and 206 seconds with all 34 skills installed: a rung carrying the
+whole pack measures the pack's bulk and the skill's content together and reports the sum.
+
 **Phase 5 — per-tool attribution (Story 5).** Join the tool-call logs from Phase 4's runs to the
 graded outcomes. No new sessions. Write `lift-results.md` as the standing table Constitution IX
 has been asking for.

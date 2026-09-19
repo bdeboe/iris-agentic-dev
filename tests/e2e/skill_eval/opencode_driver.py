@@ -58,11 +58,18 @@ def tool_calls_from_events(events) -> tuple[ToolCall, ...]:
         if not raw_name:
             continue
         server, tool = parse_mcp_tool(raw_name)
+        state = part.get("state", {}) or {}
+        status = state.get("status")
+        error = state.get("error")
         calls.append(
             ToolCall(
                 name=tool,
-                completed=part.get("state", {}).get("status") == "completed",
+                completed=status == "completed",
                 server=server,
+                status=status,
+                # Kept as text rather than parsed. Whatever shape a harness reports an error in, the
+                # thing an attribution table needs is the sentence a reader can act on.
+                error=str(error) if error else None,
             )
         )
     return tuple(calls)

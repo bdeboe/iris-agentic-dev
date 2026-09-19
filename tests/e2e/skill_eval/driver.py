@@ -62,6 +62,14 @@ class ToolCall:
     completed: bool
     server: str | None = None
     arguments: dict | None = None
+    #: What the harness said happened — `completed`, `error`, `pending`. `completed` is the bool of
+    #: this and loses the distinction between a tool that refused the call and a call the model
+    #: abandoned, which are two different findings about a description.
+    status: str | None = None
+    #: The message the tool returned when it refused, verbatim. This is the failure mode: four reaches
+    #: all erroring with `UNKNOWN_PARAMETER` says the schema is unreadable, and the same four saying
+    #: `namespace not found` says the environment was wrong.
+    error: str | None = None
 
 
 @dataclass(frozen=True)

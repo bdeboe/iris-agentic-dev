@@ -613,3 +613,67 @@ def test_the_report_names_no_skills_for_a_ladder_that_installs_none():
     runs = three_arms()
     written = report(runs, pilot_comparisons(runs), arms=(BARE, TOOLS))
     assert written["skills_installed"] == {}
+
+
+# --- the call log travels with the run — Goal 3 -----------------------------------------------------
+
+
+def test_an_arm_run_carries_the_calls_not_only_their_count():
+    """Story 5 is a join over Story 1's sessions, so the sessions have to keep what the join reads.
+    `tool_calls: int` throws away every name, and a count cannot answer which tool was reached for."""
+    from tests.e2e.skill_eval.driver import ToolCall
+    from tests.e2e.skill_eval.pilot import ArmRun, call_records
+
+    records = call_records(
+        (
+            ToolCall(
+                name="iris_doc", completed=True, server="iris_agentic_dev", status="completed"
+            ),
+            ToolCall(
+                name="iris_compile",
+                completed=False,
+                server="iris_agentic_dev",
+                status="error",
+                error="CODE_EDIT_BLOCKED",
+            ),
+            ToolCall(name="bash", completed=True, server=None, status="completed"),
+        )
+    )
+    run = ArmRun(task_id="CORPUS-01", arm="tools", passed=True, calls=records)
+    assert [record["name"] for record in run.calls] == [
+        "iris_doc",
+        "iris_compile",
+        "bash",
+    ]
+    assert run.calls[1]["error"] == "CODE_EDIT_BLOCKED"
+    assert run.calls[2]["server"] is None
+
+
+def test_the_call_records_survive_json_because_the_artifact_is_json():
+    """`asdict(run)` goes straight into the report and the incremental jsonl. A `ToolCall` in there
+    serializes today and stops the moment the dataclass gains a field that does not."""
+    import json
+
+    from tests.e2e.skill_eval.driver import ToolCall
+    from tests.e2e.skill_eval.pilot import call_records
+
+    records = call_records((ToolCall(name="iris_query", completed=True, server="s"),))
+    assert json.loads(json.dumps(records)) == list(records)
+
+
+def test_the_arguments_are_not_recorded():
+    """A call's arguments hold whole ObjectScript classes. The published artifact is committed, and a
+    per-tool table needs the name and the outcome, not the payload."""
+    from tests.e2e.skill_eval.driver import ToolCall
+    from tests.e2e.skill_eval.pilot import call_records
+
+    records = call_records(
+        (ToolCall(name="iris_doc", completed=True, arguments={"content": "x" * 5000}),)
+    )
+    assert "arguments" not in records[0]
+
+
+def test_an_arm_run_with_no_calls_records_an_empty_log():
+    from tests.e2e.skill_eval.pilot import ArmRun
+
+    assert ArmRun(task_id="CORPUS-01", arm="bare", passed=False).calls == ()

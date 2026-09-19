@@ -105,6 +105,29 @@ class ArmRun:
     #: Which repeat of this task-in-this-arm. The pilot ran each pair once and left this 0; the graded
     #: ladder repeats, and `ladder.arm_verdict` reduces the repeats by a stated rule.
     run_index: int = 0
+    #: The call log, as JSON-ready records. `tool_calls` above is its length over completed calls and
+    #: cannot answer which tool was reached for, which is the whole of Story 5's join. Recorded here
+    #: rather than re-derived later because the event stream exists only inside the session.
+    calls: tuple[dict, ...] = ()
+
+
+def call_records(tool_calls) -> tuple[dict, ...]:
+    """The call log in the shape the artifact stores: name, server, status, outcome, error.
+
+    `arguments` is dropped. A single `iris_doc` call carries a whole class definition, the report is
+    committed, and a per-tool table needs to know which tool was called and what came back — not the
+    payload. If an argument-level finding is ever wanted, the transcript is the place for it.
+    """
+    return tuple(
+        {
+            "name": call.name,
+            "server": call.server,
+            "completed": call.completed,
+            "status": call.status,
+            "error": call.error,
+        }
+        for call in tool_calls
+    )
 
 
 def arm_results(runs) -> dict[str, bool]:
@@ -298,6 +321,7 @@ def run_one(
         reason=reason,
         timed_out=hit_the_clock(session_seconds, timeout),
         tool_calls=completed_calls(graded.tool_calls),
+        calls=call_records(graded.tool_calls),
         seconds=time.monotonic() - started,
         session_seconds=session_seconds,
     )

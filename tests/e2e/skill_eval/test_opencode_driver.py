@@ -181,3 +181,46 @@ def test_collect_events_is_the_opencode_runners_own_collector(monkeypatch):
     assert seen["prompt"] == "do the thing"
     assert seen["kwargs"] == {"model": "openai/gpt-4.1", "timeout": 42}
     assert len(tool_calls_from_events(events)) == 1
+
+
+# --- the failure mode, not just the failure — Goal 3 -----------------------------------------------
+
+
+def test_a_call_keeps_the_status_opencode_reported():
+    """`completed=False` says a call did not finish. It does not say whether the tool refused the
+    arguments, the server died, or the model abandoned the call half-written, and those are three
+    different findings about a tool description. The status string is what opencode already knows."""
+    calls = tool_calls_from_events(
+        [
+            tool_event("iris-agentic-dev_iris_compile", status="error"),
+            tool_event("iris-agentic-dev_iris_doc"),
+            tool_event("bash", status="pending"),
+        ]
+    )
+    assert [c.status for c in calls] == ["error", "completed", "pending"]
+
+
+def test_an_errored_call_keeps_the_message_the_tool_returned():
+    """The failure mode Goal 3 asks for is the text. A reach count of 4 with 4 errors saying
+    "namespace not found" is a configuration fault; the same count saying "UNKNOWN_PARAMETER" is a
+    schema the model cannot read, and only one of those is the tool's problem."""
+    events = [
+        {
+            "type": "tool_use",
+            "part": {
+                "tool": "iris-agentic-dev_iris_execute",
+                "state": {
+                    "status": "error",
+                    "error": "CODE_EDIT_BLOCKED: the write gate refused",
+                },
+            },
+        }
+    ]
+    (call,) = tool_calls_from_events(events)
+    assert call.error == "CODE_EDIT_BLOCKED: the write gate refused"
+    assert call.completed is False
+
+
+def test_a_completed_call_carries_no_error():
+    (call,) = tool_calls_from_events([tool_event("iris-agentic-dev_iris_doc")])
+    assert call.error is None
