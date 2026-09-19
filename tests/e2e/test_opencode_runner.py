@@ -13,6 +13,19 @@ from tests.e2e.opencode_runner import (
     read_session_db,
 )
 
+
+@pytest.fixture(autouse=True)
+def popen_is_faked_here(monkeypatch):
+    """Permit sessions, because every spawn in this file is a fake `Popen`.
+
+    The gate in `tests/e2e/billing.py` cannot tell a fake subprocess from a real one, and what these
+    tests check is the spawn *path* — the sandboxed cwd, the scrubbed env, the kill tree. Opting in here
+    is the honest thing to write down: this file drives the spawn point, and it costs nothing because
+    the process on the other end is `true`.
+    """
+    monkeypatch.setenv("IAD_BILLABLE_SESSIONS", "1")
+
+
 TOOL_USE_COMPLETED = json.dumps(
     {
         "type": "tool_use",

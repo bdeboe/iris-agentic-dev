@@ -24,28 +24,56 @@ import subprocess
 
 import pytest
 
-from tests.e2e.skill_eval.arms import (BARE, MCP_SERVER_NAME, TOOLS,
-                                       TOOLS_ARM_TOOLSET, TOOLS_SKILLS,
-                                       ArmContaminated, assert_absent,
-                                       assert_present)
-from tests.e2e.skill_eval.driver import (ToolCall, assert_absence_checkable,
-                                         completed_calls, iad_calls)
-from tests.e2e.skill_eval.prime_agent import (SETTINGS_RELPATH,
-                                              SOCKET_PATH_LIMIT, UNATTRIBUTED,
-                                              WORKER_SOCKET_RESERVE,
-                                              PrimeAgentDriver,
-                                              SessionNeverRan, agent_ended,
-                                              listed_servers, mcp_call_sites,
-                                              remove_session_tmpdir,
-                                              session_cost,
-                                              session_tmpdir_root,
-                                              session_tokens, settings_for,
-                                              tool_calls_from_events,
-                                              write_settings)
+from tests.e2e.skill_eval.arms import (
+    BARE,
+    MCP_SERVER_NAME,
+    TOOLS,
+    TOOLS_ARM_TOOLSET,
+    TOOLS_SKILLS,
+    ArmContaminated,
+    assert_absent,
+    assert_present,
+)
+from tests.e2e.skill_eval.driver import (
+    ToolCall,
+    assert_absence_checkable,
+    completed_calls,
+    iad_calls,
+)
+from tests.e2e.skill_eval.prime_agent import (
+    SETTINGS_RELPATH,
+    SOCKET_PATH_LIMIT,
+    UNATTRIBUTED,
+    WORKER_SOCKET_RESERVE,
+    PrimeAgentDriver,
+    SessionNeverRan,
+    agent_ended,
+    listed_servers,
+    mcp_call_sites,
+    remove_session_tmpdir,
+    session_cost,
+    session_tmpdir_root,
+    session_tokens,
+    settings_for,
+    tool_calls_from_events,
+    write_settings,
+)
 
 FIXTURE = os.path.join(
     os.path.dirname(__file__), "fixtures", "prime_agent_session.jsonl"
 )
+
+
+@pytest.fixture(autouse=True)
+def popen_is_faked_here(monkeypatch):
+    """Permit sessions, because every spawn in this file is a fake `Popen`.
+
+    The gate in `tests/e2e/billing.py` cannot tell a fake subprocess from a real one, and what these
+    tests check is the spawn *path* — the sandboxed cwd, the scrubbed env, the kill tree. Opting in here
+    is the honest thing to write down: this file drives the spawn point, and it costs nothing because
+    the process on the other end is `true`.
+    """
+    monkeypatch.setenv("IAD_BILLABLE_SESSIONS", "1")
 
 
 def fixture_events():

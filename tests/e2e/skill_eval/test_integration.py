@@ -11,7 +11,6 @@ from tests.e2e.skill_eval.evaluator import (
 )
 from tests.e2e.skill_eval.baseline import save_baseline
 
-
 MODEL = "openai/gpt-4.1"
 TASKS_SKILLS_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "tasks", "skills")
@@ -36,6 +35,7 @@ def iris_available():
 # ── US1: Fire-rate ─────────────────────────────────────────────────────────────
 
 
+@pytest.mark.billable  # spawns a real agent session
 @pytest.mark.us1
 def test_fire_rate_objectscript_review(openai_key):
     """objectscript-review fire-rate task must trigger the skill tool >= 50% of 3 runs."""
@@ -50,6 +50,7 @@ def test_fire_rate_objectscript_review(openai_key):
     assert rate >= 0.5, f"objectscript-review fire rate too low: {rate}"
 
 
+@pytest.mark.billable  # spawns a real agent session
 @pytest.mark.us1
 def test_lift_objectscript_review(openai_key, iris_available):
     """objectscript-review must show positive lift on DBG-01."""
@@ -76,9 +77,9 @@ def test_lift_objectscript_review(openai_key, iris_available):
         iris_container=container,
     )
     result = compute_lift_from_scores([baseline], [skill])
-    assert result["lift"] >= 0, (
-        f"Lift should be non-negative on single run; got {result['lift']}"
-    )
+    assert (
+        result["lift"] >= 0
+    ), f"Lift should be non-negative on single run; got {result['lift']}"
 
 
 # ── US2: Regression detection ─────────────────────────────────────────────────
@@ -181,6 +182,7 @@ def test_update_baseline_writes_diff(tmp_path):
 # ── US3: Domain isolation ─────────────────────────────────────────────────────
 
 
+@pytest.mark.billable  # spawns a real agent session
 @pytest.mark.us3
 def test_isolation_iris_vector_ai(openai_key):
     """iris-vector-ai must NOT fire on a general ObjectScript repair task."""
@@ -213,6 +215,7 @@ def test_dry_run_no_llm_calls():
     assert "Run with --yes" in result.stdout
 
 
+@pytest.mark.billable  # spawns a real agent session
 @pytest.mark.cli
 def test_single_skill_full_run(openai_key, iris_available, tmp_path):
     """--skill objectscript-review --yes produces a result JSON with fire_rate populated."""

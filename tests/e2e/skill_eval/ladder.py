@@ -31,6 +31,7 @@ import statistics
 import time
 from dataclasses import asdict
 
+from tests.e2e import billing
 from tests.e2e.skill_eval import graded_task, pilot, provenance
 from tests.e2e.skill_eval.arms import ARMS, TOOLS, Arm, installed_skill_names, skill_arm
 from tests.e2e.skill_eval.comparison import (
@@ -698,7 +699,7 @@ def parse_args(argv=None):
     return args
 
 
-def main(argv=None) -> int:
+def _main(argv=None) -> int:
     from tests.e2e.skill_eval.arms import skill_ladder
     from tests.e2e.skill_eval.cost_estimator import (
         assert_within_budget,
@@ -806,6 +807,12 @@ def main(argv=None) -> int:
     print(f"written to {path}")
     print(f"sessions written incrementally to {incremental}")
     return 0
+
+
+def main(argv=None) -> int:
+    """The ladder, with billable sessions permitted for the duration — see `tests/e2e/billing.py`."""
+    with billing.allow():
+        return _main(argv)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 """US1 E2E tests — skills quality gate. Requires OPENAI_API_KEY."""
+
 import os
 import pytest
 from tests.e2e.harness import run_task
@@ -15,6 +16,7 @@ def test_us1_readme_urls_valid(tmp_path):
     assert len(urls) > 0, "README must contain at least one curl URL"
 
 
+@pytest.mark.billable  # spawns a real agent session
 @pytest.mark.us1
 def test_us1_skill_quality(openai_api_key, tmp_path):
     """objectscript-review skill must suppress Return-in-For bug."""
@@ -31,6 +33,7 @@ def test_us1_skill_quality(openai_api_key, tmp_path):
     )
 
 
+@pytest.mark.billable  # spawns a real agent session
 @pytest.mark.us1
 def test_us1_baseline(openai_api_key, tmp_path):
     """Baseline (no skill) run — result recorded; not required to pass."""

@@ -1,4 +1,5 @@
 """US3 E2E tests — full stack: skills + MCP + live IRIS."""
+
 import os
 import pytest
 from tests.e2e.harness import run_task
@@ -7,6 +8,9 @@ from tests.e2e.fixtures import load_all_fixtures
 from tests.e2e.assertions import check_tools_in_order
 from tests.e2e.opencode_runner import collect_events
 from tests.e2e.isolated_env import IsolatedEnv
+
+# Every test in this file spawns a real agent session. See `tests/e2e/billing.py`.
+pytestmark = pytest.mark.billable
 
 
 @pytest.mark.us3
@@ -26,9 +30,12 @@ def test_us3_full_stack(openai_api_key, iris_available):
         iris_container=container,
     )
 
-    assert "iris_agentic_dev:docs_introspect" in result.tool_calls, \
-        f"docs_introspect not called. Tool calls: {result.tool_calls}"
-    assert "iris_agentic_dev:iris_compile" in result.tool_calls, \
-        f"iris_compile not called. Tool calls: {result.tool_calls}"
-    assert result.passed, \
-        f"Full-stack assertion failed: {[(a.description, a.passed) for a in result.assertion_results]}"
+    assert (
+        "iris_agentic_dev:docs_introspect" in result.tool_calls
+    ), f"docs_introspect not called. Tool calls: {result.tool_calls}"
+    assert (
+        "iris_agentic_dev:iris_compile" in result.tool_calls
+    ), f"iris_compile not called. Tool calls: {result.tool_calls}"
+    assert (
+        result.passed
+    ), f"Full-stack assertion failed: {[(a.description, a.passed) for a in result.assertion_results]}"

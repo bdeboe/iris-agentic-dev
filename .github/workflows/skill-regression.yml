@@ -56,6 +56,11 @@ jobs:
       - name: Run unit tests for skill_eval harness
         # The cheapest breakage signal in the whole night, and it starts no session. If the
         # harness cannot import its own modules there is no point starting a container.
+        #
+        # The --ignore list is no longer what keeps this step from spending money: every spawn point
+        # refuses unless IAD_BILLABLE_SESSIONS=1, and the tests that spawn carry a `billable` marker
+        # that skips them without it (tests/e2e/billing.py). Kept because skipping six files is
+        # faster than collecting them, not because it is load-bearing.
         run: |
           python -m pytest tests/e2e/skill_eval/ \
             --ignore=tests/e2e/skill_eval/test_integration.py \

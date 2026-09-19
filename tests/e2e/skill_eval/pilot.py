@@ -42,6 +42,7 @@ import tempfile
 import time
 from dataclasses import asdict, dataclass
 
+from tests.e2e import billing
 from tests.e2e.skill_eval import graded_task
 from tests.e2e.skill_eval.arms import ARMS, Arm, installed_skill_names
 from tests.e2e.skill_eval.comparison import Comparison, pair_arms
@@ -464,7 +465,7 @@ def report(runs, comparisons, arms=ARMS, skill_names=None) -> dict:
     }
 
 
-def main(argv=None) -> int:
+def _main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--model", default=PILOT_MODEL)
     parser.add_argument("--timeout", type=int, default=SESSION_TIMEOUT)
@@ -506,6 +507,12 @@ def main(argv=None) -> int:
         json.dump(report(runs, comparisons), handle, indent=2)
     print(f"written to {out}")
     return 0
+
+
+def main(argv=None) -> int:
+    """The pilot, with billable sessions permitted for the duration — see `tests/e2e/billing.py`."""
+    with billing.allow():
+        return _main(argv)
 
 
 if __name__ == "__main__":

@@ -31,8 +31,13 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 
-from tests.e2e.skill_eval.arms import (MCP_SERVER_NAME, TOOLS_ARM_TOOLSET, Arm,
-                                       ArmContaminated)
+from tests.e2e import billing
+from tests.e2e.skill_eval.arms import (
+    MCP_SERVER_NAME,
+    TOOLS_ARM_TOOLSET,
+    Arm,
+    ArmContaminated,
+)
 from tests.e2e.skill_eval.driver import DriverRun, McpSource, ToolCall
 
 #: Relative to `HOME`. Also the project-level path, relative to the session's working directory.
@@ -604,6 +609,9 @@ class PrimeAgentDriver:
             argv.append("--no-skills")
         argv += ["-p", prompt]
 
+        # Before anything is spawned — see `tests/e2e/billing.py`. The candidate driver bills the same
+        # as the incumbent, so it is gated at the same place rather than trusted to be cheaper.
+        billing.assert_allowed("a prime-agent session")
         env = dict(env_vars)
         if self.node_bin:
             env["PATH"] = f"{self.node_bin}:{env.get('PATH', '')}"

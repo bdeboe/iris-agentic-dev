@@ -9,6 +9,7 @@ import sys
 
 # Ensure benchmark/021 is on path
 import tests.e2e.skill_eval  # noqa: F401 (triggers sys.path shim)
+from tests.e2e import billing
 from tests.e2e.skill_eval import provenance as provenance_mod
 from tests.e2e.skill_eval.baseline import (
     compute_diff,
@@ -306,7 +307,7 @@ def _merge_and_report(args) -> int:
     return 1 if regressions else 0
 
 
-def main():
+def _main():
     parser = argparse.ArgumentParser(
         description="Skill regression and lift measurement suite"
     )
@@ -547,6 +548,12 @@ def main():
     if not run_valid:
         sys.exit(EXIT_INTEGRITY)
     sys.exit(EXIT_INTEGRITY if regressions else EXIT_MEASURED)
+
+
+def main():
+    """The skill-eval suite, with billable sessions permitted — see `tests/e2e/billing.py`."""
+    with billing.allow():
+        return _main()
 
 
 if __name__ == "__main__":

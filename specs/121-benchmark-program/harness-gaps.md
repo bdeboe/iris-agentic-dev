@@ -26,8 +26,23 @@ something explicitly asks for one — an env var the ladder and pilot commands s
 not — so `pytest tests/e2e/skill_eval` as a directory cannot spend money whatever it collects, and
 the rule stops depending on anyone's memory. Then the list is documentation instead of a control.
 
-Not done yet, and deliberately not done while the 123-session graded run was in flight: the spawn
-point is the module that run depends on. It is the next harness change after the run lands.
+**Done, after both graded runs landed** — deliberately not while they were in flight, since the spawn
+point is the module they depend on. `tests/e2e/billing.py` holds `IAD_BILLABLE_SESSIONS`;
+`assert_allowed` runs immediately before `Popen` in both spawn points, `opencode_runner.run_opencode`
+and `PrimeAgentDriver.collect_events`; the four commands whose job is to spend — ladder, pilot, nightly
+canary, and `python -m tests.e2e.skill_eval` — wrap their bodies in `billing.allow()`, which restores
+the environment on the way out so one CLI call cannot leave the gate open behind it.
+
+Running the directory found more than expected. Thirteen tests across nine files spawn real sessions, and
+every one of them was guarded by nothing but `skipif(not os.environ.get("OPENAI_API_KEY"))` — which on
+this laptop is always set. `pytest tests/e2e/skill_eval` was not a hypothetical forty dollars. A
+`billable` marker now names them and `conftest.pytest_collection_modifyitems` skips them unless the env
+var is set, so the sweep is green and silent rather than red. Two files drive the spawn path with a fake
+`Popen` and opt in explicitly, in a fixture that says why.
+
+What the gate cannot do is tell a fake subprocess from a real one, so the opt-in in those two files is a
+statement of intent and not a measurement. The wallet is protected by the `Popen` call sites being the
+only two, which `test_billing.py` asserts by patching them to raise.
 
 ## `SELECT TOP` with `ORDER BY` works on this build
 

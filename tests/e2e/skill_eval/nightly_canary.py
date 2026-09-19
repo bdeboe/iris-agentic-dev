@@ -29,6 +29,8 @@ import subprocess
 import sys
 from typing import Optional
 
+from tests.e2e import billing
+
 #: The named canary set of FR-016. Assertion-scored on purpose — `tool_called`, `skill_invoked`
 #: and a two-tool chain — so a night costs three agent sessions and no grading call at all.
 #: MCP-01: a tool call reaches IRIS. SKILL-01: a skill is invoked. FULL-01: both, in order.
@@ -367,7 +369,7 @@ def run_canary_tasks(
     return outcomes
 
 
-def main(argv=None) -> int:
+def _main(argv=None) -> int:
     """`python -m tests.e2e.skill_eval.nightly_canary` — the whole nightly.
 
     Exit 0 healthy, 1 broken, 2 misconfigured. `--dry-run` answers the two cheap questions and
@@ -430,6 +432,12 @@ def main(argv=None) -> int:
         print(f"written: {path}", flush=True)
 
     return report.exit_code()
+
+
+def main(argv=None) -> int:
+    """The nightly, with billable sessions permitted for the duration — see `tests/e2e/billing.py`."""
+    with billing.allow():
+        return _main(argv)
 
 
 if __name__ == "__main__":
