@@ -101,7 +101,8 @@ def test_a_holdout_set_at_the_floor_is_allowed():
 def test_the_skills_ladder_is_exempt_from_the_publication_floor():
     """Twelve purpose-built tasks cannot reach 37, and the stop rule for them is a count comparison
     rather than an interval — `b <= c` is a real negative whatever the MDE says. The exemption is
-    explicit and the figure it produces is labelled, rather than the floor being quietly lowered."""
+    explicit and the figure it produces is labelled, rather than the floor being quietly lowered.
+    """
     from tests.e2e.skill_eval import ladder
 
     tasks = [FakeTask(i) for i in holdout_ids(12, prefix="SKILL")]
@@ -130,7 +131,8 @@ def test_a_task_an_arm_passed_twice_passed():
 
 def test_a_split_decision_counts_as_a_failure_and_says_why():
     """Strict-and, not majority. An arm that solves a task half the time has not solved it, and the
-    alternative rule — pass if any run passed — turns the noisier arm into the better one."""
+    alternative rule — pass if any run passed — turns the noisier arm into the better one.
+    """
     from tests.e2e.skill_eval import ladder
 
     runs = [
@@ -188,9 +190,9 @@ def test_each_adjacent_pair_is_one_result_comparison():
         ("bare", "tools"),
         ("tools", "tools+skills"),
     ]
-    assert all(c.purpose == "result" for c in comparisons), (
-        "the pilot's comparisons were design decisions; these are the published figures"
-    )
+    assert all(
+        c.purpose == "result" for c in comparisons
+    ), "the pilot's comparisons were design decisions; these are the published figures"
 
 
 def test_a_ladder_figure_goes_through_the_holdout_publish_gate():
@@ -465,14 +467,18 @@ SKILL_SPREAD = (
         FakeSkillTask(f"SKILL-{i:02d}", "objectscript-list-patterns")
         for i in range(6, 9)
     ]
-    + [FakeSkillTask(f"SKILL-{i:02d}", "objectscript-sql-patterns") for i in range(9, 12)]
+    + [
+        FakeSkillTask(f"SKILL-{i:02d}", "objectscript-sql-patterns")
+        for i in range(9, 12)
+    ]
     + [FakeSkillTask("SKILL-12", "iris-sql")]
 )
 
 
 def spread_runs(passes):
     """One `tools` run and one own-skill run per task. `passes` names the task IDs the skill arm
-    passed; the tools arm fails everything, so every task is a discordant pair for the skill."""
+    passed; the tools arm fails everything, so every task is a discordant pair for the skill.
+    """
     runs = []
     for task in SKILL_SPREAD:
         runs.append(run(task.id, "tools", False))
@@ -589,7 +595,9 @@ def test_the_runner_resolves_a_per_task_arm_list_from_a_callable():
     start twenty-four sessions to say the same thing."""
     from tests.e2e.skill_eval import ladder
 
-    assert ladder.arms_for_task((BARE, TOOLS), FakeSkillTask("SKILL-01", "iris-sql")) == (
+    assert ladder.arms_for_task(
+        (BARE, TOOLS), FakeSkillTask("SKILL-01", "iris-sql")
+    ) == (
         BARE,
         TOOLS,
     )
@@ -781,3 +789,61 @@ def test_the_report_carries_each_arm_s_rate_beside_the_comparisons():
     written = ladder.report(runs, split=split)
     assert written["arm_rates"]["tools"]["rate"] == 1.0
     assert written["arm_rates"]["bare"]["interval"][1] < 0.2
+
+
+# -- the driver the sessions actually ran under -----------------------------------
+#
+# The first graded run published `driver: "unrecorded"` over 123 sessions that opencode drove. Nothing
+# was wrong with `driver_identity` — `report` was passed `None` while `run_one` was defaulting to
+# `OpencodeDriver()` two calls away. One default, read by both, is the only version of this that
+# cannot drift.
+
+
+def test_the_runner_and_the_report_share_one_default_driver():
+    from tests.e2e.skill_eval import pilot
+    from tests.e2e.skill_eval.opencode_driver import OpencodeDriver
+
+    assert isinstance(pilot.default_driver(), OpencodeDriver)
+
+
+def test_the_default_driver_reports_the_harness_version_when_it_can():
+    import shutil
+
+    from tests.e2e.skill_eval import pilot
+
+    if not shutil.which("opencode"):
+        return
+    version = pilot.default_driver().harness_version
+    assert version and version[0].isdigit(), version
+
+
+def test_the_report_names_the_driver_that_ran_the_sessions():
+    """The provenance block must not say `unrecorded` for a run this harness drove itself."""
+    from tests.e2e.skill_eval import ladder
+
+    split = a_split(holdout_ids(40))
+    runs = []
+    for task_id in holdout_ids(40):
+        runs.append(run(task_id, "bare", False))
+        runs.append(run(task_id, "tools", True))
+        runs.append(run(task_id, "tools+skills", True))
+    written = ladder.report(runs, split=split)
+    assert written["provenance"]["driver"] == "opencode"
+
+
+def test_an_explicitly_named_driver_still_wins_over_the_default():
+    from tests.e2e.skill_eval import ladder
+
+    class _Prime:
+        name = "prime-agent"
+        harness_version = "0.4.1"
+
+    split = a_split(holdout_ids(40))
+    runs = []
+    for task_id in holdout_ids(40):
+        runs.append(run(task_id, "bare", False))
+        runs.append(run(task_id, "tools", True))
+        runs.append(run(task_id, "tools+skills", True))
+    written = ladder.report(runs, split=split, driver=_Prime())
+    assert written["provenance"]["driver"] == "prime-agent"
+    assert written["provenance"]["harness_version"] == "0.4.1"

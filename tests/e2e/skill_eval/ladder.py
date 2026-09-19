@@ -31,7 +31,7 @@ import statistics
 import time
 from dataclasses import asdict
 
-from tests.e2e.skill_eval import graded_task, provenance
+from tests.e2e.skill_eval import graded_task, pilot, provenance
 from tests.e2e.skill_eval.arms import ARMS, TOOLS, Arm, installed_skill_names, skill_arm
 from tests.e2e.skill_eval.comparison import (
     MINIMUM_FLOOR,
@@ -455,7 +455,9 @@ def report(
             "repeats": repeats,
             "sessions": len(task_ids) * len(arms) * repeats,
         },
-        **provenance.driver_identity(driver),
+        # The harness's own default when the caller did not name one, not `unrecorded`: these sessions
+        # were run by this harness, and `pilot.run_one` would have used the same driver.
+        **provenance.driver_identity(driver or pilot.default_driver()),
         **provenance.container_identity(container),
         **provenance.corpus_identity(),
     )
