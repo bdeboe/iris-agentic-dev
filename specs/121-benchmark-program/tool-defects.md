@@ -1,7 +1,7 @@
 # Defects found while building the corpus — drafts, not filed
 
-Nine problems I hit using the tool surface to build 62 graded tasks. Nothing here is filed. This
-file is the draft; filing is a separate decision.
+Ten problems I hit using the tool surface: nine while building 62 graded tasks, and one the graded run
+turned up on its own. Nothing here is filed. This file is the draft; filing is a separate decision.
 
 They are worth keeping together because of where they came from: building the corpus meant using
 iad the way a new IRIS developer would, on a task list I could not shortcut, and that is a harder
@@ -160,3 +160,28 @@ Observed while building the corpus.
 Defects 8 and 9 are the same defect if the cause is the runtime-compile path, and the answer for
 both is the same: the tool description should name what the execution path cannot do, since the
 list appears to be short and knowable.
+
+## 10. Three generation tools are advertised and inert without two undocumented env vars
+
+The graded run's attribution table has `iris_generate_test` reached twice and `iris_generate_class`
+once, three calls, all three failed, all with the same message:
+
+```
+MCP error -32600: LLM_UNAVAILABLE: Set IRIS_GENERATE_CLASS_MODEL and OPENAI_API_KEY
+```
+
+Confirmed from the run's own tool-call log: `tests/e2e/results/ladder-121-tools-holdout.json`, and
+summarised in `lift-results.md`.
+
+The message is a good one — it names both variables. The defect is upstream of it: nothing in
+`tools/list` says these three tools need a second model behind them. An agent reads the surface, sees
+a tool that generates a test class, calls it, and spends a turn finding out it was never going to
+work. In a 300-second session that is a measurable cost, and it is the one cost the agent could not
+have avoided by reading more carefully.
+
+Two fixes, either acceptable. Say it in the description, so the agent can decide not to call it. Or
+leave the tools out of `tools/list` when the variables are unset, so the surface describes what is
+actually available. The second is better for an agent and worse for a human debugging why a tool
+vanished, so it wants an `iris_info`-style line saying which tools are withheld and why.
+
+`iris_generate` was never reached at all, so nothing is known about whether it has the same problem.
