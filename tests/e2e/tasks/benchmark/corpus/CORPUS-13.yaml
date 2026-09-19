@@ -1,0 +1,45 @@
+id: CORPUS-13
+prompt: |
+  Bench.Ref.Split(pStr, .pOut) in the BENCHMARK namespace fills pOut(1), pOut(2) ...
+  with the comma-delimited pieces of pStr and returns how many it wrote. It leaves whatever the caller
+  already had in pOut in place, so a second call over a shorter string reports three pieces while the
+  array still holds subscripts from the first. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Ref
+    content: |
+      Class Bench.Ref Extends %RegisteredObject
+      {
+
+      ClassMethod Split(pStr As %String, Output pOut As %String) As %Integer
+      {
+          Set tCount = $Length(pStr, ",")
+          For i = 1:1:tCount {
+              Set pOut(i) = $Piece(pStr, ",", i)
+          }
+          Quit tCount
+      }
+
+      }
+check: |
+  try { kill out set out(9)="stale" set n=##class(Bench.Ref).Split("a,b,c",.out) set ok=((n=3)&&($get(out(2))="b")&&'$data(out(9))) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Ref
+    content: |
+      Class Bench.Ref Extends %RegisteredObject
+      {
+
+      ClassMethod Split(pStr As %String, Output pOut As %String) As %Integer
+      {
+          Kill pOut
+          Set tCount = $Length(pStr, ",")
+          For i = 1:1:tCount {
+              Set pOut(i) = $Piece(pStr, ",", i)
+          }
+          Quit tCount
+      }
+
+      }
+tags: [output-parameters]

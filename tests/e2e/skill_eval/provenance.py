@@ -26,6 +26,11 @@ from typing import Optional
 
 HOMEBREW_FALLBACK = "/opt/homebrew/bin/iris-agentic-dev"
 
+#: What `driver` says when nothing recorded which harness ran. A stated fact, like
+#: `tool_surface: "none"` — every provenance block written before 120 FR-012 reads this way, and
+#: a run nobody attributed is a run nobody can compare.
+DRIVER_UNRECORDED = "unrecorded"
+
 # The binary answers both of these without touching IRIS.
 _LIST_ARGS = ("tool", "--list", "--json")
 _VERSION_ARGS = ("--version",)
@@ -153,6 +158,39 @@ def tool_surface(binary: Optional[str]) -> str:
     return f"{version}+{digest}"
 
 
+def driver_identity(driver) -> dict:
+    """`{driver, harness_version}` off an `AgentDriver` — 120 FR-012.
+
+    Read from the driver object rather than passed in as a string at the call site: `opencode`
+    drove spec 121's pilot and `prime-agent` is the candidate, and the whole point of the driver
+    boundary is that the layer above it does not know which one ran. A call site that knows the
+    name well enough to hard-code it has already broken that.
+
+    A driver that cannot say its version records `None`. `harness_version(...)` below is the
+    best-effort way to find one; a guess would be worse than the absence.
+    """
+    if driver is None:
+        return {"driver": DRIVER_UNRECORDED, "harness_version": None}
+    return {
+        "driver": getattr(driver, "name", None) or DRIVER_UNRECORDED,
+        "harness_version": getattr(driver, "harness_version", None),
+    }
+
+
+def harness_version(binary: str) -> Optional[str]:
+    """`<binary> --version`, last whitespace-separated token, or None.
+
+    Best-effort on purpose. An agent harness that will not report its version still runs
+    sessions, and the run is worth having with the field empty — but the field then says empty
+    rather than saying something plausible.
+    """
+    out = _run(binary, _VERSION_ARGS)
+    if not out:
+        return None
+    parts = out.strip().split()
+    return parts[-1] if parts else None
+
+
 def harness_commit() -> Optional[str]:
     """Short SHA of the harness tree, when git can say. A tarball checkout cannot."""
     try:
@@ -175,6 +213,94 @@ def _utc_now() -> str:
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _docker(*args: str) -> Optional[str]:
+    try:
+        proc = subprocess.run(
+            ["docker", *args],
+            capture_output=True,
+            text=True,
+            timeout=_TIMEOUT_S,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    out = proc.stdout.strip()
+    return out or None
+
+
+def container_identity(container: str) -> dict:
+    """What IRIS the sessions were graded against — FR-020's container image digest.
+
+    Three facts, because they answer three different questions. `image` is the tag someone would
+    type, and a tag moves: `iris-community:2026.2` today and `iris-community:2026.2` after the next
+    push are different images with the same name. `image_digest` is the RepoDigest, which is what
+    another machine can actually pull. `image_id` is the local config digest, which exists even for
+    an image built here and never pushed.
+
+    A container that is not running yields Nones. A benchmark figure measured against nothing is not
+    a figure, so the caller refuses — but that refusal belongs to the caller, and this records what is
+    true rather than raising inside a provenance block.
+    """
+    image = _docker("inspect", "-f", "{{.Config.Image}}", container)
+    image_id = _docker("inspect", "-f", "{{.Image}}", container)
+    digest = None
+    if image:
+        digest = _docker("image", "inspect", "-f", "{{index .RepoDigests 0}}", image)
+    return {
+        "container": container,
+        "image": image,
+        "image_id": image_id,
+        "image_digest": digest,
+    }
+
+
+def corpus_identity() -> dict:
+    """Which corpus the tasks were read from — FR-020's corpus commit.
+
+    Separate from `harness_commit` even though the two are the same SHA today. They are two claims: a
+    corpus can be pinned while the harness moves, and a figure re-measured a year later has to know
+    which task files produced it.
+
+    `corpus_dirty` is the honest half. A commit names the corpus only if the files on disk are that
+    commit; uncommitted edits mean the SHA identifies something the reader cannot get back.
+    """
+    from tests.e2e.skill_eval import graded_task
+
+    repo = os.path.dirname(os.path.abspath(__file__))
+    commit = _git(repo, "rev-parse", "HEAD")
+    status = _git(repo, "status", "--porcelain", graded_task.BENCHMARK_DIR)
+    try:
+        count = len(graded_task.all_tasks())
+    except (
+        Exception
+    ):  # a corpus that will not load is a count of zero, not a crash here
+        count = 0
+    return {
+        "corpus_commit": commit,
+        "corpus_dirty": bool(status),
+        "corpus_task_count": count,
+    }
+
+
+def _git(cwd: str, *args: str) -> Optional[str]:
+    try:
+        proc = subprocess.run(
+            ["git", *args],
+            capture_output=True,
+            text=True,
+            timeout=_TIMEOUT_S,
+            cwd=cwd,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip() or None
+
+
 @dataclasses.dataclass
 class Provenance:
     """data-model.md § 3. What makes an old number comparable, or explains why it is not."""
@@ -188,6 +314,24 @@ class Provenance:
     runs: int
     measured_at: str = dataclasses.field(default_factory=_utc_now)
     harness_commit: Optional[str] = dataclasses.field(default_factory=harness_commit)
+    # 120 FR-012. Which agent harness drove the sessions, and at what version. Defaulted rather
+    # than required so the entries already in the committed baseline still load — they were
+    # measured before anyone recorded it, and `unrecorded` is what happened.
+    driver: str = DRIVER_UNRECORDED
+    harness_version: Optional[str] = None
+    # 121 T038 / FR-020. The five facts a published benchmark figure needs beyond the scorer's: which
+    # model drove the sessions, which IRIS they ran against, which corpus they were read from, and how
+    # many items the interval was computed over. All optional, because the committed skill-eval
+    # baseline predates every one of them and still has to load.
+    agent_model: Optional[str] = None
+    container: Optional[str] = None
+    image: Optional[str] = None
+    image_digest: Optional[str] = None
+    image_id: Optional[str] = None
+    corpus_commit: Optional[str] = None
+    corpus_dirty: Optional[bool] = None
+    corpus_task_count: Optional[int] = None
+    item_counts: dict = dataclasses.field(default_factory=dict)
 
     def __post_init__(self) -> None:
         # Sorted here rather than at every call site: the task set is compared for equality,

@@ -1,0 +1,51 @@
+id: CORPUS-39
+prompt: |
+  Bench.Contact in the BENCHMARK namespace is a persistent class holding a
+  Bench.Addr in its Addr property. The city never reaches the stored row — SELECT Addr_City FROM
+  Bench.Contact does not even have a column to read, because Bench.Addr is not a storable object type.
+  Fix Bench.Addr so the address is stored with the contact, and leave both classes compiled on the
+  server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Addr
+    content: |
+      Class Bench.Addr Extends %RegisteredObject
+      {
+
+      Property City As %String;
+
+      }
+  - name: Bench.Contact
+    content: |
+      Class Bench.Contact Extends %Persistent
+      {
+
+      Property Name As %String;
+
+      Property Addr As Bench.Addr;
+
+      }
+check: |
+  try { do ##class(Bench.Contact).%DeleteExtent() set c=##class(Bench.Contact).%New() set c.Name="Ann" set c.Addr=##class(Bench.Addr).%New() set c.Addr.City="Boston" set sc=c.%Save() set ok=0 set rs=##class(%SQL.Statement).%ExecDirect(,"SELECT Addr_City FROM Bench.Contact") if '$system.Status.IsError(sc), $isobject(rs), rs.%SQLCODE=0, rs.%Next() { set ok=(rs.%GetData(1)="Boston") } } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Addr
+    content: |
+      Class Bench.Addr Extends %SerialObject
+      {
+
+      Property City As %String;
+
+      }
+  - name: Bench.Contact
+    content: |
+      Class Bench.Contact Extends %Persistent
+      {
+
+      Property Name As %String;
+
+      Property Addr As Bench.Addr;
+
+      }
+tags: [class-definition, serial-objects]

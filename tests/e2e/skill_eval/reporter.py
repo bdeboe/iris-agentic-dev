@@ -22,7 +22,26 @@ _OUTCOME_TEXT = {
     "held": "held",
     "new_skill": "new skill",
     "not_comparable": "not comparable",
+    # 121: a Δ measured over fewer task-pairs than FR-008's floor. Not a pass, not a regression.
+    "underpowered": "underpowered",
 }
+
+# `Comparison.verdict` — what this run's two arms are entitled to claim, as against `outcome`,
+# which is this run against the stored entry. The two answer different questions and the table
+# needs both: a skill can hold against its baseline while its arms remain indistinguishable.
+_VERDICT_TEXT = {
+    "underpowered": "underpowered",
+    "indistinguishable": "indistinguishable",
+    "below_threshold": "below threshold",
+    "regressed": "arm regression",
+    "not_comparable": "arms not comparable",
+}
+
+#: Printed in the lift, pairs and MDE columns when the row has no comparison to read them from.
+#: T014: the reporter refuses to format a lift it cannot qualify, and says why on the next line
+#: rather than printing a bare number the reader would take for a finding.
+_WITHHELD = "—"
+_NO_COMPARISON = "lift withheld: no comparison recorded, so neither the item count nor the MDE is known"
 
 
 @dataclasses.dataclass
@@ -71,6 +90,84 @@ def _fmt_signed(value) -> str:
     return f"{value:+.2f}" if value else "0.00"
 
 
+def _comparison(result: "SkillResult") -> dict:
+    return getattr(result, "comparison", None) or {}
+
+
+def _lift_cells(result: "SkillResult") -> tuple:
+    """`(lift, pairs, mde, note)` for one row — the three columns that travel together.
+
+    G1 of contracts/comparison.md, at the one place a lift reaches a human. A lift with no
+    comparison beside it is the `unpowered-result` bug class, so it is not printed: the columns
+    read `—` and the note says what is missing. `mde` reads `n/a` when the arms agreed on every
+    task, because zero discordance bought no resolution and `0.00` would claim it bought perfect
+    resolution.
+    """
+    comparison = _comparison(result)
+    if result.lift is None:
+        return _WITHHELD, _WITHHELD, _WITHHELD, None
+    if not comparison:
+        return _WITHHELD, _WITHHELD, _WITHHELD, _NO_COMPARISON
+
+    n_pairs = comparison.get("n_pairs")
+    mde = comparison.get("mde")
+    return (
+        _fmt_signed(result.lift),
+        str(n_pairs) if n_pairs is not None else _WITHHELD,
+        f"{mde:.2f}" if mde is not None else "n/a",
+        None,
+    )
+
+
+def _outcome_cell(result: "SkillResult") -> str:
+    """The outcome against the stored entry, qualified by what this run's arms can support.
+
+    `underpowered` replaces the outcome rather than annotating it. `held` on eight task-pairs is
+    the reading that failed three consecutive nightly runs, and printing both words would leave
+    the wrong one first.
+    """
+    outcome = _OUTCOME_TEXT.get(
+        getattr(result, "outcome", ""), getattr(result, "outcome", "—")
+    )
+    verdict = _comparison(result).get("verdict")
+    if verdict == "underpowered" or outcome == "underpowered":
+        return "underpowered"
+    if verdict in _VERDICT_TEXT:
+        return f"{outcome} ({_VERDICT_TEXT[verdict]})"
+    return outcome
+
+
+def progress_line(skill: str, lift_data: dict) -> str:
+    """The per-skill line the nightly log is read from, with the lift's resolution on it.
+
+    Lives here rather than in `__main__.py` because it is the same refusal the table makes, and
+    two copies of a refusal is one copy of a refusal. What it replaces printed
+    `[iris-connectivity] lift=0.5 (16/16 scored)` — sixteen scored items is eight task-pairs,
+    a fifth of FR-008's floor, and the line was the first number anyone read.
+    """
+    scored = lift_data.get("items_scored") or 0
+    total = scored + (lift_data.get("items_unscored") or 0)
+    counts = f"({scored}/{total} scored)"
+    lift = lift_data.get("lift")
+    comparison = lift_data.get("comparison") or {}
+
+    if lift is None:
+        return f"  [{skill}] no lift {counts}"
+    if not comparison:
+        return f"  [{skill}] lift withheld: no comparison recorded {counts}"
+    if comparison.get("underpowered"):
+        return (
+            f"  [{skill}] lift={lift:+.2f} over {comparison.get('n_pairs')} pairs against a "
+            f"floor of {comparison.get('floor')} — underpowered {counts}"
+        )
+    mde = comparison.get("mde")
+    resolution = f"mde {mde:.2f}" if mde is not None else "mde n/a"
+    return (
+        f"  [{skill}] lift={lift:+.2f} over {comparison.get('n_pairs')} pairs "
+        f"({resolution}) {counts}"
+    )
+
+
 def print_summary(run: EvalRun) -> None:
     """Print the table and footer of contracts/eval-run.md to stdout."""
     header = f"\nSkill Evaluation Results — {run.timestamp}"
@@ -78,10 +175,11 @@ def print_summary(run: EvalRun) -> None:
     print("=" * len(header.strip()))
     print(
         f"{'skill':<31}{'mode':<10}{'scored':<9}{'base':>6}{'skill':>7}"
-        f"{'lift':>7}{'Δ base':>8}  {'outcome'}"
+        f"{'lift':>7}{'pairs':>7}{'mde':>6}{'Δ base':>8}  {'outcome'}"
     )
     print(
-        f"{'-' * 30} {'-' * 9} {'-' * 8} {'-' * 5} {'-' * 6} {'-' * 6} {'-' * 7} {'-' * 15}"
+        f"{'-' * 30} {'-' * 9} {'-' * 8} {'-' * 5} {'-' * 6} {'-' * 6} {'-' * 6} "
+        f"{'-' * 5} {'-' * 7} {'-' * 20}"
     )
 
     for r in sorted(
@@ -93,20 +191,30 @@ def print_summary(run: EvalRun) -> None:
         )
         total = (base_arm.get("items_total") or 0) + (skill_arm.get("items_total") or 0)
         mode = (getattr(r, "provenance", None) or {}).get("scoring_mode") or "—"
-        outcome = _OUTCOME_TEXT.get(
-            getattr(r, "outcome", ""), getattr(r, "outcome", "—")
-        )
+        outcome = _outcome_cell(r)
         if r.no_task_coverage:
             mode, outcome = "—", "no coverage"
+        lift, pairs, mde, withheld = _lift_cells(r)
         print(
             f"{r.skill:<31}{mode:<10}{f'{scored}/{total}' if total else '—':<9}"
             f"{_fmt_rate(r.pass_rate_baseline):>6}{_fmt_rate(r.pass_rate_skill):>7}"
-            f"{_fmt_signed(r.lift):>7}{_fmt_signed(r.lift_delta):>8}  {outcome}"
+            f"{lift:>7}{pairs:>7}{mde:>6}{_fmt_signed(r.lift_delta):>8}  {outcome}"
         )
-        # The reason a comparison was refused, and the binary change that did not refuse it.
+        # Why the lift was withheld, why a comparison was refused, and the binary or harness
+        # change that did not refuse it. The floor rides along on an underpowered row so the verdict is checkable
+        # from the report rather than only from the JSON.
+        floor = _comparison(r).get("floor")
+        underpowered = _comparison(r).get("underpowered")
         for note in (
+            withheld,
+            (
+                f"{_comparison(r).get('n_pairs')} task-pairs against a floor of {floor} (FR-008)"
+                if underpowered and floor
+                else None
+            ),
             getattr(r, "outcome_reason", None),
             getattr(r, "surface_note", None),
+            getattr(r, "driver_note", None),
         ):
             if note:
                 print(f"{'':<31}↳ {note}")

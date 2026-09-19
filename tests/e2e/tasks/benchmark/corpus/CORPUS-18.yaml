@@ -1,0 +1,65 @@
+id: CORPUS-18
+prompt: |
+  Bench.Find in the BENCHMARK namespace is a persistent class with a Name
+  property. NameOf(pId) runs embedded SQL and should return the name for that ID, the string MISSING
+  when no row has it, and ERR only when the query itself failed. Today every non-zero SQLCODE reads as
+  a failure. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Find
+    content: |
+      Class Bench.Find Extends %Persistent
+      {
+
+      Property Name As %String;
+
+      ClassMethod Seed() As %String
+      {
+          Do ..%DeleteExtent()
+          Set tRow = ..%New()
+          Set tRow.Name = "Ann"
+          Set tSC = tRow.%Save()
+          If $$$ISERR(tSC) { Quit "" }
+          Quit tRow.%Id()
+      }
+
+      ClassMethod NameOf(pId As %String) As %String
+      {
+          &sql(SELECT Name INTO :tName FROM Bench.Find WHERE ID = :pId)
+          If SQLCODE '= 0 { Quit "ERR" }
+          Quit tName
+      }
+
+      }
+check: |
+  try { set id=##class(Bench.Find).Seed() set ok=((##class(Bench.Find).NameOf(id)="Ann")&&(##class(Bench.Find).NameOf(987654)="MISSING")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Find
+    content: |
+      Class Bench.Find Extends %Persistent
+      {
+
+      Property Name As %String;
+
+      ClassMethod Seed() As %String
+      {
+          Do ..%DeleteExtent()
+          Set tRow = ..%New()
+          Set tRow.Name = "Ann"
+          Set tSC = tRow.%Save()
+          If $$$ISERR(tSC) { Quit "" }
+          Quit tRow.%Id()
+      }
+
+      ClassMethod NameOf(pId As %String) As %String
+      {
+          &sql(SELECT Name INTO :tName FROM Bench.Find WHERE ID = :pId)
+          If SQLCODE = 100 { Quit "MISSING" }
+          If SQLCODE '= 0 { Quit "ERR" }
+          Quit tName
+      }
+
+      }
+tags: [sql, sqlcode]

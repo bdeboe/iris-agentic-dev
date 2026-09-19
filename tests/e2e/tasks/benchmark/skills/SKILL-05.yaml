@@ -1,0 +1,36 @@
+id: SKILL-05
+prompt: |
+  Bench.Fee.Net(pGross, pRate, pFixed) in the BENCHMARK namespace is a stub.
+  Make it return the gross amount, less a percentage fee of pRate percent of the gross, less the flat
+  charge pFixed. Leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: objectscript-guardrails
+fixtures:
+  - name: Bench.Fee
+    content: |
+      Class Bench.Fee Extends %RegisteredObject
+      {
+
+      ClassMethod Net(pGross As %Numeric, pRate As %Numeric, pFixed As %Numeric) As %Numeric
+      {
+          Quit ""
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Fee).Net(200,10,5)=175)&&(##class(Bench.Fee).Net(100,0,0)=100)&&(##class(Bench.Fee).Net(50,50,1)=24)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Fee
+    content: |
+      Class Bench.Fee Extends %RegisteredObject
+      {
+
+      ClassMethod Net(pGross As %Numeric, pRate As %Numeric, pFixed As %Numeric) As %Numeric
+      {
+          Quit pGross - (pGross * pRate / 100) - pFixed
+      }
+
+      }
+tags: [arithmetic, precedence]

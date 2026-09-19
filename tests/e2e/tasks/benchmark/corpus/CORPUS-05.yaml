@@ -1,0 +1,46 @@
+id: CORPUS-05
+prompt: |
+  Bench.Stream.TextSize(pText) in the BENCHMARK namespace writes pText into a
+  %Stream.GlobalCharacter and should return the total number of characters it can read back. It reads
+  only the first ten and reports that. Fix it so the answer is right for text longer than one Read can
+  return, and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Stream
+    content: |
+      Class Bench.Stream Extends %RegisteredObject
+      {
+
+      ClassMethod TextSize(pText As %String) As %Integer
+      {
+          Set tStream = ##class(%Stream.GlobalCharacter).%New()
+          Do tStream.Write(pText)
+          Do tStream.Rewind()
+          Quit $Length(tStream.Read(10))
+      }
+
+      }
+check: |
+  try { set p="" for i=1:1:100 { set p=p_"x" } set t="" for i=1:1:400 { set t=t_p } set ok=((##class(Bench.Stream).TextSize(t)=40000)&&(##class(Bench.Stream).TextSize("abcde")=5)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Stream
+    content: |
+      Class Bench.Stream Extends %RegisteredObject
+      {
+
+      ClassMethod TextSize(pText As %String) As %Integer
+      {
+          Set tStream = ##class(%Stream.GlobalCharacter).%New()
+          Do tStream.Write(pText)
+          Do tStream.Rewind()
+          Set tTotal = 0
+          While 'tStream.AtEnd {
+              Set tTotal = tTotal + $Length(tStream.Read(8000))
+          }
+          Quit tTotal
+      }
+
+      }
+tags: [streams, chunked-reads]

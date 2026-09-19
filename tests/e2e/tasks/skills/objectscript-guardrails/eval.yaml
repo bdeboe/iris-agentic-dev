@@ -15,7 +15,11 @@ fire_rate_prompt: |
   }
 implicit_fire_rate_prompt: |
   Write an ObjectScript method that logs an audit event with a timestamp and saves it to EvalDemo.AuditLog. Show me the complete class.
-benchmark_tasks:
-  - TIMESTAMP-FORMAT
+# Task set retired from the gate — 121 T022/T023, verdict `too_easy` in
+# tests/e2e/skill_eval/triage_records.py. TIMESTAMP-FORMAT passes 4 times in 5 without the skill and
+# 5 in 5 with it, so the largest lift it can ever report is 0.20 — exactly the gate threshold —
+# against an MDE of 0.4334 at five pairs. The task is a valid check; it is not a measurement of this
+# skill. It comes back in Phase 4's corpus if a variant a bare arm fails exists.
+benchmark_tasks: []
 domain_skill: false
 targeted_tasks_dir: tests/e2e/tasks/skills/targeted

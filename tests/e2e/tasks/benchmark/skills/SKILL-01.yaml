@@ -1,0 +1,39 @@
+id: SKILL-01
+prompt: |
+  Bench.Html.Escape(pText) in the BENCHMARK namespace is a stub. Make it return
+  pText with the three HTML metacharacters replaced by their entities: & becomes &amp;, < becomes &lt;,
+  and > becomes &gt;. Leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: objectscript-guardrails
+fixtures:
+  - name: Bench.Html
+    content: |
+      Class Bench.Html Extends %RegisteredObject
+      {
+
+      ClassMethod Escape(pText As %String) As %String
+      {
+          Quit ""
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Html).Escape("a<b&c")="a&lt;b&amp;c")&&(##class(Bench.Html).Escape("x>y")="x&gt;y")&&(##class(Bench.Html).Escape("&&")="&amp;&amp;")&&(##class(Bench.Html).Escape("plain")="plain")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Html
+    content: |
+      Class Bench.Html Extends %RegisteredObject
+      {
+
+      ClassMethod Escape(pText As %String) As %String
+      {
+          Set tOut = $Replace(pText, "&", "&amp;")
+          Set tOut = $Replace(tOut, "<", "&lt;")
+          Set tOut = $Replace(tOut, ">", "&gt;")
+          Quit tOut
+      }
+
+      }
+tags: [strings, html-escaping]

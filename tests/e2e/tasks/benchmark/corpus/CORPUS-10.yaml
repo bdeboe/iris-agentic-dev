@@ -1,0 +1,39 @@
+id: CORPUS-10
+prompt: |
+  Bench.Slug in the BENCHMARK namespace is a persistent class with Name and Slug
+  properties. Saving an object must fill Slug with the lowercase form of Name; today Slug
+  stays empty. Add the callback that does it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Slug
+    content: |
+      Class Bench.Slug Extends %Persistent
+      {
+
+      Property Name As %String;
+
+      Property Slug As %String;
+
+      }
+check: |
+  try { set o=##class(Bench.Slug).%New() set o.Name="Hello" set sc=o.%Save() set id=o.%Id() set p=##class(Bench.Slug).%OpenId(id) set ok=('$system.Status.IsError(sc)&&$isobject(p)&&(p.Slug="hello")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Slug
+    content: |
+      Class Bench.Slug Extends %Persistent
+      {
+
+      Property Name As %String;
+
+      Property Slug As %String;
+
+      Method %OnBeforeSave(pInsert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
+      {
+          Set ..Slug = $ZConvert(..Name, "L")
+          Quit $$$OK
+      }
+
+      }
+tags: [persistence, callbacks]

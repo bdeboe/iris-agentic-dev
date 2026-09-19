@@ -1,0 +1,35 @@
+id: CORPUS-01
+prompt: |
+  Bench.StrUtil.ThirdPiece(pStr) in the BENCHMARK namespace is meant to return the third
+  comma-delimited piece of pStr, and an empty string when there is no third piece. It
+  returns the second piece instead. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.StrUtil
+    content: |
+      Class Bench.StrUtil Extends %RegisteredObject
+      {
+
+      ClassMethod ThirdPiece(pStr As %String) As %String
+      {
+          Quit $Piece(pStr, ",", 2)
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.StrUtil).ThirdPiece("a,b,c")="c")&&(##class(Bench.StrUtil).ThirdPiece("x")="")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.StrUtil
+    content: |
+      Class Bench.StrUtil Extends %RegisteredObject
+      {
+
+      ClassMethod ThirdPiece(pStr As %String) As %String
+      {
+          Quit $Piece(pStr, ",", 3)
+      }
+
+      }
+tags: [strings, logic-bug]

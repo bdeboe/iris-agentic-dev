@@ -233,3 +233,196 @@ def test_scoring_modes_accepted(mode):
         runs=1,
     )
     assert p.scoring_mode == mode
+
+
+# ---------------------------------------------------------------------------
+# Which harness drove it — 120 T017, FR-012
+# ---------------------------------------------------------------------------
+#
+# `opencode` drove spec 121's pilot and `prime-agent` is the candidate, so a run recorded
+# without saying which one ran cannot be compared to next month's. The rule is the one
+# `tool_surface` already follows: recorded, kept out of `COMPARABILITY_FIELDS`, and a
+# difference annotates the Δ instead of suppressing it. `test_baseline.py` owns that half.
+
+
+class _Driver:
+    """Only the two attributes `AgentDriver` declares. Nothing here reads anything else."""
+
+    def __init__(self, name, harness_version=None):
+        self.name = name
+        self.harness_version = harness_version
+
+
+def a_provenance(**over):
+    fields = {
+        "run_id": "r1",
+        "task_ids": ["PILOT-01"],
+        "scoring_mode": "assertion",
+        "scorer_model": None,
+        "scorer_model_requested": None,
+        "tool_surface": "1.4.2+fa0b694f8725",
+        "runs": 1,
+    }
+    fields.update(over)
+    return provenance.Provenance(**fields)
+
+
+def test_provenance_records_the_driver_and_its_version():
+    p = a_provenance(driver="opencode", harness_version="0.14.3")
+    assert p.driver == "opencode"
+    assert p.harness_version == "0.14.3"
+
+
+def test_an_unrecorded_driver_is_a_stated_fact_not_a_blank():
+    """The same shape as `tool_surface: "none"`. A run nobody attributed is a run nobody can
+    compare, and that belongs in the file rather than absent from it."""
+    assert a_provenance().driver == provenance.DRIVER_UNRECORDED
+    assert a_provenance().harness_version is None
+
+
+def test_the_driver_fields_survive_the_round_trip_into_the_baseline():
+    p = a_provenance(driver="prime-agent", harness_version="0.4.1")
+    restored = provenance.Provenance.from_dict(json.loads(json.dumps(p.to_dict())))
+    assert restored == p
+    assert json.loads(json.dumps(p.to_dict()))["driver"] == "prime-agent"
+
+
+def test_an_entry_written_before_these_fields_existed_still_loads():
+    """Every provenance block in the committed baseline predates FR-012. Reading one must not
+    raise — it must come back saying the driver was never recorded, which is true."""
+    old = {
+        "run_id": "2026-09-12T040211Z",
+        "task_ids": ["DBG-01"],
+        "scoring_mode": "judge",
+        "scorer_model": "claude-sonnet-4-6",
+        "scorer_model_requested": "us.anthropic.claude-sonnet-4-6",
+        "tool_surface": "1.4.1+fa0b694f8725",
+        "runs": 3,
+    }
+    restored = provenance.Provenance.from_dict(old)
+    assert restored.driver == provenance.DRIVER_UNRECORDED
+    assert restored.harness_version is None
+
+
+def test_driver_identity_reads_the_driver_object():
+    assert provenance.driver_identity(_Driver("opencode", "0.14.3")) == {
+        "driver": "opencode",
+        "harness_version": "0.14.3",
+    }
+
+
+def test_a_driver_that_cannot_say_its_version_records_none_not_a_guess():
+    identity = provenance.driver_identity(_Driver("prime-agent"))
+    assert identity == {"driver": "prime-agent", "harness_version": None}
+
+
+def test_no_driver_at_all_is_unrecorded_rather_than_an_exception():
+    """`--dry-run` and the fixture-only paths build provenance with no session behind it."""
+    assert provenance.driver_identity(None) == {
+        "driver": provenance.DRIVER_UNRECORDED,
+        "harness_version": None,
+    }
+
+
+def test_the_real_drivers_answer_the_two_attributes_this_reads():
+    """Against the shipped drivers, not a stub: `driver_identity` reads `name` and
+    `harness_version` off the `AgentDriver` protocol, and a rename there would otherwise
+    silently record every run as unrecorded."""
+    from tests.e2e.skill_eval.opencode_driver import OpencodeDriver
+    from tests.e2e.skill_eval.prime_agent import PrimeAgentDriver
+
+    assert provenance.driver_identity(OpencodeDriver(harness_version="0.14.3")) == {
+        "driver": "opencode",
+        "harness_version": "0.14.3",
+    }
+    assert provenance.driver_identity(PrimeAgentDriver(harness_version="0.4.1")) == {
+        "driver": "prime-agent",
+        "harness_version": "0.4.1",
+    }
+
+
+# --- what a published benchmark figure has to carry — 121 T038, FR-020 ----------------------------
+#
+# The skill-eval provenance answers "which scorer, which harness". A benchmark figure answers a
+# harder question: could someone else re-measure this? That needs the container the tasks ran
+# against, the corpus commit they were read from, and the item counts the interval was computed over.
+
+
+def test_container_identity_names_the_image_and_its_digest():
+    """A tag moves. `intersystemsdc/iris-community:2026.2` in six months is a different image, and a
+    number measured against the old one cannot be compared to a number measured against the new one
+    unless the digest is written down."""
+    identity = provenance.container_identity("iris-dev-iris")
+    assert identity["container"] == "iris-dev-iris"
+    assert identity["image"] == "intersystemsdc/iris-community:2026.2"
+    assert identity["image_id"].startswith("sha256:")
+    # RepoDigests is what someone else can pull; a locally built image has none, and then this is
+    # None rather than the image id passed off as a pullable reference.
+    assert identity["image_digest"] is None or identity["image_digest"].startswith(
+        "intersystemsdc/iris-community@sha256:"
+    )
+
+
+def test_a_container_that_is_not_running_is_recorded_as_absent_not_guessed():
+    identity = provenance.container_identity("no-such-container-121")
+    assert identity["container"] == "no-such-container-121"
+    assert identity["image"] is None
+    assert identity["image_id"] is None
+    assert identity["image_digest"] is None
+
+
+def test_the_corpus_commit_is_the_commit_the_task_files_were_read_from():
+    """`harness_commit` is HEAD. That is the same commit here, but the two are separate claims: the
+    corpus can be pinned and vendored while the harness moves, and a figure re-measured later needs to
+    know which corpus it was."""
+    record = provenance.corpus_identity()
+    assert record["corpus_commit"] is None or len(record["corpus_commit"]) == 40
+    # Dirty means the files on disk are not the commit named, so the commit alone does not identify
+    # the corpus. Stating it is the difference between reproducible and nearly reproducible.
+    assert record["corpus_dirty"] in (True, False)
+    assert record["corpus_task_count"] >= 50
+
+
+def test_a_benchmark_provenance_carries_the_five_fr_020_facts():
+    record = provenance.Provenance(
+        run_id="ladder-1",
+        task_ids=["CORPUS-01", "CORPUS-02"],
+        scoring_mode="machine",
+        scorer_model=None,
+        scorer_model_requested=None,
+        tool_surface="merged@abc1234",
+        runs=1,
+        agent_model="openai/gpt-4.1",
+        container="iris-dev-iris",
+        image="intersystemsdc/iris-community:2026.2",
+        image_digest="intersystemsdc/iris-community@sha256:5ffbd9",
+        image_id="sha256:f360aa",
+        corpus_commit="0" * 40,
+        corpus_dirty=False,
+        item_counts={"tasks": 41, "arms": 3, "sessions": 123},
+    ).to_dict()
+    assert record["agent_model"] == "openai/gpt-4.1"
+    assert record["image_digest"].endswith("5ffbd9")
+    assert record["item_counts"]["sessions"] == 123
+    assert record["corpus_dirty"] is False
+    # And the scoring mode says no model graded anything, which is the non-negotiable this whole
+    # corpus was built around.
+    assert record["scoring_mode"] == "machine"
+
+
+def test_an_old_provenance_block_still_loads_without_the_new_fields():
+    """The committed baseline has entries written before any of this existed."""
+    restored = provenance.Provenance.from_dict(
+        {
+            "run_id": "old",
+            "task_ids": ["DBG-01"],
+            "scoring_mode": "judge",
+            "scorer_model": "m",
+            "scorer_model_requested": "m",
+            "tool_surface": "none",
+            "runs": 3,
+        }
+    )
+    assert restored.agent_model is None
+    assert restored.image_digest is None
+    assert restored.item_counts == {}

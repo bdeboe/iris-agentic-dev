@@ -1,0 +1,63 @@
+id: SKILL-08
+prompt: |
+  Bench.Q.CountAll() in the BENCHMARK namespace must return how many rows the
+  persistent class Bench.Sub.Item holds, asked through SQL rather than through %ExtentCount or a global
+  walk. Return -1 if the query does not run. Leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: objectscript-sql-patterns
+fixtures:
+  - name: Bench.Sub.Item
+    content: |
+      Class Bench.Sub.Item Extends %Persistent
+      {
+
+      Property Code As %String;
+
+      Property Score As %Integer;
+
+      }
+  - name: Bench.Q
+    content: |
+      Class Bench.Q Extends %RegisteredObject
+      {
+
+      ClassMethod CountAll() As %Integer
+      {
+          Quit -1
+      }
+
+      }
+check: |
+  try { do ##class(Bench.Sub.Item).%DeleteExtent() for i=1:1:3 { set o=##class(Bench.Sub.Item).%New() set o.Code="c"_i,o.Score=i*10 do o.%Save() } set ok=(##class(Bench.Q).CountAll()=3) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Sub.Item
+    content: |
+      Class Bench.Sub.Item Extends %Persistent
+      {
+
+      Property Code As %String;
+
+      Property Score As %Integer;
+
+      }
+  - name: Bench.Q
+    content: |
+      Class Bench.Q Extends %RegisteredObject
+      {
+
+      ClassMethod CountAll() As %Integer
+      {
+          Set tRs = ##class(%SQL.Statement).%ExecDirect(, "SELECT COUNT(*) FROM Bench_Sub.Item")
+          If 'tRs.%Next() {
+              Quit -1
+          }
+          If tRs.%SQLCODE '= 0 {
+              Quit -1
+          }
+          Quit tRs.%GetData(1)
+      }
+
+      }
+tags: [sql, schema-names]

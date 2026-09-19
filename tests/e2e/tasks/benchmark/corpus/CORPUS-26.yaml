@@ -1,0 +1,82 @@
+id: CORPUS-26
+prompt: |
+  Bench.Purge.Clear() in the BENCHMARK namespace should delete every row of
+  Bench.Purge and return how many it deleted. It deletes them but always reports 0. Count() is already
+  there and works. Fix Clear() and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Purge
+    content: |
+      Class Bench.Purge Extends %Persistent
+      {
+
+      Property Name As %String;
+
+      ClassMethod Seed(pRows As %Integer) As %Status
+      {
+          Set tSC = $$$OK
+          Do ..%DeleteExtent()
+          For i = 1:1:pRows {
+              Set tRow = ..%New()
+              Set tRow.Name = "row"_i
+              Set tSC = tRow.%Save()
+              If $$$ISERR(tSC) { Quit }
+          }
+          Quit tSC
+      }
+
+      ClassMethod Count() As %Integer
+      {
+          &sql(SELECT COUNT(*) INTO :tRows FROM Bench.Purge)
+          If SQLCODE '= 0 { Quit -1 }
+          Quit tRows
+      }
+
+      ClassMethod Clear() As %Integer
+      {
+          Do ..%DeleteExtent()
+          Quit 0
+      }
+
+      }
+check: |
+  try { do ##class(Bench.Purge).Seed(4) set n=##class(Bench.Purge).Clear() set ok=((n=4)&&(##class(Bench.Purge).Count()=0)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Purge
+    content: |
+      Class Bench.Purge Extends %Persistent
+      {
+
+      Property Name As %String;
+
+      ClassMethod Seed(pRows As %Integer) As %Status
+      {
+          Set tSC = $$$OK
+          Do ..%DeleteExtent()
+          For i = 1:1:pRows {
+              Set tRow = ..%New()
+              Set tRow.Name = "row"_i
+              Set tSC = tRow.%Save()
+              If $$$ISERR(tSC) { Quit }
+          }
+          Quit tSC
+      }
+
+      ClassMethod Count() As %Integer
+      {
+          &sql(SELECT COUNT(*) INTO :tRows FROM Bench.Purge)
+          If SQLCODE '= 0 { Quit -1 }
+          Quit tRows
+      }
+
+      ClassMethod Clear() As %Integer
+      {
+          Set tBefore = ..Count()
+          Do ..%DeleteExtent()
+          Quit tBefore
+      }
+
+      }
+tags: [persistence, extent]

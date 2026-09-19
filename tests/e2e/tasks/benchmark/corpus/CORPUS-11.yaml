@@ -1,0 +1,43 @@
+id: CORPUS-11
+prompt: |
+  Bench.Rect in the BENCHMARK namespace has Width, Height and Area properties. Area is
+  stored, so it reads back empty however Width and Height are set. Make Area a calculated
+  property that returns Width multiplied by Height, and leave the class compiled on the
+  server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Rect
+    content: |
+      Class Bench.Rect Extends %RegisteredObject
+      {
+
+      Property Width As %Numeric;
+
+      Property Height As %Numeric;
+
+      Property Area As %Numeric;
+
+      }
+check: |
+  try { set r=##class(Bench.Rect).%New() set r.Width=3 set r.Height=4 set ok=(r.Area=12) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Rect
+    content: |
+      Class Bench.Rect Extends %RegisteredObject
+      {
+
+      Property Width As %Numeric;
+
+      Property Height As %Numeric;
+
+      Property Area As %Numeric [ Calculated ];
+
+      Method AreaGet() As %Numeric
+      {
+          Quit ..Width * ..Height
+      }
+
+      }
+tags: [class-definition, calculated-properties]

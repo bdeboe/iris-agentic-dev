@@ -1,0 +1,56 @@
+id: CORPUS-20
+prompt: |
+  Bench.Chain.Outer(pFail) in the BENCHMARK namespace calls Inner(pFail) and
+  should hand the caller whatever %Status Inner returned. It swallows the error and answers success
+  instead. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Chain
+    content: |
+      Class Bench.Chain Extends %RegisteredObject
+      {
+
+      ClassMethod Inner(pFail As %Boolean) As %Status
+      {
+          If pFail {
+              Quit $$$ERROR($$$GeneralError, "inner failed")
+          }
+          Quit $$$OK
+      }
+
+      ClassMethod Outer(pFail As %Boolean) As %Status
+      {
+          Set tSC = ..Inner(pFail)
+          Quit $$$OK
+      }
+
+      }
+check: |
+  try { set bad=##class(Bench.Chain).Outer(1) set good=##class(Bench.Chain).Outer(0) set ok=($system.Status.IsError(bad)&&'$system.Status.IsError(good)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Chain
+    content: |
+      Class Bench.Chain Extends %RegisteredObject
+      {
+
+      ClassMethod Inner(pFail As %Boolean) As %Status
+      {
+          If pFail {
+              Quit $$$ERROR($$$GeneralError, "inner failed")
+          }
+          Quit $$$OK
+      }
+
+      ClassMethod Outer(pFail As %Boolean) As %Status
+      {
+          Set tSC = ..Inner(pFail)
+          If $$$ISERR(tSC) {
+              Quit tSC
+          }
+          Quit $$$OK
+      }
+
+      }
+tags: [status-handling]

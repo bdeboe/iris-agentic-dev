@@ -1,0 +1,77 @@
+id: SKILL-04
+prompt: |
+  Bench.Ren in the BENCHMARK namespace already holds rows. Its Nm property should
+  be called Name. Rename it so that rows already stored still read back under the new name — a row
+  saved before the rename must still return its old value from Name. Age must keep working too. Leave
+  the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: objectscript-guardrails
+fixtures:
+  - name: Bench.Ren
+    content: |
+      Class Bench.Ren Extends %Persistent
+      {
+
+      Property Nm As %String;
+
+      Property Age As %Integer;
+
+      Storage Default
+      {
+      <Data name="RenDefaultData">
+      <Value name="1">
+      <Value>%%CLASSNAME</Value>
+      </Value>
+      <Value name="2">
+      <Value>Nm</Value>
+      </Value>
+      <Value name="3">
+      <Value>Age</Value>
+      </Value>
+      </Data>
+      <DataLocation>^Bench.RenD</DataLocation>
+      <DefaultData>RenDefaultData</DefaultData>
+      <IdLocation>^Bench.RenD</IdLocation>
+      <IndexLocation>^Bench.RenI</IndexLocation>
+      <StreamLocation>^Bench.RenS</StreamLocation>
+      <Type>%Storage.Persistent</Type>
+      }
+
+      }
+check: |
+  try { set ^Bench.RenD(1)=$listbuild("","Ann",41) set ^Bench.RenD=1 set o=##class(Bench.Ren).%OpenId(1) set ok=($isobject(o)&&(o.Name="Ann")&&(o.Age=41)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Ren
+    content: |
+      Class Bench.Ren Extends %Persistent
+      {
+
+      Property Name As %String;
+
+      Property Age As %Integer;
+
+      Storage Default
+      {
+      <Data name="RenDefaultData">
+      <Value name="1">
+      <Value>%%CLASSNAME</Value>
+      </Value>
+      <Value name="2">
+      <Value>Name</Value>
+      </Value>
+      <Value name="3">
+      <Value>Age</Value>
+      </Value>
+      </Data>
+      <DataLocation>^Bench.RenD</DataLocation>
+      <DefaultData>RenDefaultData</DefaultData>
+      <IdLocation>^Bench.RenD</IdLocation>
+      <IndexLocation>^Bench.RenI</IndexLocation>
+      <StreamLocation>^Bench.RenS</StreamLocation>
+      <Type>%Storage.Persistent</Type>
+      }
+
+      }
+tags: [storage, class-definition]

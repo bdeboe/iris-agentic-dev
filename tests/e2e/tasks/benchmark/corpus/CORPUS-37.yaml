@@ -1,0 +1,35 @@
+id: CORPUS-37
+prompt: |
+  Bench.Avg.Total(pBase, pQty, pPrice) in the BENCHMARK namespace should return
+  the base charge plus the quantity times the unit price. It returns something much larger — Total(10,
+  3, 5) comes back 65 where it should be 25. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Avg
+    content: |
+      Class Bench.Avg Extends %RegisteredObject
+      {
+
+      ClassMethod Total(pBase As %Numeric, pQty As %Numeric, pPrice As %Numeric) As %Numeric
+      {
+          Quit pBase + pQty * pPrice
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Avg).Total(10,3,5)=25)&&(##class(Bench.Avg).Total(5,1,2)=7)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Avg
+    content: |
+      Class Bench.Avg Extends %RegisteredObject
+      {
+
+      ClassMethod Total(pBase As %Numeric, pQty As %Numeric, pPrice As %Numeric) As %Numeric
+      {
+          Quit pBase + (pQty * pPrice)
+      }
+
+      }
+tags: [arithmetic, precedence]

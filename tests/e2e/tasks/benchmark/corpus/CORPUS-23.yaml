@@ -1,0 +1,63 @@
+id: CORPUS-23
+prompt: |
+  Bench.Target.Compute(pN) in the BENCHMARK namespace is a stub that returns 0.
+  It must return the same answer as Bench.Source.Compute(pN), which is already on the server. Read
+  that class, implement Bench.Target.Compute() to match it for every input, and leave Bench.Target
+  compiled on the server. Do not change Bench.Source.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Source
+    content: |
+      Class Bench.Source Extends %RegisteredObject
+      {
+
+      ClassMethod Compute(pN As %Integer) As %Integer
+      {
+          Set tTotal = 0
+          For i = 1:1:pN {
+              If (i # 3) = 0 {
+                  Set tTotal = tTotal + (i * i)
+              } Else {
+                  Set tTotal = tTotal + i
+              }
+          }
+          Quit tTotal
+      }
+
+      }
+  - name: Bench.Target
+    content: |
+      Class Bench.Target Extends %RegisteredObject
+      {
+
+      ClassMethod Compute(pN As %Integer) As %Integer
+      {
+          Quit 0
+      }
+
+      }
+check: |
+  try { set ok=1 for n=0,1,3,7,12 { if ##class(Bench.Target).Compute(n)'=##class(Bench.Source).Compute(n) { set ok=0 } } if ##class(Bench.Target).Compute(4)=0 { set ok=0 } } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Target
+    content: |
+      Class Bench.Target Extends %RegisteredObject
+      {
+
+      ClassMethod Compute(pN As %Integer) As %Integer
+      {
+          Set tTotal = 0
+          For i = 1:1:pN {
+              If (i # 3) = 0 {
+                  Set tTotal = tTotal + (i * i)
+              } Else {
+                  Set tTotal = tTotal + i
+              }
+          }
+          Quit tTotal
+      }
+
+      }
+tags: [server-state, read-existing-class]

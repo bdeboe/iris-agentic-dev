@@ -1,0 +1,51 @@
+id: CORPUS-22
+prompt: |
+  Bench.Arr.Evens(pJson) in the BENCHMARK namespace takes a JSON array of
+  integers and should return the JSON array of the even ones, in order. It keeps the odd ones. Fix it
+  and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Arr
+    content: |
+      Class Bench.Arr Extends %RegisteredObject
+      {
+
+      ClassMethod Evens(pJson As %String) As %String
+      {
+          Set tIn = ##class(%DynamicArray).%FromJSON(pJson)
+          Set tOut = ##class(%DynamicArray).%New()
+          Set tIterator = tIn.%GetIterator()
+          While tIterator.%GetNext(.tKey, .tValue) {
+              If (tValue # 2) = 1 {
+                  Do tOut.%Push(tValue)
+              }
+          }
+          Quit tOut.%ToJSON()
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Arr).Evens("[1,2,3,4]")="[2,4]")&&(##class(Bench.Arr).Evens("[1,3]")="[]")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Arr
+    content: |
+      Class Bench.Arr Extends %RegisteredObject
+      {
+
+      ClassMethod Evens(pJson As %String) As %String
+      {
+          Set tIn = ##class(%DynamicArray).%FromJSON(pJson)
+          Set tOut = ##class(%DynamicArray).%New()
+          Set tIterator = tIn.%GetIterator()
+          While tIterator.%GetNext(.tKey, .tValue) {
+              If (tValue # 2) = 0 {
+                  Do tOut.%Push(tValue)
+              }
+          }
+          Quit tOut.%ToJSON()
+      }
+
+      }
+tags: [json, iterators]

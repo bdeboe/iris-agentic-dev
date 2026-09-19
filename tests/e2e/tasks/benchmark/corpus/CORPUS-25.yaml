@@ -1,0 +1,34 @@
+id: CORPUS-25
+prompt: |
+  Bench.Cmp.Same(pA, pB) in the BENCHMARK namespace should compare two strings
+  ignoring case. It compares them exactly. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Cmp
+    content: |
+      Class Bench.Cmp Extends %RegisteredObject
+      {
+
+      ClassMethod Same(pA As %String, pB As %String) As %Boolean
+      {
+          Quit pA = pB
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Cmp).Same("Ab","aB")=1)&&(##class(Bench.Cmp).Same("Ab","ac")=0)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Cmp
+    content: |
+      Class Bench.Cmp Extends %RegisteredObject
+      {
+
+      ClassMethod Same(pA As %String, pB As %String) As %Boolean
+      {
+          Quit $ZConvert(pA, "U") = $ZConvert(pB, "U")
+      }
+
+      }
+tags: [strings, case-folding]

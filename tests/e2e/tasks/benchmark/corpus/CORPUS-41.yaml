@@ -1,0 +1,35 @@
+id: CORPUS-41
+prompt: |
+  Bench.Proc.Add(pA, pB) in the BENCHMARK namespace returns the sum, but SQL cannot
+  call it: SELECT Bench.Proc_Add(2,3) fails. Make the method callable as a SQL function without
+  changing what it computes, and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Proc
+    content: |
+      Class Bench.Proc Extends %RegisteredObject
+      {
+
+      ClassMethod Add(pA As %Integer, pB As %Integer) As %Integer
+      {
+          Quit pA + pB
+      }
+
+      }
+check: |
+  try { set rs=##class(%SQL.Statement).%ExecDirect(,"SELECT Bench.Proc_Add(2,3) AS Total") set ok=0 if $isobject(rs), rs.%SQLCODE=0, rs.%Next() { set ok=(rs.Total=5) } } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Proc
+    content: |
+      Class Bench.Proc Extends %RegisteredObject
+      {
+
+      ClassMethod Add(pA As %Integer, pB As %Integer) As %Integer [ SqlProc ]
+      {
+          Quit pA + pB
+      }
+
+      }
+tags: [sql, sql-projection]

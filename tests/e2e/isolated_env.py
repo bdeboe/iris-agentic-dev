@@ -51,6 +51,7 @@ class IsolatedEnv:
         iris_username: str = "_SYSTEM",
         iris_password: str = "SYS",
         binary: str | None = None,
+        toolset: str | None = None,
     ) -> "IsolatedEnv":
         """Configure the iad MCP server for this session.
 
@@ -59,6 +60,10 @@ class IsolatedEnv:
         iad tools, and the harness scored the toolless transcripts and published the zeros.
         Raising when nothing resolves is the point: an MCP entry naming a missing file is
         valid JSON, so the old failure was silent all the way to the report.
+
+        `toolset` names which tool surface the session gets (`IRIS_TOOLSET`). Left unset the server
+        picks its own default, which is fine for a fire-rate probe and not fine for a benchmark arm:
+        the surface is the denominator of every reach figure, so `arms.py` states it.
         """
         resolved = binary or provenance.resolve_binary()
         if not resolved:
@@ -79,6 +84,7 @@ class IsolatedEnv:
                     "IRIS_NAMESPACE": iris_namespace,
                     "IRIS_USERNAME": iris_username,
                     "IRIS_PASSWORD": iris_password,
+                    **({} if toolset is None else {"IRIS_TOOLSET": toolset}),
                 },
             }
         }

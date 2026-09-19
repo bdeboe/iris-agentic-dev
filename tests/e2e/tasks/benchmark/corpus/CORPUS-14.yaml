@@ -1,0 +1,46 @@
+id: CORPUS-14
+prompt: |
+  Bench.Seq.Next() in the BENCHMARK namespace should hand out 1, 2, 3 ... on successive
+  calls after Reset(). It returns one less than it stored, so the first call answers 0.
+  Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Seq
+    content: |
+      Class Bench.Seq Extends %RegisteredObject
+      {
+
+      ClassMethod Reset()
+      {
+          Kill ^Bench.Seq
+      }
+
+      ClassMethod Next() As %Integer
+      {
+          Set ^Bench.Seq = $Get(^Bench.Seq) + 1
+          Quit ^Bench.Seq - 1
+      }
+
+      }
+check: |
+  try { do ##class(Bench.Seq).Reset() set a=##class(Bench.Seq).Next() set b=##class(Bench.Seq).Next() set ok=((a=1)&&(b=2)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Seq
+    content: |
+      Class Bench.Seq Extends %RegisteredObject
+      {
+
+      ClassMethod Reset()
+      {
+          Kill ^Bench.Seq
+      }
+
+      ClassMethod Next() As %Integer
+      {
+          Quit $Increment(^Bench.Seq)
+      }
+
+      }
+tags: [globals, increment]

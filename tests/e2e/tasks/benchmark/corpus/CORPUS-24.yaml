@@ -1,0 +1,57 @@
+id: CORPUS-24
+prompt: |
+  Bench.Config.Threshold() in the BENCHMARK namespace must return the value
+  stored at ^Bench.Config("threshold"), or 10 when that node is not set. It returns a hardcoded 10
+  either way. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Config
+    content: |
+      Class Bench.Config Extends %RegisteredObject
+      {
+
+      ClassMethod Seed(pValue As %Integer)
+      {
+          Kill ^Bench.Config
+          Set ^Bench.Config("threshold") = pValue
+      }
+
+      ClassMethod Clear()
+      {
+          Kill ^Bench.Config
+      }
+
+      ClassMethod Threshold() As %Integer
+      {
+          Quit 10
+      }
+
+      }
+check: |
+  try { do ##class(Bench.Config).Seed(42) set a=##class(Bench.Config).Threshold() do ##class(Bench.Config).Clear() set b=##class(Bench.Config).Threshold() set ok=((a=42)&&(b=10)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Config
+    content: |
+      Class Bench.Config Extends %RegisteredObject
+      {
+
+      ClassMethod Seed(pValue As %Integer)
+      {
+          Kill ^Bench.Config
+          Set ^Bench.Config("threshold") = pValue
+      }
+
+      ClassMethod Clear()
+      {
+          Kill ^Bench.Config
+      }
+
+      ClassMethod Threshold() As %Integer
+      {
+          Quit $Get(^Bench.Config("threshold"), 10)
+      }
+
+      }
+tags: [globals, defaults]

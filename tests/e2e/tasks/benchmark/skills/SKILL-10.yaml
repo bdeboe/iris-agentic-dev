@@ -1,0 +1,43 @@
+id: SKILL-10
+prompt: |
+  Bench.Ls3.RealCount(pList) in the BENCHMARK namespace is a stub. Make it return
+  how many elements of the %List pList actually carry a value; elements that are empty do not count, and
+  a list with nothing in it counts 0. Leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: objectscript-list-patterns
+fixtures:
+  - name: Bench.Ls3
+    content: |
+      Class Bench.Ls3 Extends %RegisteredObject
+      {
+
+      ClassMethod RealCount(pList As %List) As %Integer
+      {
+          Quit -1
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Ls3).RealCount($listbuild("a","","b"))=2)&&(##class(Bench.Ls3).RealCount($listbuild())=0)&&(##class(Bench.Ls3).RealCount("")=0)&&(##class(Bench.Ls3).RealCount($listbuild("only"))=1)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Ls3
+    content: |
+      Class Bench.Ls3 Extends %RegisteredObject
+      {
+
+      ClassMethod RealCount(pList As %List) As %Integer
+      {
+          Set tCount = 0
+          Set tPointer = 0
+          While $ListNext(pList, tPointer, tValue) {
+              If $Data(tValue), tValue '= "" {
+                  Set tCount = tCount + 1
+              }
+          }
+          Quit tCount
+      }
+
+      }
+tags: [lists, empty-list]

@@ -1,0 +1,39 @@
+id: CORPUS-15
+prompt: |
+  Bench.Clone.Copy(pObj) in the BENCHMARK namespace should return an independent
+  copy of pObj, so changing the copy leaves the original alone. It returns the same object, so both
+  names change together. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Clone
+    content: |
+      Class Bench.Clone Extends %RegisteredObject
+      {
+
+      Property Name As %String;
+
+      ClassMethod Copy(pObj As Bench.Clone) As Bench.Clone
+      {
+          Quit pObj
+      }
+
+      }
+check: |
+  try { set a=##class(Bench.Clone).%New() set a.Name="x" set b=##class(Bench.Clone).Copy(a) set b.Name="y" set ok=((a.Name="x")&&(b.Name="y")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Clone
+    content: |
+      Class Bench.Clone Extends %RegisteredObject
+      {
+
+      Property Name As %String;
+
+      ClassMethod Copy(pObj As Bench.Clone) As Bench.Clone
+      {
+          Quit pObj.%ConstructClone()
+      }
+
+      }
+tags: [objects, clone]

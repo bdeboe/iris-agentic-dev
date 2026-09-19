@@ -186,3 +186,104 @@ def format_dry_run(est: dict, n_covered: int, n_uncovered: int) -> str:
         "Run with --yes to proceed, or --skill <name> for a single skill.",
     ]
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# The benchmark ladder's own estimate — spec 121 T034, FR-015
+# ---------------------------------------------------------------------------
+
+#: The hard cap for the whole benchmark programme, not per stage. Three stages share it: the tools
+#: ladder, the per-skill ladder, and whatever the reserve gets spent on.
+BENCHMARK_BUDGET_USD = 80.0
+
+#: Derived from the pilot's own bill: 24 opencode sessions against `openai/gpt-4.1` for about $2.
+#: Not a published rate — the driver bills through opencode and `pilot-121.json` records no token
+#: counts, so this is the only grounded number available. It is deliberately rounded up.
+COST_PER_SESSION_USD = 0.085
+
+#: `tests/e2e/results/pilot-121.json`, mean wall seconds per session over all 24: 124.5. Six of the
+#: 24 hit the 300 s timeout, so this mean already carries the timeout tax rather than ignoring it.
+SECONDS_PER_SESSION = 124.5
+
+#: The same file, per arm. The bare arm takes three times as long as tools+skills for the same price,
+#: because a session that flails until the clock kills it bills for the flailing. A ladder estimate
+#: that averages the arms together understates the clock for a bare-heavy run.
+SECONDS_PER_SESSION_BY_ARM = {
+    "bare": 219.1,
+    "tools": 90.7,
+    "tools+skills": 63.8,
+}
+
+
+class BudgetExceeded(RuntimeError):
+    """The estimate does not fit under the cap. No session runs."""
+
+
+def estimate_ladder(
+    n_tasks: int,
+    arms: "tuple[str, ...] | list[str]",
+    runs: int = 2,
+    cost_per_session: float = COST_PER_SESSION_USD,
+) -> dict:
+    """One session per task per arm per run, priced and timed from the pilot's measurements.
+
+    There is no model-token arithmetic here on purpose. The driver spawns opencode sessions and
+    nothing in the artifact bundle reports tokens, so a token-based estimate would be a guess
+    dressed as a calculation. A per-session price measured against a real bill is less precise and
+    more honest, and `format_ladder_estimate` prints it as an estimate.
+    """
+    arms = list(arms)
+    if n_tasks <= 0 or not arms or runs <= 0:
+        raise ValueError(
+            f"a ladder needs tasks, arms and runs; got n_tasks={n_tasks}, arms={arms}, runs={runs}"
+        )
+    sessions = n_tasks * len(arms) * runs
+    seconds = sum(
+        n_tasks * runs * SECONDS_PER_SESSION_BY_ARM.get(arm, SECONDS_PER_SESSION)
+        for arm in arms
+    )
+    return {
+        "n_tasks": n_tasks,
+        "arms": arms,
+        "runs": runs,
+        "sessions": sessions,
+        "cost_usd": round(sessions * cost_per_session, 2),
+        "hours_serial": round(seconds / 3600, 2),
+    }
+
+
+def assert_within_budget(
+    estimate: dict,
+    already_spent: float = 0.0,
+    budget: float = BENCHMARK_BUDGET_USD,
+) -> dict:
+    """Raise `BudgetExceeded` unless this estimate fits on top of what is already spent (FR-015).
+
+    Returns the estimate, so the call reads as a checkpoint at the point of use and a discarded
+    return value is not a silently skipped check.
+    """
+    projected = already_spent + estimate["cost_usd"]
+    if projected > budget:
+        raise BudgetExceeded(
+            f"{estimate['sessions']} sessions estimate at ${estimate['cost_usd']:.2f}, on top of "
+            f"${already_spent:.2f} already spent, projects ${projected:.2f} against a cap of "
+            f"${budget:.2f}. Cut the item count, the arms or the runs — the cap does not move"
+        )
+    return estimate
+
+
+def format_ladder_estimate(
+    estimate: dict,
+    already_spent: float = 0.0,
+    budget: float = BENCHMARK_BUDGET_USD,
+) -> str:
+    """The line that goes in the log before the first billable session of a stage."""
+    projected = already_spent + estimate["cost_usd"]
+    arms = ", ".join(estimate["arms"])
+    return (
+        f"Ladder estimate: {estimate['n_tasks']} tasks x {len(estimate['arms'])} arms ({arms}) "
+        f"x {estimate['runs']} runs = {estimate['sessions']} sessions, "
+        f"~${estimate['cost_usd']:.2f} at ${COST_PER_SESSION_USD:.3f}/session, "
+        f"~{estimate['hours_serial']}h serial. "
+        f"Spent so far ${already_spent:.2f}; projects ${projected:.2f} of ${budget:.2f}."
+    )

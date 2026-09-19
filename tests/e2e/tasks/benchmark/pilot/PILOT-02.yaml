@@ -1,0 +1,32 @@
+id: PILOT-02
+# Read an existing class, change a signature, put it back compiled. benchmark/021's MOD-01.
+prompt: |
+  The class Pilot.Greeter in the BENCHMARK namespace has a Hello() method that returns
+  "Hello World". Change it to take a parameter pName As %String and return "Hello " concatenated
+  with pName, then leave the class compiled on the server. Hello("Tom") must return "Hello Tom".
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Pilot.Greeter
+    content: |
+      Class Pilot.Greeter Extends %RegisteredObject
+      {
+      ClassMethod Hello() As %String
+      {
+          Quit "Hello World"
+      }
+      }
+check: |
+  try { set ok=(##class(Pilot.Greeter).Hello("Tom")="Hello Tom") } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Pilot.Greeter
+    content: |
+      Class Pilot.Greeter Extends %RegisteredObject
+      {
+      ClassMethod Hello(pName As %String) As %String
+      {
+          Quit "Hello "_pName
+      }
+      }
+tags: [modification, existing-class]

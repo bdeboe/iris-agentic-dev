@@ -1,0 +1,35 @@
+id: CORPUS-36
+prompt: |
+  Bench.Grade.Letter(pScore) in the BENCHMARK namespace should return A for 90 and
+  above, B for 80 to 89, and C below 80. The boundaries are off by one: 90 reads as B and 80 reads as
+  C. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Grade
+    content: |
+      Class Bench.Grade Extends %RegisteredObject
+      {
+
+      ClassMethod Letter(pScore As %Integer) As %String
+      {
+          Quit $Select(pScore > 90:"A", pScore > 80:"B", 1:"C")
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Grade).Letter(90)="A")&&(##class(Bench.Grade).Letter(80)="B")&&(##class(Bench.Grade).Letter(79)="C")&&(##class(Bench.Grade).Letter(95)="A")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Grade
+    content: |
+      Class Bench.Grade Extends %RegisteredObject
+      {
+
+      ClassMethod Letter(pScore As %Integer) As %String
+      {
+          Quit $Select(pScore >= 90:"A", pScore >= 80:"B", 1:"C")
+      }
+
+      }
+tags: [logic-bug, boundaries]

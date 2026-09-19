@@ -1,0 +1,35 @@
+id: CORPUS-42
+prompt: |
+  Bench.Trim.Clean(pStr) in the BENCHMARK namespace should strip whitespace from
+  both ends of pStr. It strips only the leading whitespace. Fix it and leave the class compiled on the
+  server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Trim
+    content: |
+      Class Bench.Trim Extends %RegisteredObject
+      {
+
+      ClassMethod Clean(pStr As %String) As %String
+      {
+          Quit $ZStrip(pStr, "<W")
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Trim).Clean("  abc  ")="abc")&&(##class(Bench.Trim).Clean("abc")="abc")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Trim
+    content: |
+      Class Bench.Trim Extends %RegisteredObject
+      {
+
+      ClassMethod Clean(pStr As %String) As %String
+      {
+          Quit $ZStrip(pStr, "<>W")
+      }
+
+      }
+tags: [strings, zstrip]

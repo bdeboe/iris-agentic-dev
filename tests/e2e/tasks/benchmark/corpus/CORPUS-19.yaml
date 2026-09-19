@@ -1,0 +1,32 @@
+id: CORPUS-19
+prompt: |
+  Bench.Indexed in the BENCHMARK namespace is a persistent class with a Code
+  property. Two rows can be saved with the same Code today. Make the class reject the second one —
+  the save must return an error %Status — without changing the property, and leave the class compiled
+  on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Indexed
+    content: |
+      Class Bench.Indexed Extends %Persistent
+      {
+
+      Property Code As %String;
+
+      }
+check: |
+  try { do ##class(Bench.Indexed).%DeleteExtent() set a=##class(Bench.Indexed).%New() set a.Code="X" set sc1=a.%Save() set b=##class(Bench.Indexed).%New() set b.Code="X" set sc2=b.%Save() set ok=('$system.Status.IsError(sc1)&&$system.Status.IsError(sc2)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Indexed
+    content: |
+      Class Bench.Indexed Extends %Persistent
+      {
+
+      Property Code As %String;
+
+      Index CodeIdx On Code [ Unique ];
+
+      }
+tags: [class-definition, indices]

@@ -1,0 +1,36 @@
+id: CORPUS-16
+prompt: |
+  Bench.Valid.IsCode(pStr) in the BENCHMARK namespace should answer 1 only when
+  pStr is exactly three uppercase letters followed by exactly three digits, and 0 otherwise. Today it
+  accepts any run of letters followed by any run of digits, so AB12 passes. Fix it and leave the class
+  compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Valid
+    content: |
+      Class Bench.Valid Extends %RegisteredObject
+      {
+
+      ClassMethod IsCode(pStr As %String) As %Boolean
+      {
+          Quit $Match(pStr, "[A-Z]+[0-9]+")
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Valid).IsCode("ABC123")=1)&&(##class(Bench.Valid).IsCode("AB12")=0)&&(##class(Bench.Valid).IsCode("ABCD1234")=0)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Valid
+    content: |
+      Class Bench.Valid Extends %RegisteredObject
+      {
+
+      ClassMethod IsCode(pStr As %String) As %Boolean
+      {
+          Quit $Match(pStr, "[A-Z]{3}[0-9]{3}")
+      }
+
+      }
+tags: [regex, validation]

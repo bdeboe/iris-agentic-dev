@@ -871,13 +871,155 @@ def test_scored_exception() -> None:
 
 
 # ---------------------------------------------------------------------------
+# unpowered-result — 121 T015
+# ---------------------------------------------------------------------------
+
+# The shipped instance, `lift.py:76`: two point estimates subtracted, and whatever prints the
+# result has no item count and no resolution to print beside it.
+LIFT_FROM_TWO_POINT_ESTIMATES = """
+def compute_lift_from_scores(baseline, skill):
+    return {"lift": skill.pass_rate - baseline.pass_rate}
+"""
+
+# The fix: the lift comes off a paired comparison, and the dict carries what measured it.
+LIFT_FROM_A_COMPARISON = """
+def compute_lift_from_scores(baseline, skill):
+    comparison = pair_arms("baseline", "skill", baseline, skill)
+    return {"lift": comparison.lift, "comparison": comparison.to_dict()}
+"""
+
+# A formatting call site that prints a lift and nothing that says how well it was measured.
+LIFT_PRINTED_BARE = """
+def print_summary(run):
+    for r in run.skills:
+        print(f"{r.skill:<30}{r.lift:+.2f}  {r.outcome}")
+"""
+
+# The same call site once the item count and the MDE travel with the number.
+LIFT_PRINTED_WITH_ITS_EVIDENCE = """
+def print_summary(run):
+    for r in run.skills:
+        lift, pairs, mde, _ = _lift_cells(r)
+        print(f"{r.skill:<30}{lift:>7}{pairs:>7}{mde:>6}  {r.outcome}")
+"""
+
+# A serialized result is a published figure too, and the same rule applies to it.
+LIFT_SERIALIZED_BARE = """
+def entry(result):
+    return {"skill": result.skill, "lift": result.lift, "fire_rate": result.fire_rate}
+"""
+
+# Two rates printed side by side are not a lift. The detector must not invent one.
+RATES_WITHOUT_A_LIFT = """
+def print_arms(run):
+    for r in run.skills:
+        print(f"{r.skill:<30}{r.pass_rate_baseline:>6}{r.pass_rate_skill:>7}")
+"""
+
+# `nightly_canary.lift_mentions` — a scan *for* the word, so the nightly cannot publish one. It
+# mentions a lift in a message and holds a word list called `_LIFT_WORDS`; it emits no number.
+# The one function in the tree whose whole job is keeping lift out of the nightly was the one
+# function the detector flagged, because a word appearing anywhere read as a figure published.
+A_GUARD_THAT_SCANS_FOR_LIFT = '''
+_LIFT_WORDS = ("lift", "pass_rate", "delta")
+
+
+def lift_mentions(payload):
+    """Every place a lift-ish word appears in the report, as `path: text`."""
+    found = []
+
+    def walk(node, path):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                here = f"{path}.{key}" if path else str(key)
+                if any(word in str(key).lower() for word in _LIFT_WORDS):
+                    found.append(f"{here}: key names a lift")
+                walk(value, here)
+
+    walk(payload, "")
+    return found
+'''
+
+
+def test_unpowered_result() -> None:
+    print("unpowered-result")
+
+    found = ap.unpowered_result_findings(
+        {"tests/e2e/skill_eval/lift.py": LIFT_FROM_TWO_POINT_ESTIMATES}
+    )
+    check(
+        "fires on a lift subtracted out of two pass rates",
+        len(found) >= 1 and any("point estimate" in f.message for f in found),
+        messages(found),
+    )
+
+    found = ap.unpowered_result_findings({"a.py": LIFT_FROM_A_COMPARISON})
+    check(
+        "silent once the lift comes off a comparison that carries its item count",
+        not found,
+        messages(found),
+    )
+
+    found = ap.unpowered_result_findings({"a.py": LIFT_PRINTED_BARE})
+    check(
+        "fires on a formatting call site that omits the MDE",
+        len(found) == 1 and "mde" in found[0].message.lower(),
+        messages(found),
+    )
+
+    found = ap.unpowered_result_findings({"a.py": LIFT_PRINTED_WITH_ITS_EVIDENCE})
+    check(
+        "silent on a call site that prints the item count and the MDE beside the lift",
+        not found,
+        messages(found),
+    )
+
+    found = ap.unpowered_result_findings({"a.py": LIFT_SERIALIZED_BARE})
+    check(
+        "fires on a serialized lift with no comparison beside it",
+        len(found) == 1,
+        messages(found),
+    )
+
+    found = ap.unpowered_result_findings({"a.py": RATES_WITHOUT_A_LIFT})
+    check(
+        "leaves two pass rates printed side by side alone — that is not a lift",
+        not found,
+        messages(found),
+    )
+
+    found = ap.unpowered_result_findings({"a.py": A_GUARD_THAT_SCANS_FOR_LIFT})
+    check(
+        "leaves a guard that scans for the word `lift` alone — it names no number",
+        not found,
+        messages(found),
+    )
+
+    found = ap.unpowered_result_findings({"a.py": "def broken(:\n    pass\n"})
+    check(
+        "reports a file it cannot parse rather than skipping it",
+        len(found) == 1 and "does not parse" in found[0].message,
+        messages(found),
+    )
+
+    # The class is clean in the tree as of 121 Phase 1, which is what lets it be never-baselined.
+    found = ap.check_unpowered_result()
+    check("reports zero on the real tree", not found, messages(found))
+
+
+# ---------------------------------------------------------------------------
 # The harness itself
 # ---------------------------------------------------------------------------
 
 
 def test_both_classes_are_never_baselined() -> None:
     print("registration")
-    for name in ("undeclared-params", "prose-only-enum", "scored-exception"):
+    for name in (
+        "undeclared-params",
+        "prose-only-enum",
+        "scored-exception",
+        "unpowered-result",
+    ):
         check(f"{name} is registered in CHECKS", name in ap.CHECKS)
         check(f"{name} is never baselined", name in ap.NO_BASELINE)
     baseline = ap.load_baseline()
@@ -934,6 +1076,17 @@ def test_baseline_counts_repeats() -> None:
     )
 
 
+def test_zz_every_canary_passed() -> None:
+    """The one assertion in the file, and the reason `pytest` can be trusted on it.
+
+    `check()` records a failure and returns, which is right for the `__main__` path — one run
+    reports every broken canary rather than stopping at the first. But under pytest that made
+    every test above pass unconditionally: a run with two failing canaries printed `11 passed`.
+    Named `zz` so it collects last, after every canary has had its say.
+    """
+    assert not FAILURES, f"{len(FAILURES)} canary failure(s): " + "; ".join(FAILURES)
+
+
 def main() -> int:
     test_undeclared_params()
     test_prose_only_enum()
@@ -942,6 +1095,7 @@ def main() -> int:
     test_empty_tests()
     test_device_capture()
     test_scored_exception()
+    test_unpowered_result()
     test_both_classes_are_never_baselined()
     test_baseline_key_ignores_line_numbers()
     test_baseline_counts_repeats()

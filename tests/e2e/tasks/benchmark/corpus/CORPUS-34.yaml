@@ -1,0 +1,30 @@
+id: CORPUS-34
+prompt: |
+  Bench.Req in the BENCHMARK namespace is a persistent class with a Name
+  property. An object with no Name saves happily today; it must fail validation instead, while an
+  object with a Name still saves. Change the class, not the check, and leave it compiled on the
+  server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Req
+    content: |
+      Class Bench.Req Extends %Persistent
+      {
+
+      Property Name As %String;
+
+      }
+check: |
+  try { do ##class(Bench.Req).%DeleteExtent() set a=##class(Bench.Req).%New() set sc1=a.%Save() set b=##class(Bench.Req).%New() set b.Name="Ann" set sc2=b.%Save() set ok=($system.Status.IsError(sc1)&&'$system.Status.IsError(sc2)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Req
+    content: |
+      Class Bench.Req Extends %Persistent
+      {
+
+      Property Name As %String [ Required ];
+
+      }
+tags: [class-definition, validation]

@@ -1,0 +1,22 @@
+# The committed train/holdout split for the pilot corpus — spec 120 FR-011.
+#
+# Every task ID appears in exactly one side, and `tests/e2e/skill_eval/split.py` refuses to load this
+# file otherwise. Spec 121's T033 refuses to publish a figure computed over anything on the train side.
+#
+# How the line was drawn, so the next person can extend it the same way:
+#
+# - **PILOT-01 is train because it has been read.** Every phase gate in spec 120 ran it, and I read the
+#   transcripts to work out why the bare and tools arms failed. That is tuning, whatever it was called
+#   at the time, and a lift published off it would be measured on a task the harness was fitted to.
+# - **PILOT-02 and PILOT-03 join it** so the optimizer has more than one task to fit against, and so a
+#   change that helps only PILOT-01 is visible as such. They cover two different failure shapes —
+#   read/modify/put, and the `$List` loop `objectscript-guardrails` is written about.
+# - **The remaining five are holdout and stay unread.** Their transcripts are not for me to browse.
+#   PILOT-04 through PILOT-08 cover SQLCODE, globals, `%Status`, inheritance and open/modify/save.
+#
+# Spec 121's T031 grows the corpus to 50 tasks. New tasks default to holdout; a task moves to train
+# the moment anyone tunes anything while looking at it, and that move is a commit with a reason.
+
+train = ["PILOT-01", "PILOT-02", "PILOT-03"]
+
+holdout = ["PILOT-04", "PILOT-05", "PILOT-06", "PILOT-07", "PILOT-08"]

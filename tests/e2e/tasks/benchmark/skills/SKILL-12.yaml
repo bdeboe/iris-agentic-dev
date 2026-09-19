@@ -1,0 +1,70 @@
+id: SKILL-12
+prompt: |
+  Bench.Look.Find(pCode) in the BENCHMARK namespace must return the Score of the
+  Bench.Sub.Item row with that Code. When no row has that Code it must return the string NONE, and when
+  the query itself will not run it must return the string ERR. The three answers have to be
+  distinguishable. Leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: objectscript-sql-patterns
+fixtures:
+  - name: Bench.Sub.Item
+    content: |
+      Class Bench.Sub.Item Extends %Persistent
+      {
+
+      Property Code As %String;
+
+      Property Score As %Integer;
+
+      }
+  - name: Bench.Look
+    content: |
+      Class Bench.Look Extends %RegisteredObject
+      {
+
+      ClassMethod Find(pCode As %String) As %String
+      {
+          Quit ""
+      }
+
+      }
+check: |
+  try { do ##class(Bench.Sub.Item).%DeleteExtent() for i=1:1:3 { set o=##class(Bench.Sub.Item).%New() set o.Code="c"_i,o.Score=i*10 do o.%Save() } set ok=((##class(Bench.Look).Find("c2")=20)&&(##class(Bench.Look).Find("c3")=30)&&(##class(Bench.Look).Find("zzz")="NONE")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Sub.Item
+    content: |
+      Class Bench.Sub.Item Extends %Persistent
+      {
+
+      Property Code As %String;
+
+      Property Score As %Integer;
+
+      }
+  - name: Bench.Look
+    content: |
+      Class Bench.Look Extends %RegisteredObject
+      {
+
+      ClassMethod Find(pCode As %String) As %String
+      {
+          Set tRs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Score FROM Bench_Sub.Item WHERE Code = ?", pCode)
+          If tRs.%SQLCODE '= 0 {
+              Quit "ERR"
+          }
+          If 'tRs.%Next() {
+              Quit "NONE"
+          }
+          If tRs.%SQLCODE = 100 {
+              Quit "NONE"
+          }
+          If tRs.%SQLCODE '= 0 {
+              Quit "ERR"
+          }
+          Quit tRs.%GetData(1)
+      }
+
+      }
+tags: [sql, sqlcode]

@@ -1,0 +1,75 @@
+id: PILOT-04
+# Embedded SQL that ignores SQLCODE. The fixture's method compiles, runs, and returns the wrong
+# number in silence, which is the failure mode that makes this worth a task at all.
+prompt: |
+  Pilot.SqlCity in the BENCHMARK namespace is a persistent class with City and Name properties and
+  a Seed() classmethod that loads three rows. CityCount(pCity) is meant to return how many rows have
+  that city, using embedded SQL, and to return -1 if the query fails. It currently always returns 0.
+
+  Fix CityCount and leave the class compiled on the server. After Seed(), CityCount("Boston") must
+  return 2 and CityCount("Nowhere") must return 0.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Pilot.SqlCity
+    content: |
+      Class Pilot.SqlCity Extends %Persistent
+      {
+      Property Name As %String;
+
+      Property City As %String;
+
+      ClassMethod Seed() As %Status
+      {
+          Set tSC = $$$OK
+          Do ..%KillExtent()
+          For i=1:1:3 {
+              Set tRow = ..%New()
+              Set tRow.Name = "Person"_i
+              Set tRow.City = $Select(i=3:"Chicago", 1:"Boston")
+              Set tSC = tRow.%Save()
+              If $$$ISERR(tSC) { Quit tSC }
+          }
+          Quit tSC
+      }
+
+      ClassMethod CityCount(pCity As %String) As %Integer
+      {
+          Quit 0
+      }
+      }
+check: |
+  try { do ##class(Pilot.SqlCity).Seed() set ok=((##class(Pilot.SqlCity).CityCount("Boston")=2)&&(##class(Pilot.SqlCity).CityCount("Nowhere")=0)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Pilot.SqlCity
+    content: |
+      Class Pilot.SqlCity Extends %Persistent
+      {
+      Property Name As %String;
+
+      Property City As %String;
+
+      ClassMethod Seed() As %Status
+      {
+          Set tSC = $$$OK
+          Do ..%KillExtent()
+          For i=1:1:3 {
+              Set tRow = ..%New()
+              Set tRow.Name = "Person"_i
+              Set tRow.City = $Select(i=3:"Chicago", 1:"Boston")
+              Set tSC = tRow.%Save()
+              If $$$ISERR(tSC) { Quit tSC }
+          }
+          Quit tSC
+      }
+
+      ClassMethod CityCount(pCity As %String) As %Integer
+      {
+          Set tCount = 0
+          &sql(SELECT COUNT(*) INTO :tCount FROM Pilot.SqlCity WHERE City = :pCity)
+          If SQLCODE < 0 { Quit -1 }
+          Quit +tCount
+      }
+      }
+tags: [sql-patterns, sqlcode]

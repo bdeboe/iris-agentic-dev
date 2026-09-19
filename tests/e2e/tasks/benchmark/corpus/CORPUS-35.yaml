@@ -1,0 +1,29 @@
+id: CORPUS-35
+prompt: |
+  Bench.Colour in the BENCHMARK namespace has a Kind property that accepts any
+  string. It must accept only red, green or blue — %ValidateObject has to fail for anything else and
+  pass for those three. Change the property definition and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Colour
+    content: |
+      Class Bench.Colour Extends %RegisteredObject
+      {
+
+      Property Kind As %String;
+
+      }
+check: |
+  try { set a=##class(Bench.Colour).%New() set a.Kind="red" set sc1=a.%ValidateObject() set b=##class(Bench.Colour).%New() set b.Kind="magenta" set sc2=b.%ValidateObject() set ok=('$system.Status.IsError(sc1)&&$system.Status.IsError(sc2)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Colour
+    content: |
+      Class Bench.Colour Extends %RegisteredObject
+      {
+
+      Property Kind As %String(VALUELIST = ",red,green,blue");
+
+      }
+tags: [class-definition, valuelist]

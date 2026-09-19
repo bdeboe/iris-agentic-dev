@@ -1,0 +1,178 @@
+"""FR-004 and FR-022 against live IRIS — T028's confirmation, and the pilot's preflight.
+
+This is the half of corpus validation that only IRIS can answer: apply each task's fixture and the
+check must FAIL; apply its reference solution and the same check must PASS. A task that cannot show
+both is not allowed to produce a number, because a 0.00 from it is indistinguishable from the four
+skills that read 0.00 through a broken check.
+
+**No model tokens.** Every call here is `iris-agentic-dev exec` / `iris_compile` against
+`iris-dev-iris`. This file is safe to run repeatedly, unlike the billable `test_debug_*.py` and
+`test_integration.py` in this directory. It does need the container:
+
+    docker ps --filter name=iris-dev-iris
+
+Per-run isolation is by document reset before each task rather than by namespace drop: the pilot's
+own runner drops and recreates BENCHMARK between arms, and dropping it here for a validation pass
+would cost 30 seconds per task to prove something the reset already proves.
+"""
+
+import os
+import subprocess
+
+import pytest
+
+from tests.e2e.skill_eval.graded_task import (
+    BENCHMARK_NAMESPACE,
+    CorpusInvalid,
+    Document,
+    GradedTask,
+    all_tasks,
+    apply_documents,
+    pilot_tasks,
+    reset_documents,
+    run_check,
+    validate_live,
+)
+
+pytestmark = pytest.mark.skipif(
+    subprocess.run(
+        ["docker", "ps", "--filter", "name=iris-dev-iris", "--format", "{{.Names}}"],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    != "iris-dev-iris",
+    reason="iris-dev-iris is not running, and IRIS is the only thing that can answer FR-004",
+)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def iris_connection():
+    """The connection the CLI reads. Explicit rather than inherited, so a stray IRIS_NAMESPACE in the
+    shell cannot point a validation pass at someone's working namespace."""
+    previous = {
+        key: os.environ.get(key)
+        for key in (
+            "IRIS_HOST",
+            "IRIS_WEB_PORT",
+            "IRIS_USERNAME",
+            "IRIS_PASSWORD",
+            "IRIS_NAMESPACE",
+        )
+    }
+    os.environ.update(
+        {
+            "IRIS_HOST": os.environ.get("IRIS_HOST", "localhost"),
+            "IRIS_WEB_PORT": os.environ.get("IRIS_WEB_PORT", "52780"),
+            "IRIS_USERNAME": os.environ.get("IRIS_USERNAME", "_SYSTEM"),
+            "IRIS_PASSWORD": os.environ.get("IRIS_PASSWORD", "SYS"),
+            "IRIS_NAMESPACE": BENCHMARK_NAMESPACE,
+        }
+    )
+    yield
+    for key, value in previous.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
+
+
+@pytest.mark.parametrize("task", all_tasks(), ids=lambda task: task.id)
+def test_every_committed_task_is_false_before_and_true_after(task):
+    """FR-004 and FR-022 for one task, which is the whole of what makes it gradeable.
+
+    Twice, because the second pass starts from the state the first pass left — the reference solution
+    applied and whatever globals it wrote. A task that only satisfies FR-004 on a clean namespace
+    leaks state into the next arm, and the pairing would then report one arm's work in the next arm's
+    column. PILOT-05 failed exactly this way: its check read a global an earlier reference had already
+    set, so it passed before the agent ran.
+    """
+    validate_live(task)
+    validate_live(task)
+
+
+def test_a_check_that_is_already_true_is_rejected():
+    """The FR-004 rejection, demonstrated rather than asserted about.
+
+    The fixture here is already correct, so the check passes before the agent does anything. That
+    task would report 0.00 lift from every arm and read as "the tools did not help".
+    """
+    already_solved = GradedTask(
+        id="PILOT-DEMO-TRIVIAL",
+        prompt="nothing to do",
+        check='try { set ok=(##class(Pilot.Trivial).Two()=2) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")',
+        fixtures=(
+            Document(
+                name="Pilot.Trivial",
+                content=(
+                    "Class Pilot.Trivial Extends %RegisteredObject\n{\n"
+                    "ClassMethod Two() As %Integer\n{\n    Quit 2\n}\n}\n"
+                ),
+            ),
+        ),
+        solution=(
+            Document(
+                name="Pilot.Trivial",
+                content=(
+                    "Class Pilot.Trivial Extends %RegisteredObject\n{\n"
+                    "ClassMethod Two() As %Integer\n{\n    Quit 2\n}\n}\n"
+                ),
+            ),
+        ),
+    )
+    with pytest.raises(CorpusInvalid) as excinfo:
+        validate_live(already_solved)
+    assert "FR-004" in str(excinfo.value)
+
+
+def test_a_reference_that_does_not_pass_its_own_check_is_rejected():
+    """The FR-022 rejection. This is the shape of the four floors: a check nothing can satisfy."""
+    unsatisfiable = GradedTask(
+        id="PILOT-DEMO-BROKEN",
+        prompt="make Three() return 3",
+        check='try { set ok=(##class(Pilot.Broken).Three()=3) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")',
+        fixtures=(
+            Document(
+                name="Pilot.Broken",
+                content=(
+                    "Class Pilot.Broken Extends %RegisteredObject\n{\n"
+                    "ClassMethod Three() As %Integer\n{\n    Quit 0\n}\n}\n"
+                ),
+            ),
+        ),
+        # The reference returns 4, so no agent could ever satisfy the check by copying it.
+        solution=(
+            Document(
+                name="Pilot.Broken",
+                content=(
+                    "Class Pilot.Broken Extends %RegisteredObject\n{\n"
+                    "ClassMethod Three() As %Integer\n{\n    Quit 4\n}\n}\n"
+                ),
+            ),
+        ),
+    )
+    with pytest.raises(CorpusInvalid) as excinfo:
+        validate_live(unsatisfiable)
+    assert "FR-022" in str(excinfo.value)
+
+
+def test_the_same_state_gives_the_same_verdict_twice():
+    """Determinism, measured rather than argued: one state, two runs of the check, one answer."""
+    task = pilot_tasks()[0]
+    reset_documents([doc.name for doc in task.fixtures], task.namespace)
+    apply_documents(task.fixtures, task.namespace)
+    assert run_check(task) is False
+    assert run_check(task) is False
+    apply_documents(task.solution, task.namespace)
+    assert run_check(task) is True
+    assert run_check(task) is True
+
+
+def test_the_reset_really_puts_the_fixture_back():
+    """The pairing depends on it. If arm two started from arm one's answer, its pass rate would be
+    the first arm's work reported as the second arm's."""
+    task = pilot_tasks()[0]
+    apply_documents(task.solution, task.namespace)
+    assert run_check(task) is True
+    reset_documents([doc.name for doc in task.fixtures], task.namespace)
+    apply_documents(task.fixtures, task.namespace)
+    assert run_check(task) is False

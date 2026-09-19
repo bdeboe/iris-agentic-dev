@@ -1,0 +1,43 @@
+id: CORPUS-03
+prompt: |
+  Bench.Bag.Fill() in the BENCHMARK namespace should build a %ArrayOfDataTypes holding
+  three entries and return its Count(). It returns 1, because every entry is stored under
+  the same key. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Bag
+    content: |
+      Class Bench.Bag Extends %RegisteredObject
+      {
+
+      ClassMethod Fill() As %Integer
+      {
+          Set tArray = ##class(%ArrayOfDataTypes).%New()
+          Do tArray.SetAt("x", "k")
+          Do tArray.SetAt("y", "k")
+          Do tArray.SetAt("z", "k")
+          Quit tArray.Count()
+      }
+
+      }
+check: |
+  try { set ok=(##class(Bench.Bag).Fill()=3) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Bag
+    content: |
+      Class Bench.Bag Extends %RegisteredObject
+      {
+
+      ClassMethod Fill() As %Integer
+      {
+          Set tArray = ##class(%ArrayOfDataTypes).%New()
+          Do tArray.SetAt("x", "k1")
+          Do tArray.SetAt("y", "k2")
+          Do tArray.SetAt("z", "k3")
+          Quit tArray.Count()
+      }
+
+      }
+tags: [collections]

@@ -1,0 +1,71 @@
+id: PILOT-08
+# Open, change, save. The fixture's Rename returns $$$OK without saving anything, which is exactly
+# what a session that never reached IRIS looks like from the outside.
+prompt: |
+  Pilot.Person.Rename(pId, pName) in the BENCHMARK namespace returns $$$OK but does not change
+  anything. Implement it so it opens the row with that id, sets its Name to pName, saves it, and
+  returns the %Status of the save — returning an error %Status if the row does not exist. Leave the
+  class compiled on the server.
+
+  Seed() creates one row and returns its id; after Rename(id, "Zed"), reopening that id must give a
+  row whose Name is "Zed".
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Pilot.Person
+    content: |
+      Include %occStatus
+
+      Class Pilot.Person Extends %Persistent
+      {
+      Property Name As %String;
+
+      ClassMethod Seed() As %String
+      {
+          Do ..%KillExtent()
+          Set tRow = ..%New()
+          Set tRow.Name = "Original"
+          Do tRow.%Save()
+          Quit tRow.%Id()
+      }
+
+      ClassMethod Rename(pId As %String, pName As %String) As %Status
+      {
+          Set tSC = $$$OK
+          Quit tSC
+      }
+      }
+check: |
+  try { set id=##class(Pilot.Person).Seed() do ##class(Pilot.Person).Rename(id,"Zed") set p=##class(Pilot.Person).%OpenId(id) set ok=($isobject(p)&&(p.Name="Zed")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Pilot.Person
+    content: |
+      Include %occStatus
+
+      Class Pilot.Person Extends %Persistent
+      {
+      Property Name As %String;
+
+      ClassMethod Seed() As %String
+      {
+          Do ..%KillExtent()
+          Set tRow = ..%New()
+          Set tRow.Name = "Original"
+          Do tRow.%Save()
+          Quit tRow.%Id()
+      }
+
+      ClassMethod Rename(pId As %String, pName As %String) As %Status
+      {
+          Set tSC = $$$OK
+          Set tRow = ..%OpenId(pId)
+          If '$IsObject(tRow) {
+              Quit $$$ERROR($$$GeneralError, "no such row: "_pId)
+          }
+          Set tRow.Name = pName
+          Set tSC = tRow.%Save()
+          Quit tSC
+      }
+      }
+tags: [persistence, open-modify-save]

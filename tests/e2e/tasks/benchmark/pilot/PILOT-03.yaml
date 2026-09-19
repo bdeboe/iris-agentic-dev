@@ -1,0 +1,47 @@
+id: PILOT-03
+# The $List loop that quits on the first empty element instead of skipping it — the mistake
+# objectscript-guardrails is written about, here graded by IRIS rather than by a reviewer.
+prompt: |
+  Pilot.ListUtil.FilterNonEmpty(pList) in the BENCHMARK namespace is meant to return a %List
+  containing every non-empty element of pList, in order. It currently stops at the first empty
+  element. Fix it and leave the class compiled on the server.
+
+  FilterNonEmpty($ListBuild("a","","b")) must return a two-element list: "a" then "b".
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Pilot.ListUtil
+    content: |
+      Class Pilot.ListUtil Extends %RegisteredObject
+      {
+      ClassMethod FilterNonEmpty(pList As %List) As %List
+      {
+          Set tOut = ""
+          For i=1:1:$ListLength(pList) {
+              Set tItem = $List(pList, i)
+              If tItem = "" { Quit }
+              Set tOut = tOut_$ListBuild(tItem)
+          }
+          Quit tOut
+      }
+      }
+check: |
+  try { set r=##class(Pilot.ListUtil).FilterNonEmpty($listbuild("a","","b")) set ok=(($listlength(r)=2)&&($list(r,1)="a")&&($list(r,2)="b")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Pilot.ListUtil
+    content: |
+      Class Pilot.ListUtil Extends %RegisteredObject
+      {
+      ClassMethod FilterNonEmpty(pList As %List) As %List
+      {
+          Set tOut = ""
+          For i=1:1:$ListLength(pList) {
+              Set tItem = $List(pList, i)
+              If tItem = "" { Continue }
+              Set tOut = tOut_$ListBuild(tItem)
+          }
+          Quit tOut
+      }
+      }
+tags: [list-patterns, logic-bug]

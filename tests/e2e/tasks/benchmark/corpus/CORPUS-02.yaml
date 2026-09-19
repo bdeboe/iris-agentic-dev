@@ -1,0 +1,42 @@
+id: CORPUS-02
+prompt: |
+  Bench.Initials.Of(pName) in the BENCHMARK namespace should return the first letter of
+  every space-separated word in pName, concatenated. It returns only the first letter of
+  the whole string. Fix it and leave the class compiled on the server.
+  Of("Thomas Dyar") must return "TD".
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Initials
+    content: |
+      Class Bench.Initials Extends %RegisteredObject
+      {
+
+      ClassMethod Of(pName As %String) As %String
+      {
+          Quit $Extract(pName, 1)
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Initials).Of("Thomas Dyar")="TD")&&(##class(Bench.Initials).Of("a b c")="abc")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Initials
+    content: |
+      Class Bench.Initials Extends %RegisteredObject
+      {
+
+      ClassMethod Of(pName As %String) As %String
+      {
+          Set tOut = ""
+          For i = 1:1:$Length(pName, " ") {
+              Set tWord = $Piece(pName, " ", i)
+              Continue:tWord=""
+              Set tOut = tOut_$Extract(tWord, 1)
+          }
+          Quit tOut
+      }
+
+      }
+tags: [strings, loops]

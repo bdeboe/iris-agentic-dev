@@ -5,6 +5,7 @@ import os
 import pytest
 import yaml
 
+from tests.e2e.skill_eval.comparison import GATE_THRESHOLD
 from tests.e2e.skill_eval.evaluator import (
     SkillEvalConfig,
     SkillResult,
@@ -105,6 +106,8 @@ def provenance(task_ids=("DBG-01",), scorer_model="claude-sonnet-4-6", **over):
         "runs": 3,
         "measured_at": "2026-09-12T04:11:07Z",
         "harness_commit": "7d82f7d",
+        "driver": "opencode",
+        "harness_version": "0.14.3",
     }
     prov.update(over)
     return prov
@@ -136,9 +139,11 @@ def result(lift=0.25, prov=None, arms=None, base_rate=0.33, skill_rate=0.58):
         no_task_coverage=False,
         task_ids_used=["DBG-01"],
         provenance=provenance() if prov is None else prov,
-        arms=arms
-        if arms is not None
-        else {"baseline": arm(base_rate), "skill": arm(skill_rate)},
+        arms=(
+            arms
+            if arms is not None
+            else {"baseline": arm(base_rate), "skill": arm(skill_rate)}
+        ),
     )
 
 
@@ -280,6 +285,25 @@ def test_a_changed_tool_surface_annotates_without_suppressing():
     assert out.surface_note and "1.3.0+000000000000" in out.surface_note
 
 
+def test_a_changed_driver_annotates_without_suppressing():
+    """120 FR-012. Swapping opencode for prime-agent is exactly the change a Δ has to survive:
+    the harness moved, the skill did not, and a suppressed comparison would hide that.
+    """
+    out = compare_to_baseline(
+        result(lift=0.27),
+        {
+            "objectscript-guardrails": entry(
+                0.25, prov=provenance(driver="prime-agent", harness_version="0.4.1")
+            )
+        },
+        threshold=0.05,
+    )
+    assert out.outcome == "held"
+    assert out.lift_delta == pytest.approx(0.02)
+    assert out.driver_note and "prime-agent" in out.driver_note
+    assert "opencode" in out.driver_note
+
+
 def test_regression_flag_is_read_from_the_outcome_and_not_computed_twice():
     """Two fields, one decision. `regression_flag` survives only for shard-merge compatibility."""
     for lift, expected in ((0.10, True), (0.25, False), (0.40, False)):
@@ -303,3 +327,85 @@ def test_the_derivation_order_puts_new_skill_before_comparability():
     """§5 order, first match wins: no entry at all is `new_skill`, not `not_comparable`."""
     out = compare_to_baseline(result(prov=None), {}, threshold=0.05)
     assert out.outcome == "new_skill"
+
+
+# ---------------------------------------------------------------------------
+# 121 T013 — the gate threshold, and an underpowered comparison at the gate
+# ---------------------------------------------------------------------------
+
+
+def comparison_over(b, c, both_pass=0, both_fail=0) -> dict:
+    """A real `Comparison`, serialized the way `lift.py` writes it into the result."""
+    from tests.e2e.skill_eval.comparison import Comparison, TaskPair
+
+    pairs = []
+    for cell, (passed_a, passed_b) in (
+        (b, (False, True)),
+        (c, (True, False)),
+        (both_pass, (True, True)),
+        (both_fail, (False, False)),
+    ):
+        for _ in range(cell):
+            pairs.append(
+                TaskPair(
+                    f"t{len(pairs)}",
+                    "baseline",
+                    "skill",
+                    passed_a=passed_a,
+                    passed_b=passed_b,
+                )
+            )
+    return Comparison.from_pairs("baseline", "skill", pairs).to_dict()
+
+
+def test_the_gate_threshold_defaults_to_the_declared_020():
+    """FR-009. The old default of 0.05 sat below the harness's own resolution."""
+    out = compare_to_baseline(
+        result(lift=0.10), {"objectscript-guardrails": entry(0.25)}
+    )
+    assert out.threshold_applied == pytest.approx(GATE_THRESHOLD)
+    assert out.threshold_applied == pytest.approx(0.20)
+    assert out.outcome == "held", "a 15-point drop is inside the declared threshold"
+
+
+def test_an_underpowered_comparison_is_never_a_regression():
+    """The three consecutive failing nightly runs, at the gate rather than in the report."""
+    res = result(lift=0.10)
+    res.comparison = comparison_over(b=5, c=1, both_fail=2)
+    out = compare_to_baseline(res, {"objectscript-guardrails": entry(0.60)})
+    assert out.outcome == "underpowered"
+    assert out.regression_flag is False
+    # The reason names both numbers the reader needs: the pairs it had and the pairs it needed.
+    # Six discordant pairs of eight is a discordance of 0.75, which recomputes the floor well
+    # above `MINIMUM_FLOOR` — the reason quotes the recomputed value, not the declared one.
+    assert "8 task-pairs" in out.outcome_reason
+    assert str(res.comparison["floor"]) in out.outcome_reason
+    assert res.comparison["floor"] > 37
+
+
+def test_an_underpowered_comparison_still_reports_its_delta():
+    """Underpowered is a statement about resolution, not a refusal to show the number."""
+    res = result(lift=0.10)
+    res.comparison = comparison_over(b=5, c=1, both_fail=2)
+    out = compare_to_baseline(res, {"objectscript-guardrails": entry(0.60)})
+    assert out.lift_delta == pytest.approx(-0.50)
+
+
+def test_a_powered_comparison_still_regresses_past_the_threshold():
+    """The fix must not make every drop unreportable."""
+    res = result(lift=0.10)
+    res.comparison = comparison_over(b=6, c=2, both_pass=20, both_fail=12)
+    out = compare_to_baseline(res, {"objectscript-guardrails": entry(0.60)})
+    assert res.comparison["n_pairs"] == 40
+    assert res.comparison["verdict"] != "underpowered"
+    assert out.outcome == "regressed"
+    assert out.regression_flag is True
+
+
+def test_a_result_with_no_comparison_recorded_still_gates_on_the_threshold():
+    """Older result files carry no `comparison` key, and must not all read as underpowered."""
+    out = compare_to_baseline(
+        result(lift=0.10), {"objectscript-guardrails": entry(0.60)}
+    )
+    assert out.comparison is None
+    assert out.outcome == "regressed"

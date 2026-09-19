@@ -1,9 +1,12 @@
 """Lift measurement via OpenCode harness + benchmark judge — T014."""
 
+import contextlib
 import os
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from tests.e2e.skill_eval import cost_estimator, scoring
+from tests.e2e.skill_eval.comparison import pair_arms
 
 if TYPE_CHECKING:
     from tests.e2e.skill_eval.evaluator import SkillEvalConfig
@@ -58,6 +61,87 @@ def _round_or_none(value):
     return None if value is None else round(value, 4)
 
 
+def _pair_key(item: dict, ordinal: int):
+    """The key two arms are paired on.
+
+    `task_id` when the item carries one, which is the real pairing: the same task, run in both
+    arms. Items from older result files carry no `task_id`, and those fall back to position within
+    their arm — the arms ran the same task list in the same order, so the ordinal is the task.
+
+    `run_index` joins the key because both arms run each task the same number of times, so run 1
+    pairs with run 1. Collapsing runs into a per-task majority would throw away item count, and
+    item count is what buys resolution.
+    """
+    task_id = item.get("task_id")
+    if task_id:
+        return (task_id, item.get("run_index"))
+    return ("#ordinal", ordinal)
+
+
+def _arm_outcomes(items: list[dict]) -> tuple[dict, list[str]]:
+    """Per-pair pass/fail for the scored items, and a named hole for each unscored one.
+
+    An unscored item is not a failure and cannot be paired, so it leaves the comparison and says
+    so. Counting it as a failure is the bug 118 fixed at the arm level; dropping it silently would
+    put the same bug back at the pair level.
+
+    Two items sharing a key are a hole for the same reason. They are not one measurement, and a
+    dict assignment quietly keeps the last: 121 T018 ran five runs of one task and got a result
+    file claiming `items_total: 5` beside `n_pairs: 1`, because `run_index` was never stamped and
+    every item keyed `(task_id, None)`. The floor FR-008 gates on counts pairs, so that collapse
+    cost 5× resolution with nothing on screen to say it had happened.
+    """
+    outcomes: dict = {}
+    holes: list[str] = []
+    for ordinal, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        key = _pair_key(item, ordinal)
+        name = str(key[0] if key[0] != "#ordinal" else f"item {ordinal}")
+        if not item.get("scored"):
+            holes.append(name)
+            continue
+        if key in outcomes:
+            holes.append(f"{name} key collision on {key!r} — run not distinguished")
+            continue
+        score = item.get("score")
+        outcomes[key] = score is not None and score >= scoring.PASS_THRESHOLD
+    return outcomes, holes
+
+
+def _paired_comparison(baseline_scores: list[dict], skill_scores: list[dict]):
+    """A `Comparison` over the two arms, or `None` when there is nothing to pair.
+
+    `None` is the honest return when an arm scored nothing: FR-008's floor, the interval and the
+    MDE are all undefined without pairs, and inventing them would be the same category of lie as
+    the subtraction this replaces.
+    """
+    baseline_outcomes, baseline_holes = _arm_outcomes(baseline_scores)
+    skill_outcomes, skill_holes = _arm_outcomes(skill_scores)
+    if not baseline_outcomes or not skill_outcomes:
+        return None
+    if not set(baseline_outcomes) & set(skill_outcomes):
+        return None
+
+    comparison = pair_arms("baseline", "skill", baseline_outcomes, skill_outcomes)
+    extra = [f"{h} unscored in baseline" for h in baseline_holes]
+    extra += [f"{h} unscored in skill" for h in skill_holes]
+    if extra:
+        comparison = replace(comparison, holes=comparison.holes + tuple(extra))
+    return comparison
+
+
+def _comparison_to_dict(comparison) -> dict | None:
+    """The measurement's own provenance, in the result JSON beside the number it produced.
+
+    The shape lives on `Comparison` itself, because `reporter.py` reads the same keys back out to
+    print the item count and the MDE. Two hand-written copies of it would drift.
+    """
+    if comparison is None:
+        return None
+    return comparison.to_dict()
+
+
 def compute_lift_from_scores(
     baseline_scores: list[dict], skill_scores: list[dict]
 ) -> dict:
@@ -66,14 +150,23 @@ def compute_lift_from_scores(
     `lift` is `None` when either arm scored nothing. Subtracting from an unmeasured number
     produces a plausible `0.0`, which is how "the credential was missing" got published as
     "the skill made no difference".
+
+    T012: the lift is now the paired difference from `comparison.py`, not a subtraction of two
+    aggregate rates. The old line was `skill.pass_rate - baseline.pass_rate` — two point estimates
+    with no item count and no resolution beside them, the first shipped instance of the
+    `unpowered-result` bug class. The two agree whenever both arms scored the same task list, and
+    where they disagree the paired figure is the correct one, because it drops tasks only one arm
+    scored instead of quietly comparing different denominators.
+
+    The `comparison` key carries the item count, the floor, the MDE and the verdict, so no consumer
+    can read the lift without them.
     """
     baseline = scoring.ArmResult.from_items(baseline_scores)
     skill = scoring.ArmResult.from_items(skill_scores)
     all_items = list(baseline_scores) + list(skill_scores)
 
-    lift = None
-    if baseline.pass_rate is not None and skill.pass_rate is not None:
-        lift = skill.pass_rate - baseline.pass_rate
+    comparison = _paired_comparison(baseline_scores, skill_scores)
+    lift = None if comparison is None else comparison.lift
 
     models = sorted(
         {
@@ -93,6 +186,9 @@ def compute_lift_from_scores(
         "pass_rate_baseline": _round_or_none(baseline.pass_rate),
         "pass_rate_skill": _round_or_none(skill.pass_rate),
         "lift": _round_or_none(lift),
+        # G1: the lift never travels without what it took to measure it. `None` here means the run
+        # could not pair the arms at all, which is a different fact from a lift of zero.
+        "comparison": _comparison_to_dict(comparison),
         # The two arms with their denominators, which is what makes `22/24` printable and what
         # the baseline entry stores. A bare float cannot say how much of it was measured.
         "arms": {"baseline": baseline.to_dict(), "skill": skill.to_dict()},
@@ -112,6 +208,16 @@ def compute_lift_from_scores(
         # estimate printed before the run is a projection; this is the bill.
         "scorer_cost": cost_estimator.scorer_cost(all_items),
     }
+
+
+# How much of one assistant message the judge is shown. This was 500, which is less than an
+# ObjectScript class definition or a connection script, so on every judged code-writing task the
+# judge graded a fragment that stopped mid-sentence — and scored it 1, "partial", exactly as the
+# rubric tells it to. Four skills read 0.00 against 0.00 on that for months (121 T021).
+#
+# 8000 is `runner.judge._format_transcript`'s own per-turn cap: the two agree so neither silently
+# decides what the scorer sees. It stays a cap because the judge call is billed per token.
+TRANSCRIPT_TEXT_LIMIT = 8000
 
 
 def format_transcript(events: list[dict]) -> list[dict]:
@@ -135,8 +241,70 @@ def format_transcript(events: list[dict]) -> list[dict]:
         elif event.get("type") == "text":
             part = event["part"]
             if part.get("time", {}).get("end"):
-                turns.append({"role": "assistant", "text": part.get("text", "")[:500]})
+                turns.append(
+                    {
+                        "role": "assistant",
+                        "text": part.get("text", "")[:TRANSCRIPT_TEXT_LIMIT],
+                    }
+                )
     return turns
+
+
+def _completed_tool_calls(events: list[dict]) -> int:
+    """Tool calls that ran to completion. A pending one produced no output and proves nothing."""
+    return sum(
+        1
+        for event in events
+        if event.get("type") == "tool_use"
+        and event.get("part", {}).get("state", {}).get("status") == "completed"
+    )
+
+
+def _reached_idle(events: list[dict]) -> bool:
+    """Whether OpenCode reported the session finished on its own.
+
+    `opencode_runner.run_opencode` stops reading on exactly this event, and kills the process tree
+    on a 300 s timer otherwise. So its presence is the one signal that separates a session that
+    ended from a session that was killed — both come back as the same list of events.
+    """
+    return any(
+        event.get("type") == "session.status"
+        and event.get("properties", {}).get("status", {}).get("type") == "idle"
+        for event in events
+    )
+
+
+def session_evidence_gap(events: list[dict]) -> str | None:
+    """Why this session cannot be scored, or `None` if it can.
+
+    A session killed at the timeout before it did anything holds no evidence about the agent, and
+    scoring its opening sentence 0 records a harness failure as an agent failure. 118 fixed that for
+    a missing credential; this is the same class for a truncated session (121 T021 —
+    SQLCODE-SILENT's live baseline run was one turn with no completed tool calls, recorded as 0).
+
+    Conservative by design: a session that was killed *after* doing real work left real evidence, and
+    discarding it would cost more items than the guard saves.
+    """
+    if _reached_idle(events):
+        return None
+    completed = _completed_tool_calls(events)
+    if completed:
+        return None
+    return (
+        f"session never reached idle and made 0 completed tool calls over {len(events)} "
+        f"events — killed before it produced anything to score, most likely at "
+        f"opencode_runner's timeout"
+    )
+
+
+def unscored_session(task_id: str, condition: str, reason: str) -> dict:
+    """The verdict for a session there is nothing to score.
+
+    `score: None`, never `0` — `runner.judge.unscored`'s contract.
+    """
+    from runner.judge import unscored
+
+    return {**unscored(reason), "task_id": task_id, "condition": condition}
 
 
 def _apply_global_fixture(fx: dict, iris_host: str, iris_web_port: str) -> None:
@@ -250,6 +418,15 @@ def run_task_and_score(
             )
         finally:
             pass  # workdir_obj cleanup happens below
+
+    # Before any of the three scoring paths: did this session produce anything to score? A killed
+    # session and a finished one are the same shape, so all three paths would happily grade the
+    # fragment — the judge as a 1, the pattern path as a 0, the assertions as a 0.
+    gap = session_evidence_gap(events)
+    if gap:
+        with contextlib.suppress(Exception):
+            workdir_obj.cleanup()
+        return unscored_session(task_id, skill_name_or_none or "baseline", gap)
 
     # Check for tool_assertions in task — bypasses LLM judge, scores by tool calls
     tool_assertions = task_dict.get("tool_assertions", [])
@@ -491,12 +668,17 @@ def measure_lift(
     iris_web_port: str = "52780",
     iris_container: str = "iris-dev-iris",
 ) -> dict:
-    """Run all benchmark tasks baseline + skill and compute lift."""
+    """Run all benchmark tasks baseline + skill and compute lift.
+
+    Each item is stamped with the run it came from. Without that stamp `_pair_key` cannot tell run
+    3 of a task from run 1, and `n_runs` runs of one task collapse to a single pair — measured for
+    real in 121 T018, where five runs per arm reported `n_pairs: 1`.
+    """
     baseline_scores = []
     skill_scores = []
     task_ids_used = []
     for task_id in config.benchmark_tasks:
-        for _ in range(n_runs):
+        for run_index in range(n_runs):
             b = run_task_and_score(
                 task_id,
                 None,
@@ -507,6 +689,8 @@ def measure_lift(
                 iris_container,
                 no_mcp=config.no_mcp_for_benchmark,
             )
+            b.setdefault("task_id", task_id)
+            b["run_index"] = run_index
             baseline_scores.append(b)
             s = run_task_and_score(
                 task_id,
@@ -518,6 +702,8 @@ def measure_lift(
                 iris_container,
                 no_mcp=config.no_mcp_for_benchmark,
             )
+            s.setdefault("task_id", task_id)
+            s["run_index"] = run_index
             skill_scores.append(s)
         task_ids_used.append(task_id)
     result = compute_lift_from_scores(baseline_scores, skill_scores)
