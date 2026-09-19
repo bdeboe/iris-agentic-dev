@@ -70,6 +70,20 @@ class LadderRefused(RuntimeError):
     the check can be made before spending."""
 
 
+class LadderAborted(LadderRefused):
+    """The environment stopped answering, so the run stopped spending.
+
+    Raised mid-run, which the parent class is not: every session before it is already on disk through
+    `on_run`, and `resume.py` picks up from there.
+    """
+
+
+#: Consecutive sessions with no verdict before the run gives up. Three, because one unscored session is
+#: a task whose check is wrong and two in a row can still be coincidence, while three consecutive
+#: sessions that could not be graded means the thing doing the grading is gone.
+UNSCORED_ABORT = 3
+
+
 # --- before the money ------------------------------------------------------------------------------
 
 
@@ -448,6 +462,9 @@ def run_ladder(
     port = iris_web_port or os.environ.get("IRIS_WEB_PORT", "52780")
 
     runs = []
+    # A session that could not be graded is not a failure, so it does not end up in a comparison — it
+    # ends up as a hole, and the run keeps paying for more of them. Three in a row is the environment.
+    unscored_streak: list = []
     for repeat in range(repeats):
         for task in tasks:
             for arm in arms_for_task(arms, task):
@@ -476,6 +493,21 @@ def run_ladder(
                 )
                 if on_run is not None:
                     on_run(run)
+                if run.passed is None:
+                    unscored_streak.append(run)
+                    if len(unscored_streak) >= UNSCORED_ABORT:
+                        raise LadderAborted(
+                            f"{len(unscored_streak)} sessions in a row could not be graded, so the "
+                            "run stopped rather than spending the rest of the ladder on sessions "
+                            "nothing can score. Fix the environment and resume from the sessions "
+                            "already written:\n"
+                            + "\n".join(
+                                f"  {other.task_id} {other.arm}: {other.reason}"
+                                for other in unscored_streak
+                            )
+                        )
+                else:
+                    unscored_streak.clear()
     return runs
 
 
@@ -626,17 +658,29 @@ def main(argv=None) -> int:
             handle.write(json.dumps(asdict(run)) + "\n")
 
     driver = None
-    runs = run_ladder(
-        tasks,
-        arms,
-        repeats=args.repeats,
-        model=args.model,
-        timeout=args.timeout,
-        iris_container=args.container,
-        binary=os.environ.get("IAD_BINARY"),
-        driver=driver,
-        on_run=record,
-    )
+    try:
+        runs = run_ladder(
+            tasks,
+            arms,
+            repeats=args.repeats,
+            model=args.model,
+            timeout=args.timeout,
+            iris_container=args.container,
+            binary=os.environ.get("IAD_BINARY"),
+            driver=driver,
+            on_run=record,
+        )
+    except LadderAborted as aborted:
+        # No report. A report over a run that stopped early would print a lift whose denominator is an
+        # accident of when the container died.
+        print(f"\n{aborted}", flush=True)
+        print(f"\nsessions so far: {incremental}")
+        print(
+            "resume with:\n"
+            f"  python3 -m tests.e2e.skill_eval.resume --remaining {incremental}\n"
+            "then pass the ids back as --task arguments, and merge with --merge"
+        )
+        return 3
 
     written = report(
         runs,

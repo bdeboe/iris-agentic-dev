@@ -1,7 +1,8 @@
-# Two things the harness says that are not true
+# Things the harness says that are not true, and one it did not say at all
 
-Recorded here because both were found by relying on them, and neither belongs in the tool-defect
-list: one is a document that does not exist and one is a rule that this build does not have.
+Recorded here because each was found by relying on it, and none belongs in the tool-defect list: a
+document that does not exist, a rule that this build does not have, and a run that kept spending
+after the thing it was measuring had gone away.
 
 ## The "safe file list" is not written down anywhere
 
@@ -49,3 +50,48 @@ older builds, and the reason it was written down is not recorded. What it is gro
 it up: check the InterSystems SQL reference for the version range, then either scope the rule to
 those versions or drop it. Until then it stands, because a rule that costs a rewritten query is
 cheaper than a wrong query on a customer's instance.
+
+## The run kept paying after the container died
+
+The graded tools run reached session 92 of 123 and then stopped producing verdicts. The host slept at
+00:37 (`vmgr.log`: `level=info msg=sleep`), OrbStack's docker daemon came back at 00:55 answering
+`docker info` with `containers=0 images=0` and an empty server version, and `iris-dev-iris` was gone
+with it. Restarting OrbStack brought back 63 containers and 189 images — nothing was lost, the daemon
+was wedged — and `docker start iris-dev-iris` was enough after that.
+
+The harness handled the outage correctly one session at a time and wrongly in aggregate. Each
+session recorded what happened instead of guessing:
+
+```
+CORPUS-36 tools+skills  the check did not answer: `iris-agentic-dev exec -n …` exited 1:
+  Code contains block-syntax ({...}) that is not supported in terminal (docker exec) mode
+CORPUS-37 bare          the task did not validate against IRIS before the session:
+  could not determine source-control state for Bench.Avg.cls in BENCHMARK
+```
+
+`passed` is `None` on all four, which is right — a check that could not run has not failed the task.
+But nothing was watching the sequence, so the run spent another 300-second session, and another, and
+would have spent the remaining 31 the same way: about $2.60 of the cap buying a report with 31 holes
+in it.
+
+Fixed, with the tests first: `ladder.UNSCORED_ABORT = 3` and `LadderAborted`. Three consecutive
+ungradeable sessions end the run, because one is a task whose check is wrong and two can still be
+coincidence, while three in a row means the thing doing the grading is gone. The abort raises rather
+than reporting, since a report over a run that stopped early prints a lift whose denominator is an
+accident of when the container died.
+
+The other half is `tests/e2e/skill_eval/resume.py`, which is what makes aborting cheap. Sessions were
+always written to `<run_id>.runs.jsonl` as they landed; now `--remaining` reads them and names the
+tasks that still owe a scored session, and `--merge` assembles several files into the one report the
+straight-through run would have written. Two rules in it both move a number: an unscored session
+counts as work still owed, and a later unscored session never displaces a verdict already earned.
+
+The 92 sessions cost nothing to keep. The resume was 11 tasks — the three arms of any task with a
+hole in it, re-run whole, because half a pair measured before the outage and half after is a pair
+whose difference has two explanations.
+
+One finding inside the finding: the grading call reached IRIS over `docker exec` rather than Atelier
+REST, and `exec` in that mode cannot run `try {…}`. That is the documented `NoPWS` fallback working as
+designed, and it means a check written in block syntax silently loses the ability to run when REST
+goes away. Worth knowing before anyone points this corpus at an Enterprise 2026.2.0AI build, where
+`docker_only=true` is the normal configuration rather than the degraded one.

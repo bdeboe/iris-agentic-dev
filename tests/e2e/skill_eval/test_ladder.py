@@ -608,3 +608,68 @@ def test_the_pooled_task_set_is_every_holdout_skill_task_and_each_one_names_a_sk
     assert len(tasks) == 12
     assert all(task.skill for task in tasks)
     assert len({task.skill for task in tasks}) == 4
+
+
+# --- the dead-environment abort --------------------------------------------------------------------
+#
+# The first graded run lost its container at session 92: the host slept, docker came back wedged, and
+# the four sessions after that each spent their 300 s and recorded "the check did not answer". Nothing
+# stopped it. Left alone it would have burned the remaining 31 sessions the same way, about $2.60 of
+# the cap, and produced a report with 31 holes in it.
+
+
+def _fake_run_one(verdicts, calls):
+    """A stand-in for `pilot.run_one` that returns the next verdict in the list."""
+
+    def run_one(task, arm, **kwargs):
+        calls.append((task.id, arm.name))
+        passed = verdicts[len(calls) - 1] if len(calls) <= len(verdicts) else True
+        return run(
+            task.id,
+            arm.name,
+            passed,
+            reason=None if passed is not None else "the check did not answer",
+        )
+
+    return run_one
+
+
+def test_the_runner_stops_once_the_environment_has_failed_three_sessions_running(
+    monkeypatch,
+):
+    from tests.e2e.skill_eval import ladder, pilot
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    calls = []
+    monkeypatch.setattr(pilot, "run_one", _fake_run_one([None] * 9, calls))
+
+    written = []
+    with pytest.raises(ladder.LadderAborted) as raised:
+        ladder.run_ladder(
+            [FakeTask("CORPUS-01"), FakeTask("CORPUS-02"), FakeTask("CORPUS-03")],
+            (BARE, TOOLS, TOOLS_SKILLS),
+            on_run=written.append,
+        )
+
+    assert len(calls) == ladder.UNSCORED_ABORT == 3
+    # Every session that did run is still on disk through `on_run`, which is what `resume.py` reads.
+    assert len(written) == 3
+    assert "the check did not answer" in str(raised.value)
+
+
+def test_a_scored_session_clears_the_abort_counter(monkeypatch):
+    from tests.e2e.skill_eval import ladder, pilot
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    calls = []
+    # unscored, unscored, scored, then unscored twice more: five sessions, no abort.
+    monkeypatch.setattr(
+        pilot, "run_one", _fake_run_one([None, None, True, None, None], calls)
+    )
+
+    runs = ladder.run_ladder(
+        [FakeTask("CORPUS-01"), FakeTask("CORPUS-02")],
+        (BARE, TOOLS, TOOLS_SKILLS),
+    )
+    assert len(runs) == 6
+    assert len(calls) == 6
