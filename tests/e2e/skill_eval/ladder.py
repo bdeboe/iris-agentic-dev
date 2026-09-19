@@ -204,6 +204,41 @@ def publishable(
 # --- time-to-solve ---------------------------------------------------------------------------------
 
 
+def arm_rates(runs) -> dict:
+    """Per arm: how many tasks it solved out of how many were scored, with a 95% Wilson interval.
+
+    T037's first column. Wilson rather than the normal approximation for one reason: the bare arm
+    scored zero, and the normal interval at zero has zero width, which reads as certainty nobody has.
+
+    The denominator is the scored sessions. An ungradeable session is not a failure, and putting it in
+    the denominator would make an arm look worse the more often the container fell over.
+    """
+    from tests.e2e.skill_eval.stats import wilson_interval
+
+    by_arm: dict[str, list] = {}
+    for run in runs:
+        by_arm.setdefault(run.arm, []).append(run)
+    out = {}
+    for arm, arm_runs in sorted(by_arm.items()):
+        scored = [run for run in arm_runs if run.passed is not None]
+        passed = sum(1 for run in scored if run.passed)
+        interval = wilson_interval(passed, len(scored)) if scored else None
+        out[arm] = {
+            "sessions": len(arm_runs),
+            "scored": len(scored),
+            "unscored": len(arm_runs) - len(scored),
+            "passed": passed,
+            "rate": (passed / len(scored)) if scored else None,
+            "interval": (
+                None
+                if interval is None
+                else [round(interval[0], 4), round(interval[1], 4)]
+            ),
+            "interval_method": "Wilson score, 95%",
+        }
+    return out
+
+
 def failure_modes(runs) -> dict:
     """Per arm, the three different things a failure can be.
 
@@ -442,6 +477,7 @@ def report(
             if arm.skills
         },
         "provenance": record.to_dict(),
+        "arm_rates": arm_rates(runs),
         "solve_time": solve_time(runs),
         "failure_modes": failure_modes(runs),
         "comparisons": [comparison.to_dict() for comparison in comparisons],

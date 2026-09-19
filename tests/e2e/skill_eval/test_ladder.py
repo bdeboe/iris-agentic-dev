@@ -726,3 +726,58 @@ def test_failure_modes_are_reported_per_arm_in_the_report():
     written = ladder.report(runs, split=split)
     assert written["failure_modes"]["bare"]["killed_on_the_clock"] == 40
     assert written["failure_modes"]["tools"]["failed"] == 0
+
+
+# --- each arm's own pass rate, with an interval -----------------------------------------------------
+#
+# T037 asks for three things beside the lift: every arm's pass rate with a 95% Wilson interval, the
+# discordance, and the MDE. The last two are already on `Comparison`. The first is here, and Wilson
+# rather than the normal approximation because the bare arm scored zero and a zero with a zero-width
+# interval is not a measurement.
+
+
+def test_arm_rates_carry_a_wilson_interval_over_the_scored_sessions():
+    from tests.e2e.skill_eval import ladder
+
+    runs = [run(f"CORPUS-{i:02d}", "bare", False) for i in range(1, 31)]
+    rates = ladder.arm_rates(runs)["bare"]
+    assert rates["scored"] == 30
+    assert rates["passed"] == 0
+    assert rates["rate"] == 0.0
+    # A zero out of 30 is not "0% and nothing more can be said".
+    assert rates["interval"][0] == 0.0
+    assert 0.0 < rates["interval"][1] < 0.2
+
+
+def test_arm_rates_leave_the_unscored_out_of_the_denominator():
+    from tests.e2e.skill_eval import ladder
+
+    runs = [
+        run("CORPUS-01", "tools", True),
+        run("CORPUS-02", "tools", False),
+        run("CORPUS-03", "tools", None, reason="the check did not answer"),
+    ]
+    rates = ladder.arm_rates(runs)["tools"]
+    assert (rates["scored"], rates["passed"], rates["unscored"]) == (2, 1, 1)
+    assert rates["rate"] == 0.5
+
+
+def test_arm_rates_report_no_rate_rather_than_zero_when_nothing_was_scored():
+    from tests.e2e.skill_eval import ladder
+
+    rates = ladder.arm_rates([run("CORPUS-01", "bare", None)])["bare"]
+    assert rates["rate"] is None and rates["interval"] is None
+
+
+def test_the_report_carries_each_arm_s_rate_beside_the_comparisons():
+    from tests.e2e.skill_eval import ladder
+
+    split = a_split(holdout_ids(40))
+    runs = []
+    for task_id in holdout_ids(40):
+        runs.append(run(task_id, "bare", False))
+        runs.append(run(task_id, "tools", True))
+        runs.append(run(task_id, "tools+skills", True))
+    written = ladder.report(runs, split=split)
+    assert written["arm_rates"]["tools"]["rate"] == 1.0
+    assert written["arm_rates"]["bare"]["interval"][1] < 0.2
