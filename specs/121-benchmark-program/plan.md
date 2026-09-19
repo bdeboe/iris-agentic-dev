@@ -197,6 +197,24 @@ With `b` = pairs the skill arm passes and the tools arm fails, and `c` the rever
 `helps` needs a margin and not just a sign, because 3-2 over twelve items is noise and publishing it
 as a help is exactly the mistake `Comparison` exists to prevent.
 
+The twelve are pooled, and that is a decision, not a convenience. The corpus spreads them over four
+skills — five for `objectscript-guardrails`, three each for `objectscript-list-patterns` and
+`objectscript-sql-patterns`, one for `iris-sql` — so three of the four single-skill rungs cannot
+reach `b ≥ 4` on item count alone, whatever their document does. Read per skill, the table would
+print `inconclusive` three times and a reader would take it as a finding about the documents when it
+is a fact about the denominators. So every task runs against the arm holding **its own** skill, all
+twelve pair under one arm name (`tools+its-own-skill`), and `skill_verdict` decides the twelve. Each
+skill's counts appear beside it in `per_skill` with `pairs` and `helps_reachable`, which is
+description and is labelled as description.
+
+This keeps the one-skill-per-session property intact. No session installs a skill its task does not
+name, so PILOT-03's failure mode — 41 calls and 206 seconds under all 34 — cannot come back through
+the pooling. What pools is the arithmetic, not the environment.
+
+Run it as `python3 -m tests.e2e.skill_eval.ladder --ladder skill --skill all`: 12 tasks, 2 arms, 24
+sessions, about $2.04. `--skill <name>` still runs one rung alone for anyone reading a single
+document's counts.
+
 The reason the rule is written down first: the tempting move after a flat result is to add tasks
 until the sign changes. If twelve tasks built specifically to need a documented convention — storage
 blocks, `$LIST` traps, `%Status` propagation, `$$$OK`/`$$$ISERR`, the SQL restrictions — give

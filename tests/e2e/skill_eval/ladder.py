@@ -32,7 +32,7 @@ import time
 from dataclasses import asdict
 
 from tests.e2e.skill_eval import graded_task, provenance
-from tests.e2e.skill_eval.arms import ARMS, installed_skill_names
+from tests.e2e.skill_eval.arms import ARMS, TOOLS, Arm, installed_skill_names, skill_arm
 from tests.e2e.skill_eval.comparison import (
     MINIMUM_FLOOR,
     Comparison,
@@ -245,6 +245,76 @@ def skill_verdict(*, b: int, c: int) -> str:
     return "inconclusive"
 
 
+#: The one name the twelve skill tasks' skill arms pair under. Four arm names would pair as four
+#: comparisons of five, three, three and one, and `helps` needs `b >= 4` — so three of the four rungs
+#: could not reach it whatever their skill did. The twelve are the twelve the rule was written for.
+POOLED_ARM = "tools+its-own-skill"
+
+
+def pooled_arm() -> Arm:
+    """The pooled rung as an `Arm`, for `ladder_comparisons` and the report's arm list.
+
+    `skill_names` is deliberately empty: no single list describes this arm, because each session
+    installed the one skill its own task named. `per_skill` is where that is recorded.
+    """
+    return Arm(name=POOLED_ARM, tools=True, skills=True)
+
+
+def pooled_skill_arms(task) -> tuple[Arm, Arm]:
+    """The two arms one skill task runs: shared tools, then tools plus that task's own skill."""
+    return (TOOLS, skill_arm(task.skill))
+
+
+def pooled_runs(runs, *, pooled_name: str = POOLED_ARM):
+    """Relabel every one-skill arm to the pooled name, leaving the shared `tools` arm alone.
+
+    Copies rather than mutates, because the report keeps the real arm names in its `runs` list — the
+    attribution join and the per-skill breakdown both need to know which skill was installed.
+    """
+    return [
+        (
+            type(run)(**{**asdict(run), "arm": pooled_name})
+            if run.arm.startswith("tools+")
+            else run
+        )
+        for run in runs
+    ]
+
+
+def pooled_skill_comparison(runs) -> Comparison:
+    """The headline skills comparison: twelve pairs, each task against its own skill."""
+    return ladder_comparisons(pooled_runs(runs), arms=(TOOLS, pooled_arm()))[0]
+
+
+def skill_breakdown(runs, tasks) -> list[dict]:
+    """Per-skill discordant counts, each with the item count that bounds what it can say.
+
+    Descriptive, not a verdict on the document. The corpus spreads twelve tasks over four skills as
+    5/3/3/1, so `helps_reachable` is False for three of them on item count alone — printing a verdict
+    without that beside it would read as a finding about the skill.
+    """
+    skill_of = {task.id: getattr(task, "skill", None) for task in tasks}
+    rows = []
+    for skill in sorted({skill for skill in skill_of.values() if skill}):
+        ids = {task_id for task_id, named in skill_of.items() if named == skill}
+        comparison = ladder_comparisons(
+            [run for run in runs if run.task_id in ids],
+            arms=(TOOLS, skill_arm(skill)),
+        )[0]
+        rows.append(
+            {
+                "skill": skill,
+                "pairs": comparison.n_pairs,
+                "b": comparison.b,
+                "c": comparison.c,
+                "verdict": skill_verdict(b=comparison.b, c=comparison.c),
+                # `helps` needs b >= 4, so a rung of three cannot reach it however good the skill is.
+                "helps_reachable": comparison.n_pairs >= 4,
+            }
+        )
+    return rows
+
+
 # --- the report ------------------------------------------------------------------------------------
 
 
@@ -259,10 +329,21 @@ def report(
     driver=None,
     skill_names=None,
     run_id: str | None = None,
+    pooled: bool = False,
+    tasks=None,
 ) -> dict:
-    """The whole graded run in one shape, with everything a re-measurement needs (FR-020)."""
+    """The whole graded run in one shape, with everything a re-measurement needs (FR-020).
+
+    `pooled` switches to the skills rung: the comparison is the twelve tasks against their own skills
+    under one arm name, `skill_verdict` decides it instead of an interval, and `per_skill` carries the
+    counts per document. `tasks` is only read for that breakdown.
+    """
     split = split or default_split()
-    comparisons = ladder_comparisons(runs, arms=arms)
+    if pooled:
+        arms = (TOOLS, pooled_arm())
+        comparisons = [pooled_skill_comparison(runs)]
+    else:
+        comparisons = ladder_comparisons(runs, arms=arms)
     # Strict: the runner filtered to the holdout side before spending anything, so a leaked ID here is
     # a bug in the harness and not a fact about the corpus. Raising costs nothing — `run_ladder`'s
     # `on_run` has already written every session to disk, so the report can be rebuilt after the fix.
@@ -311,6 +392,20 @@ def report(
         "comparisons": [comparison.to_dict() for comparison in comparisons],
         "published": [comparison.summary() for comparison in published],
         "runs": [asdict(run) for run in runs],
+        **(
+            {
+                "skill_verdict": skill_verdict(b=comparisons[0].b, c=comparisons[0].c),
+                "skill_verdict_rule": (
+                    "Discordant counts, not an interval: twelve items cannot reach the publication "
+                    "floor of 37 and an interval over twelve contains zero whatever happens. `helps` "
+                    "needs b >= 4 and c <= 1; b <= c is a real negative about the documents. Fixed in "
+                    "plan.md and in `skill_verdict` before the first skill session ran."
+                ),
+                "per_skill": skill_breakdown(runs, tasks or ()),
+            }
+            if pooled
+            else {}
+        ),
     }
 
 
@@ -355,7 +450,7 @@ def run_ladder(
     runs = []
     for repeat in range(repeats):
         for task in tasks:
-            for arm in arms:
+            for arm in arms_for_task(arms, task):
                 run = run_one(
                     task,
                     arm,
@@ -404,6 +499,31 @@ def skill_ladder_tasks(skill: str, split: Split | None = None):
     `assert_publishable_corpus`."""
     tasks = [task for task in graded_task.skill_corpus() if task.skill == skill]
     return assert_publishable_corpus(holdout_only(tasks, split=split), floor=None)
+
+
+def pooled_skill_tasks(split: Split | None = None):
+    """Every holdout skill task, for the pooled rung. Each runs against its own skill's arm.
+
+    A task here with no skill named would run against an arm holding nothing and still be counted as a
+    pair, so it is refused rather than skipped.
+    """
+    tasks = holdout_only(list(graded_task.skill_corpus()), split=split)
+    unnamed = [task.id for task in tasks if not getattr(task, "skill", None)]
+    if unnamed:
+        raise LadderRefused(
+            f"{', '.join(unnamed)} name no skill, so the pooled rung would install nothing for them "
+            "and count the pair anyway"
+        )
+    return assert_publishable_corpus(tasks, floor=None)
+
+
+def arms_for_task(arms, task) -> tuple:
+    """Either the fixed arm tuple or, for the pooled rung, the arms this one task runs.
+
+    A callable is how the pooled rung gives every task the arm holding its own skill without
+    `run_ladder` needing to know what a skill is.
+    """
+    return tuple(arms(task)) if callable(arms) else tuple(arms)
 
 
 # --- the command -----------------------------------------------------------------------------------
@@ -463,12 +583,23 @@ def main(argv=None) -> int:
     args = parse_args(argv)
     run_id = f"ladder-{time.strftime('%Y%m%dT%H%M%S')}"
 
-    if args.ladder == "skill":
+    # `--skill all` is the pooled rung, and it is the one that answers the skills question: the corpus
+    # spreads twelve skill tasks over four skills as 5/3/3/1, and `helps` needs b >= 4, so three of the
+    # four single-skill rungs cannot reach it on item count alone. Pooled, the twelve pair as the
+    # twelve the rule was written for, and `per_skill` carries each document's counts beside it.
+    pooled = args.ladder == "skill" and args.skill == "all"
+    if pooled:
+        arms = pooled_skill_arms
+        tasks = pooled_skill_tasks()
+        arm_names = [TOOLS.name, POOLED_ARM]
+    elif args.ladder == "skill":
         arms = skill_ladder(args.skill)
         tasks = skill_ladder_tasks(args.skill)
+        arm_names = [arm.name for arm in arms]
     else:
         arms = ARMS
         tasks = tools_ladder_tasks()
+        arm_names = [arm.name for arm in arms]
 
     if args.task:
         wanted = set(args.task)
@@ -477,9 +608,7 @@ def main(argv=None) -> int:
             print(f"no holdout task matches {sorted(wanted)}")
             return 2
 
-    estimate = estimate_ladder(
-        len(tasks), [arm.name for arm in arms], runs=args.repeats
-    )
+    estimate = estimate_ladder(len(tasks), arm_names, runs=args.repeats)
     print(format_ladder_estimate(estimate, already_spent=args.spent))
     assert_within_budget(estimate, already_spent=args.spent)
     if args.dry_run:
@@ -511,11 +640,13 @@ def main(argv=None) -> int:
 
     written = report(
         runs,
-        arms=arms,
+        arms=(TOOLS,) if pooled else arms,
         model=args.model,
         container=args.container,
         repeats=args.repeats,
         run_id=run_id,
+        pooled=pooled,
+        tasks=tasks,
     )
     for record_ in written["comparisons"]:
         print(
@@ -523,6 +654,16 @@ def main(argv=None) -> int:
             f"lift={record_['lift']} n={record_['n_pairs']} mde={record_['mde']} "
             f"{record_['verdict']}"
         )
+    if pooled:
+        print(f"skills verdict over {len(tasks)} pairs: {written['skill_verdict']}")
+        for row in written["per_skill"]:
+            reach = (
+                "" if row["helps_reachable"] else "  (too few items to reach `helps`)"
+            )
+            print(
+                f"  {row['skill']:<30} {row['pairs']:>2} pairs  b={row['b']} c={row['c']}  "
+                f"{row['verdict']}{reach}"
+            )
     path = write_report(written, out=args.out)
     print(f"written to {path}")
     print(f"sessions written incrementally to {incremental}")

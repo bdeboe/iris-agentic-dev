@@ -442,3 +442,169 @@ def test_the_cli_can_be_asked_for_the_estimate_without_spending_anything():
     from tests.e2e.skill_eval import ladder
 
     assert ladder.parse_args(["--dry-run"]).dry_run is True
+
+
+# --- the pooled skills rung ------------------------------------------------------------------------
+#
+# The stop rule's `b >= 4` was written for twelve items, and the corpus has twelve skill tasks — but
+# spread over four skills, 5/3/3/1. So `helps` is unreachable for three of the four rungs by item
+# count alone, and a per-skill table is the wrong place to put the verdict. The twelve pair as twelve:
+# every task runs against the arm holding its own skill, the pooled comparison is the headline, and the
+# per-skill counts sit beside it as description with their item counts showing.
+
+
+class FakeSkillTask:
+    def __init__(self, task_id, skill):
+        self.id = task_id
+        self.skill = skill
+
+
+SKILL_SPREAD = (
+    [FakeSkillTask(f"SKILL-{i:02d}", "objectscript-guardrails") for i in range(1, 6)]
+    + [
+        FakeSkillTask(f"SKILL-{i:02d}", "objectscript-list-patterns")
+        for i in range(6, 9)
+    ]
+    + [FakeSkillTask(f"SKILL-{i:02d}", "objectscript-sql-patterns") for i in range(9, 12)]
+    + [FakeSkillTask("SKILL-12", "iris-sql")]
+)
+
+
+def spread_runs(passes):
+    """One `tools` run and one own-skill run per task. `passes` names the task IDs the skill arm
+    passed; the tools arm fails everything, so every task is a discordant pair for the skill."""
+    runs = []
+    for task in SKILL_SPREAD:
+        runs.append(run(task.id, "tools", False))
+        runs.append(run(task.id, f"tools+{task.skill}", task.id in passes))
+    return runs
+
+
+def test_the_pooled_rung_gives_each_task_the_arm_holding_its_own_skill():
+    from tests.e2e.skill_eval import ladder
+
+    lower, upper = ladder.pooled_skill_arms(FakeSkillTask("SKILL-12", "iris-sql"))
+    assert lower is TOOLS
+    assert (upper.skills, upper.skill_names) == (True, ("iris-sql",))
+
+
+def test_the_pooled_comparison_pairs_all_twelve_across_four_skills():
+    """Four arm names would pair as four thin comparisons. Under one name they are the twelve items
+    the rule was written for."""
+    from tests.e2e.skill_eval import ladder
+
+    runs = spread_runs({f"SKILL-{i:02d}" for i in range(1, 6)})
+    comparison = ladder.pooled_skill_comparison(runs)
+    assert comparison.n_pairs == 12
+    assert (comparison.b, comparison.c) == (5, 0)
+    assert ladder.skill_verdict(b=comparison.b, c=comparison.c) == "helps"
+
+
+def test_relabelling_for_the_pool_leaves_the_shared_tools_arm_alone():
+    from tests.e2e.skill_eval import ladder
+
+    relabelled = ladder.pooled_runs(spread_runs(set()))
+    names = {r.arm for r in relabelled}
+    assert names == {"tools", ladder.POOLED_ARM}
+
+
+def test_the_pooled_rung_reports_no_effect_when_the_skill_wins_nothing():
+    """The stop rule's whole point: twelve purpose-built tasks giving b <= c is the finding, not a
+    reason to write more tasks."""
+    from tests.e2e.skill_eval import ladder
+
+    comparison = ladder.pooled_skill_comparison(spread_runs(set()))
+    assert (comparison.b, comparison.c) == (0, 0)
+    assert ladder.skill_verdict(b=comparison.b, c=comparison.c) == "no effect"
+
+
+def test_the_per_skill_breakdown_shows_its_item_count_and_whether_helps_is_reachable():
+    """A three-item rung cannot reach `helps` whatever the skill does. Printing its verdict without
+    its item count would read as a finding about the document."""
+    from tests.e2e.skill_eval import ladder
+
+    rows = {
+        row["skill"]: row
+        for row in ladder.skill_breakdown(
+            spread_runs({f"SKILL-{i:02d}" for i in range(1, 6)}), SKILL_SPREAD
+        )
+    }
+    assert rows["objectscript-guardrails"]["pairs"] == 5
+    assert rows["objectscript-guardrails"]["helps_reachable"] is True
+    assert rows["objectscript-guardrails"]["verdict"] == "helps"
+    assert rows["objectscript-list-patterns"]["pairs"] == 3
+    assert rows["objectscript-list-patterns"]["helps_reachable"] is False
+    assert rows["iris-sql"]["pairs"] == 1
+
+
+def test_the_report_carries_the_pooled_comparison_and_the_breakdown_beside_it():
+    from tests.e2e.skill_eval import ladder
+
+    written = ladder.report(
+        spread_runs({f"SKILL-{i:02d}" for i in range(1, 6)}),
+        arms=(TOOLS,),
+        pooled=True,
+        tasks=SKILL_SPREAD,
+        split=a_split(holdout_ids(12, prefix="SKILL")),
+        model="m",
+        container="c",
+        repeats=1,
+    )
+    assert written["comparisons"][0]["arm_b"] == ladder.POOLED_ARM
+    assert written["comparisons"][0]["n_pairs"] == 12
+    assert written["skill_verdict"] == "helps"
+    assert len(written["per_skill"]) == 4
+    # The real arm names survive in the runs, or attribution cannot tell which skill was installed.
+    assert "tools+iris-sql" in {r["arm"] for r in written["runs"]}
+
+
+def test_a_pooled_report_is_not_held_to_the_publication_floor():
+    """Twelve items will never reach 37 and were never meant to — `skill_verdict` is the rule, and the
+    floor check exists to stop a lift being published, not a discordant count."""
+    from tests.e2e.skill_eval import ladder
+
+    written = ladder.report(
+        spread_runs(set()),
+        arms=(TOOLS,),
+        pooled=True,
+        tasks=SKILL_SPREAD,
+        split=a_split(holdout_ids(12, prefix="SKILL")),
+        model="m",
+        container="c",
+        repeats=1,
+    )
+    assert written["published"] == []
+
+
+def test_the_cli_takes_skill_all_for_the_pooled_rung():
+    from tests.e2e.skill_eval import ladder
+
+    args = ladder.parse_args(["--ladder", "skill", "--skill", "all"])
+    assert args.skill == "all"
+
+
+def test_the_runner_resolves_a_per_task_arm_list_from_a_callable():
+    """The pooled rung needs a different upper arm per task, so `run_ladder` takes either a fixed
+    tuple or a function of the task. Tested here rather than through `run_ladder`, which would have to
+    start twenty-four sessions to say the same thing."""
+    from tests.e2e.skill_eval import ladder
+
+    assert ladder.arms_for_task((BARE, TOOLS), FakeSkillTask("SKILL-01", "iris-sql")) == (
+        BARE,
+        TOOLS,
+    )
+    lower, upper = ladder.arms_for_task(
+        ladder.pooled_skill_arms, FakeSkillTask("SKILL-01", "iris-sql")
+    )
+    assert upper.skill_names == ("iris-sql",)
+
+
+def test_the_pooled_task_set_is_every_holdout_skill_task_and_each_one_names_a_skill():
+    """A task in this set with no skill would run against an arm holding nothing and be counted as a
+    pair anyway."""
+    from tests.e2e.skill_eval import ladder
+
+    tasks = ladder.pooled_skill_tasks()
+    assert len(tasks) == 12
+    assert all(task.skill for task in tasks)
+    assert len({task.skill for task in tasks}) == 4
