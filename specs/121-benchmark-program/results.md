@@ -98,7 +98,8 @@ another. See `harness-gaps.md`.
   builds, interoperability productions, or a codebase the model has not been handed.
 - **Nothing about the skills.** The second comparison is a null, and a null at 41 pairs with an MDE
   of 0.188 means the measurement could not see an effect that size, not that there is none. The
-  purpose-built skills rung is the run that addresses it.
+  purpose-built skills rung is the run that addresses it, and it came out negative:
+  `skills-verdict.md`.
 
 ## The run itself
 

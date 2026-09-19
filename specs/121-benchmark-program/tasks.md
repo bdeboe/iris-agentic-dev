@@ -182,10 +182,13 @@ Only runs if T030 said go. This is the phase the $50–80 cap is for.
       = 123 sessions. 50 was the target corpus; 41 is its holdout side, above FR-008's floor of 37.
       One repeat, not two, because the budget bought one and the strict-and rule needs no second to
       be correct — `tests/e2e/results/ladder-121-tools-holdout.json`
-- [ ] T036 [US4] Run the per-skill ladder the Cost table budgets: 9 skills × 6 tasks × 2 arms × 2
-      runs, tools against tools+skills, which is the only comparison that says whether a given
-      skill document earns its place. Skills whose task sets Phase 2 deleted drop out, and the
-      estimate shrinks with them
+- [x] T036 [US4] Run the per-skill ladder: 12 holdout skill tasks × 2 arms × 1 run = 24 sessions,
+      each session installing only its own task's skill. The budgeted 9 × 6 × 2 × 2 shrank with the
+      task sets Phase 2 deleted, and the four surviving skills split 5/3/3/1 — so the twelve pair
+      under one pooled arm name, since three of four rungs could not reach `helps` on item count
+      alone. Result is negative: b=1, c=4, `skill_verdict: harmful`, not publishable as a lift
+      (n=12, MDE 0.472) — `tests/e2e/results/ladder-121-skills-pooled.json`, written up in
+      `skills-verdict.md`
 - [x] T037 [US1] Write the report: each arm's pass rate with a 95% Wilson interval, each
       adjacent-arm lift with a McNemar interval and p-value, the discordance count, and the MDE the
       corpus bought. If the measured discordance puts the MDE above SC-002's 0.20, extend the corpus

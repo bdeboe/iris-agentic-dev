@@ -136,6 +136,26 @@ def arm_runs(records, *, scored_only: bool = False):
     ]
 
 
+def pooled_tasks_for(records):
+    """The skill tasks these sessions ran, which is what the per-skill breakdown reads.
+
+    Refuses a file whose tasks are not skill tasks. `pooled_runs` relabels every arm whose name starts
+    with `tools+`, so merging the tools ladder under `--pooled` would fold its 34-skill arm into the
+    pooled rung and report it as twelve tasks against their own one document.
+    """
+    from tests.e2e.skill_eval import ladder
+
+    ids = {record["task_id"] for record in records}
+    tasks = [task for task in ladder.pooled_skill_tasks() if task.id in ids]
+    strangers = sorted(ids - {task.id for task in tasks})
+    if strangers:
+        raise ResumeRefused(
+            f"{', '.join(strangers)} is not a skill task, so these sessions are not the pooled rung. "
+            "Merge them without --pooled."
+        )
+    return tasks
+
+
 def main(argv=None) -> int:
     """Two commands in one: what is left to run, and the report over what has been run.
 
@@ -164,6 +184,11 @@ def main(argv=None) -> int:
     )
     parser.add_argument("--model", default=ladder.LADDER_MODEL)
     parser.add_argument("--container", default="iris-dev-iris")
+    parser.add_argument(
+        "--pooled",
+        action="store_true",
+        help="the sessions came from the skills rung (--ladder skill --skill all)",
+    )
     args = parser.parse_args(argv)
 
     if args.remaining == args.merge:
@@ -179,7 +204,11 @@ def main(argv=None) -> int:
         )
         return 0
 
-    records = merge_sessions(args.sessions)
+    # The pooled rung's arms are one per skill, so the ladder's three names order nothing here. Naming
+    # only the shared arm puts it first and leaves the skill arms after it, alphabetically.
+    records = merge_sessions(
+        args.sessions, arms=(ladder.TOOLS.name,) if args.pooled else LADDER_ARMS
+    )
     runs = arm_runs(records)
     holes = unscored(records)
     written = ladder.report(
@@ -187,6 +216,10 @@ def main(argv=None) -> int:
         model=args.model,
         container=args.container,
         run_id=args.run_id or _run_id_from(args.sessions[-1]),
+        pooled=args.pooled,
+        # Only read for the per-skill breakdown, and only the tasks that were actually merged: the
+        # full corpus here would print a row of zero pairs for a skill this run never touched.
+        tasks=pooled_tasks_for(records) if args.pooled else None,
     )
     written["merged_from"] = [os.path.basename(path) for path in args.sessions]
     written["unscored_sessions"] = [

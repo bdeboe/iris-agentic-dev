@@ -122,3 +122,23 @@ Five tests, written first. The provenance block on the published figure is resta
 Worth stating plainly, because the whole program rests on it: a provenance field cannot be trusted
 because the function that formats it is correct. It can be trusted when something asserts it against
 the run. The tests that now do this assert on `report`'s output, not on `driver_identity`'s.
+
+## The fix landed six minutes after the run that needed it started
+
+The pooled skills run was launched at 02:35:37. The driver fix was committed at 02:41:35. Python had
+already imported `ladder.py`, so the skills report wrote `driver: "unrecorded"` out of code that no longer
+existed on disk — and stamped `harness_commit: 8d0314b`, read by `git rev-parse` at report time, which
+names a tree that would have got it right. A commit SHA in a provenance block says when the report was
+written, not what code wrote it.
+
+Rebuilding the report from `<run_id>.runs.jsonl` is exactly what `resume --merge` is for, and it could not
+do it: it hard-coded the tools ladder. A pooled run merged through it reports a bare arm that never ran,
+no `skill_verdict`, and no per-skill breakdown. Worse than a crash, because it produces a report.
+
+`--pooled` now exists, tested first, seven tests. One of them is a refusal: `pooled_runs` relabels every
+arm whose name starts with `tools+`, so merging the tools ladder under `--pooled` would fold its
+34-document arm into the pooled rung and report it as twelve tasks against their own single skill.
+`pooled_tasks_for` rejects any session whose task is not a skill task instead.
+
+Same defect class as the two above, third instance: a mode declared in one place (`ladder.main` knows
+what `--ladder skill --skill all` means) and not in the other that has to reproduce its output.

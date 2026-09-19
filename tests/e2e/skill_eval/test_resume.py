@@ -162,3 +162,85 @@ def test_arm_runs_drops_the_unscored_when_asked(tmp_path):
     merged = resume.merge_sessions([path])
     assert len(resume.arm_runs(merged, scored_only=True)) == 2
     assert len(resume.arm_runs(merged)) == 3
+
+
+# --- the pooled rung, merged -----------------------------------------------------------------------
+#
+# The skills run's own report came out of the old `ladder.main` and said `driver: "unrecorded"`, so it
+# had to be rebuilt from its sessions. `--merge` could not do it: it hard-coded the tools ladder, and a
+# pooled run merged as a three-arm ladder reports a bare arm that never ran and no skill verdict at all.
+
+
+def pooled_pair(task, skill, passed=(True, False)):
+    """One skill task's two sessions: shared tools, then tools plus that task's own skill."""
+    return [
+        record(task, "tools", passed[0]),
+        record(task, f"tools+{skill}", passed[1]),
+    ]
+
+
+def pooled_sessions(tmp_path, name="ladder-pooled.runs.jsonl"):
+    return write(
+        tmp_path,
+        name,
+        pooled_pair("SKILL-01", "objectscript-guardrails", (True, True))
+        + pooled_pair("SKILL-04", "objectscript-guardrails", (True, False))
+        + pooled_pair("SKILL-06", "objectscript-list-patterns", (True, True)),
+    )
+
+
+def merged(tmp_path, *argv):
+    out = os.path.join(str(tmp_path), "report.json")
+    assert resume.main([*argv, "--merge", "--out", out]) == 0
+    with open(out, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def test_a_pooled_merge_reports_the_skills_comparison_not_the_ladder(tmp_path):
+    written = merged(tmp_path, pooled_sessions(tmp_path), "--pooled")
+    assert [(row["arm_a"], row["arm_b"]) for row in written["comparisons"]] == [
+        ("tools", "tools+its-own-skill")
+    ]
+    assert written["comparisons"][0]["n_pairs"] == 3
+
+
+def test_a_pooled_merge_decides_it_by_the_skill_verdict_rule(tmp_path):
+    written = merged(tmp_path, pooled_sessions(tmp_path), "--pooled")
+    # b=0, c=1: one task the skill lost and none it won.
+    assert written["skill_verdict"] == "harmful"
+    assert "b >= 4" in written["skill_verdict_rule"]
+
+
+def test_a_pooled_merge_breaks_the_result_down_per_skill(tmp_path):
+    written = merged(tmp_path, pooled_sessions(tmp_path), "--pooled")
+    rows = {row["skill"]: row for row in written["per_skill"]}
+    assert set(rows) == {"objectscript-guardrails", "objectscript-list-patterns"}
+    assert rows["objectscript-guardrails"]["pairs"] == 2
+    assert rows["objectscript-guardrails"]["helps_reachable"] is False
+
+
+def test_a_pooled_merge_records_no_pack_because_no_list_describes_it(tmp_path):
+    written = merged(tmp_path, pooled_sessions(tmp_path), "--pooled")
+    assert written["skills_installed"] == {"tools+its-own-skill": []}
+
+
+def test_a_merged_report_names_the_driver_that_ran_the_sessions(tmp_path):
+    written = merged(tmp_path, pooled_sessions(tmp_path), "--pooled")
+    assert written["provenance"]["driver"] == "opencode"
+
+
+def test_a_ladder_merge_is_unchanged_by_the_pooled_flag_existing(tmp_path):
+    path = write(tmp_path, "a.runs.jsonl", triple("CORPUS-01") + triple("CORPUS-02"))
+    written = merged(tmp_path, path)
+    assert written["arms"] == list(ARM_NAMES)
+    assert [(row["arm_a"], row["arm_b"]) for row in written["comparisons"]] == [
+        ("bare", "tools"),
+        ("tools", "tools+skills"),
+    ]
+    assert "skill_verdict" not in written
+
+
+def test_a_pooled_merge_refuses_a_session_file_of_tools_ladder_arms(tmp_path):
+    path = write(tmp_path, "a.runs.jsonl", triple("CORPUS-01"))
+    with pytest.raises(resume.ResumeRefused):
+        merged(tmp_path, path, "--pooled")
