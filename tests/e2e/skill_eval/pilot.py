@@ -205,19 +205,15 @@ def to_driver_run(driver, session, *, passed, reason: str | None):
 
 
 def default_driver():
-    """The harness this repo drives sessions with, and the one a report attributes them to.
+    """The driver a session runs under when the caller did not name one — `opencode_driver` owns it.
 
-    Both `run_one` and `ladder.report` read it from here. They used to decide separately: `run_one`
-    defaulted to `OpencodeDriver()` and `report` was handed `None`, so the first graded run published
-    `driver: "unrecorded"` over 123 sessions opencode had plainly run. A default in two places is a
-    provenance field that disagrees with the run it describes.
-
-    The version is best-effort off `opencode --version`; absent, it records `None` rather than a guess.
+    Re-exported here because `run_one` is where the default is reached for, and because `ladder.report`
+    reads the same function to attribute the run. A default in two places is a provenance field that
+    disagrees with the run it describes.
     """
-    from tests.e2e.skill_eval import provenance
-    from tests.e2e.skill_eval.opencode_driver import OpencodeDriver
+    from tests.e2e.skill_eval.opencode_driver import default_driver as _default
 
-    return OpencodeDriver(harness_version=provenance.harness_version("opencode"))
+    return _default()
 
 
 def run_one(

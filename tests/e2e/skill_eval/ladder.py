@@ -407,6 +407,15 @@ def skill_breakdown(runs, tasks) -> list[dict]:
 # --- the report ------------------------------------------------------------------------------------
 
 
+def _installed_default(skill_names, pooled: bool) -> tuple[str, ...]:
+    """What a skills arm installed when the caller named nothing: the shipped pack, or nothing pooled."""
+    from tests.e2e.skill_eval.pilot import shipped_skills
+
+    if skill_names:
+        return tuple(skill_names)
+    return () if pooled else tuple(shipped_skills())
+
+
 def report(
     runs,
     *,
@@ -473,8 +482,14 @@ def report(
         "caveats": list(CAVEATS),
         "timeout_seconds": SESSION_TIMEOUT,
         "arms": [arm.name for arm in arms],
+        # `run_one` reads an unset list as "the whole pack", so the report has to read it the same way
+        # or it records an empty list over sessions that installed 34 documents — which is what the
+        # first graded run did. The pooled rung is the exception: there each session installed its own
+        # task's one skill, no list describes the arm, and `per_skill` is where that is written down.
         "skills_installed": {
-            arm.name: list(installed_skill_names(arm, tuple(skill_names or ())))
+            arm.name: list(
+                installed_skill_names(arm, _installed_default(skill_names, pooled))
+            )
             for arm in arms
             if arm.skills
         },

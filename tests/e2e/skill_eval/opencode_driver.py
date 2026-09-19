@@ -188,3 +188,20 @@ class OpencodeDriver:
             )
         reward, scored, reason = check()
         return self.grade(session, reward=reward, scored=scored, reason=reason)
+
+
+def default_driver() -> OpencodeDriver:
+    """The incumbent driver with its version filled in, and the only place the harness builds one.
+
+    Three modules used to decide separately: `pilot.run_one` for the session, `arms` for the arm
+    assertions, and `ladder.report` not at all — it was handed `None`, which is why the first graded
+    run published `driver: "unrecorded"` over 123 sessions opencode had run. The arm assertions in
+    particular decide what "the tools are absent" means, so two defaults that can drift is an arm
+    checked under one driver and run under another.
+
+    The version is best-effort off `opencode --version`. Absent, the field records `None` rather than
+    a plausible guess, which is `provenance.harness_version`'s contract.
+    """
+    from tests.e2e.skill_eval import provenance
+
+    return OpencodeDriver(harness_version=provenance.harness_version("opencode"))

@@ -806,6 +806,20 @@ def test_the_runner_and_the_report_share_one_default_driver():
     assert isinstance(pilot.default_driver(), OpencodeDriver)
 
 
+def test_every_default_driver_in_the_harness_is_the_same_one():
+    """Three modules had their own `OpencodeDriver()` default. The arm assertions' driver decides what
+    "the tools are absent" means, so a harness where those two can differ is one where the arm was
+    checked under a different driver than the one that ran it."""
+    from tests.e2e.skill_eval import arms, pilot
+    from tests.e2e.skill_eval.opencode_driver import default_driver
+
+    canonical = default_driver()
+    for made in (arms._default_driver(), pilot.default_driver()):
+        assert type(made) is type(canonical)
+        assert made.name == canonical.name
+        assert made.harness_version == canonical.harness_version
+
+
 def test_the_default_driver_reports_the_harness_version_when_it_can():
     import shutil
 
@@ -847,3 +861,53 @@ def test_an_explicitly_named_driver_still_wins_over_the_default():
     written = ladder.report(runs, split=split, driver=_Prime())
     assert written["provenance"]["driver"] == "prime-agent"
     assert written["provenance"]["harness_version"] == "0.4.1"
+
+
+# -- which skills the skills arm was holding --------------------------------------
+#
+# Same class of bug, same run: `skills_installed` came out `{"tools+skills": []}` over sessions that
+# installed the whole pack, because `run_one` defaults an empty list to `shipped_skills()` and
+# `ladder.report` defaulted it to nothing. The second comparison in the run is about those documents,
+# and the report did not say which ones they were.
+
+
+def test_the_report_names_the_pack_the_skills_arm_installed():
+    from tests.e2e.skill_eval import ladder
+    from tests.e2e.skill_eval.pilot import shipped_skills
+
+    split = a_split(holdout_ids(40))
+    runs = []
+    for task_id in holdout_ids(40):
+        runs.append(run(task_id, "bare", False))
+        runs.append(run(task_id, "tools", True))
+        runs.append(run(task_id, "tools+skills", True))
+    written = ladder.report(runs, split=split)
+    assert written["skills_installed"]["tools+skills"] == list(shipped_skills())
+    assert written["skills_installed"]["tools+skills"], "the pack must not be empty"
+
+
+def test_a_named_subset_is_recorded_instead_of_the_whole_pack():
+    from tests.e2e.skill_eval import ladder
+
+    split = a_split(holdout_ids(40))
+    runs = []
+    for task_id in holdout_ids(40):
+        runs.append(run(task_id, "bare", False))
+        runs.append(run(task_id, "tools", True))
+        runs.append(run(task_id, "tools+skills", True))
+    written = ladder.report(runs, split=split, skill_names=("objectscript-guardrails",))
+    assert written["skills_installed"]["tools+skills"] == ["objectscript-guardrails"]
+
+
+def test_the_pooled_rung_records_no_pack_because_no_list_describes_it():
+    """Each pooled session installed one skill, its own task's. Recording all 34 there would say the
+    opposite of what happened, so the pooled arm records nothing and `per_skill` carries the truth.
+    """
+    from tests.e2e.skill_eval import ladder
+
+    runs = ladder.pooled_runs(spread_runs({}))
+    written = ladder.report(
+        runs, pooled=True, split=a_split([r.task_id for r in runs]), tasks=None
+    )
+    assert written["skills_installed"][ladder.POOLED_ARM] == []
+    assert "per_skill" in written

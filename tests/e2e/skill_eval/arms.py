@@ -204,10 +204,13 @@ def _default_driver():
     """opencode, the incumbent. Imported here rather than at module scope because `driver.py` reads
     `ArmContaminated` from this module, and because the default must stay a default: spec 120
     Decision 5 has `prime-agent` under evaluation, so no call site should name a harness.
-    """
-    from tests.e2e.skill_eval.opencode_driver import OpencodeDriver
 
-    return OpencodeDriver()
+    One function builds it, in `opencode_driver`, so the driver the arm assertions check under is the
+    same object the session runs under and the report attributes it to.
+    """
+    from tests.e2e.skill_eval.opencode_driver import default_driver
+
+    return default_driver()
 
 
 def assert_absent(
