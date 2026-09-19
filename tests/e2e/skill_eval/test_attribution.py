@@ -501,3 +501,39 @@ def test_the_document_names_the_passed_over_tools_in_prose_not_only_in_the_table
     )
     text = attribution.render_document(a_report(), rows)
     assert "iris_query" in text.split("| Tool |")[0]
+
+
+# --- the command -----------------------------------------------------------------------------------
+
+
+def test_the_command_writes_the_document_from_a_report_on_disk(tmp_path):
+    """T041 as a command, not a function I call by hand. The table has to be re-derivable from the
+    artifact months later, and a call site that exists only in a transcript is not that."""
+    import json
+
+    from tests.e2e.skill_eval import attribution, provenance
+
+    if not provenance.resolve_binary():
+        pytest.skip("no iris-agentic-dev binary resolved; set IAD_BINARY")
+
+    report_path = tmp_path / "report.json"
+    report_path.write_text(json.dumps(a_report()), encoding="utf-8")
+    out = tmp_path / "lift-results.md"
+
+    assert attribution.main([str(report_path), "--out", str(out)]) == 0
+    text = out.read_text(encoding="utf-8")
+    assert "ladder-20260918T000000" in text
+    assert "| `iris_doc` |" in text
+    # The real surface, so the real finding: most of 81 tools go unreached by a two-run report.
+    assert text.count("\n| `") > 50
+
+
+def test_the_command_refuses_a_report_with_no_runs(tmp_path):
+    """An empty report renders a table of 81 zeros that looks exactly like a real result."""
+    import json
+
+    from tests.e2e.skill_eval import attribution
+
+    report_path = tmp_path / "empty.json"
+    report_path.write_text(json.dumps({"provenance": {}, "runs": []}), encoding="utf-8")
+    assert attribution.main([str(report_path), "--out", str(tmp_path / "x.md")]) == 2

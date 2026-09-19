@@ -228,6 +228,59 @@ def render_document(report: dict, rows) -> str:
     return "\n".join(lines)
 
 
+DOCUMENT_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(TABLE_PATH)))),
+    "specs",
+    "121-benchmark-program",
+    "lift-results.md",
+)
+
+
+def main(argv=None) -> int:
+    """Regenerate `lift-results.md` from a written ladder report — T041.
+
+    A command rather than a function called once from a transcript: the standing table has to be
+    re-derivable from the artifact months later, by someone who was not here.
+    """
+    import argparse
+    import json
+
+    from tests.e2e.skill_eval import graded_task, provenance
+
+    parser = argparse.ArgumentParser(
+        description="per-tool attribution from a ladder report"
+    )
+    parser.add_argument("report", help="path to a ladder report JSON")
+    parser.add_argument("--out", default=DOCUMENT_PATH)
+    args = parser.parse_args(argv)
+
+    with open(args.report, encoding="utf-8") as handle:
+        report = json.load(handle)
+
+    runs = runs_from_report(report)
+    if not runs:
+        # 81 rows of zero render exactly like a real result, and the zeros would be the report's,
+        # not the tools'.
+        print(f"{args.report} has no runs, so there is nothing to attribute")
+        return 2
+
+    binary = provenance.resolve_binary()
+    if not binary:
+        print("no iris-agentic-dev binary resolved; set IAD_BINARY")
+        return 2
+    surface = [tool["name"] for tool in provenance.tool_list(binary)]
+
+    rows = attribute(runs=runs, tasks=graded_task.all_tasks(), surface=surface)
+    with open(args.out, "w", encoding="utf-8") as handle:
+        handle.write(render_document(report, rows))
+
+    passed_over = unreached(rows)
+    print(f"{args.out}: {len(rows)} tools, {len(passed_over)} passed over")
+    for row in passed_over:
+        print(f"  {row['tool']:<32} {row['applicable_tasks']} applicable, 0 reached")
+    return 0
+
+
 def _had_tools(run) -> bool:
     """Whether this run's arm could call an iad tool at all.
 
@@ -308,3 +361,7 @@ def format_failure_modes(rows) -> str:
     if not any_row:
         return "No tool call failed in this run."
     return "\n".join(lines)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
