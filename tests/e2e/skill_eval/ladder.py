@@ -204,6 +204,46 @@ def publishable(
 # --- time-to-solve ---------------------------------------------------------------------------------
 
 
+def failure_modes(runs) -> dict:
+    """Per arm, the three different things a failure can be.
+
+    The bare arm's 0-for-30 is not one claim. Some of those sessions made a dozen calls with shell and
+    curl and got the answer wrong; some returned in six seconds having called nothing, which is the
+    model declining rather than failing; some were killed on the 300 s clock, where the honest reading
+    is "not solved in five minutes" and not "cannot solve". Publishing the three as one number invites
+    the reading that suits whoever quotes it.
+
+    Unscored sessions are counted and kept out of `failed`, for the same reason they are kept out of a
+    comparison: a check that could not run has not failed the task.
+    """
+    by_arm: dict[str, list] = {}
+    for run in runs:
+        by_arm.setdefault(run.arm, []).append(run)
+    out = {}
+    for arm, arm_runs in sorted(by_arm.items()):
+        failed = [run for run in arm_runs if run.passed is False]
+        killed = [run for run in failed if run.timed_out]
+        # No tool call and no timeout: the session ended on its own having tried nothing. In the bare
+        # arm that is a refusal, and it is evidence about the model, not about the tools.
+        declined = [
+            run for run in failed if not run.timed_out and (run.tool_calls or 0) == 0
+        ]
+        out[arm] = {
+            "sessions": len(arm_runs),
+            "failed": len(failed),
+            "unscored": sum(1 for run in arm_runs if run.passed is None),
+            "killed_on_the_clock": len(killed),
+            "made_no_attempt": len(declined),
+            "tried_and_failed": len(failed) - len(killed) - len(declined),
+            "note": (
+                f"{len(killed)} of {len(failed)} failures hit the {SESSION_TIMEOUT}s clock and "
+                f"{len(declined)} ended with no tool call at all; only "
+                f"{len(failed) - len(killed) - len(declined)} were an attempt that came back wrong"
+            ),
+        }
+    return out
+
+
 def solve_time(runs) -> dict:
     """Per arm: how long the sessions that solved the task took, and how many were killed trying.
 
@@ -403,6 +443,7 @@ def report(
         },
         "provenance": record.to_dict(),
         "solve_time": solve_time(runs),
+        "failure_modes": failure_modes(runs),
         "comparisons": [comparison.to_dict() for comparison in comparisons],
         "published": [comparison.summary() for comparison in published],
         "runs": [asdict(run) for run in runs],

@@ -673,3 +673,56 @@ def test_a_scored_session_clears_the_abort_counter(monkeypatch):
     )
     assert len(runs) == 6
     assert len(calls) == 6
+
+
+# --- what "bare failed" actually means -------------------------------------------------------------
+#
+# 24 of 30 discordant pairs is not a finding until the bare arm's failures are broken out. Some bare
+# sessions ran 10-15 calls and got it wrong; others returned in six seconds with no calls at all, which
+# is the model declining rather than trying; five of the pilot's seven were killed on the 300 s clock.
+# Three different claims, and one pass rate hides all three.
+
+
+def test_failure_modes_separate_the_clock_from_the_decline_from_the_attempt():
+    from tests.e2e.skill_eval import ladder
+
+    runs = [
+        run("CORPUS-01", "bare", False, timed_out=True, session_seconds=300.1),
+        run("CORPUS-02", "bare", False, session_seconds=6.0),
+        run("CORPUS-03", "bare", False, session_seconds=48.0),
+        run("CORPUS-04", "bare", True),
+    ]
+    runs[1] = ArmRun(**{**runs[1].__dict__, "tool_calls": 0})
+    modes = ladder.failure_modes(runs)["bare"]
+    assert modes["failed"] == 3
+    assert modes["killed_on_the_clock"] == 1
+    assert modes["made_no_attempt"] == 1
+    assert modes["tried_and_failed"] == 1
+
+
+def test_failure_modes_count_only_the_scored_failures():
+    from tests.e2e.skill_eval import ladder
+
+    runs = [
+        run("CORPUS-01", "tools", None, reason="the check did not answer"),
+        run("CORPUS-02", "tools", False, session_seconds=30.0),
+        run("CORPUS-03", "tools", True),
+    ]
+    modes = ladder.failure_modes(runs)["tools"]
+    assert modes["failed"] == 1
+    assert modes["unscored"] == 1
+    assert modes["tried_and_failed"] == 1
+
+
+def test_failure_modes_are_reported_per_arm_in_the_report():
+    from tests.e2e.skill_eval import ladder
+
+    split = a_split(holdout_ids(40))
+    runs = []
+    for task_id in holdout_ids(40):
+        runs.append(run(task_id, "bare", False, timed_out=True, session_seconds=300.1))
+        runs.append(run(task_id, "tools", True))
+        runs.append(run(task_id, "tools+skills", True))
+    written = ladder.report(runs, split=split)
+    assert written["failure_modes"]["bare"]["killed_on_the_clock"] == 40
+    assert written["failure_modes"]["tools"]["failed"] == 0
