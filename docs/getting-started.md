@@ -1,25 +1,46 @@
 # Getting started
 
-Fifteen minutes from nothing to an agent that can read and write ObjectScript on your IRIS
-instance. Six steps, each one ending in output you can compare against what is printed here.
+Fifteen minutes from nothing to an agent that can read and write ObjectScript on IRIS. This
+assumes one IRIS running in Docker on your own machine and no prior IRIS experience. Six steps,
+each one ending in output you can compare against what is printed here.
 
-The order is deliberate. Three things can be wrong: the install, the connection, and the
-editor config. Only the last one involves your editor, so this checks them in that order.
-Skip to step 6 and you cannot tell which of the three you are looking at.
+If you already run IRIS somewhere else, or more than one instance, or Enterprise IRIS behind a
+Web Gateway, read [connecting.md](connecting.md) instead. Everything here still applies; only
+step 3 changes.
 
-Every command below was run against `iris-community:2026.2` on the way to writing this, and
+The order is deliberate. Three things can be wrong: the IRIS instance, the connection, and the
+editor config. Only the last one involves your editor, so this checks them in that order. Skip
+to step 6 and you cannot tell which of the three you are looking at.
+
+Every command below was run while writing this, against the container step 1 starts, and
 `tests/e2e/test_getting_started.py` checks that each subcommand, tool and argument named here
 still exists.
 
-## What you need
+## Step 1 — Get an IRIS running
 
-- IRIS with the Atelier REST API reachable over HTTP. A community Docker image has it; so does
-  native IRIS on IIS or Apache. Enterprise IRIS without a Web Gateway does not; see
-  [connecting.md](connecting.md).
-- Credentials for a user that can read the namespace you care about.
-- An editor with MCP support, for step 6 only. Steps 1–5 need nothing but a terminal.
+```bash
+docker run -d --name iris-quickstart -p 1972:1972 -p 52773:52773 \
+  intersystemsdc/iris-community:latest
+```
 
-## Step 1 — Install, and confirm what you installed
+That image is on Docker Hub and needs no login. Give it a minute, then:
+
+```bash
+docker ps --filter name=iris-quickstart
+```
+
+The container's default password is expired the moment it starts, which every HTTP call answers
+as `401 Unauthorized` and nothing tells you why. Clear it:
+
+```bash
+docker exec iris-quickstart iris session IRIS -U%SYS \
+  '##class(Security.Users).UnExpireUserPasswords("*")'
+```
+
+It prints nothing when it works. The credentials are now `_SYSTEM` / `SYS`, which is fine for a
+throwaway container on your laptop and nowhere else.
+
+## Step 2 — Install `iris-agentic-dev`, and prove it runs
 
 ```bash
 brew tap intersystems-community/iris-agentic-dev
@@ -31,10 +52,10 @@ iris-agentic-dev --version
 iris-agentic-dev 1.4.2
 ```
 
-Linux, direct download and Windows are in the README's [Install](../README.md#install)
-section. One binary, no runtime, no Python or Node.
+Linux, direct download and Windows are in the README's [Install](../README.md#install) section.
+One binary, no runtime, no Python or Node.
 
-## Step 2 — Prove the binary works, with no IRIS at all
+Now list the tools:
 
 ```bash
 iris-agentic-dev tool --list
@@ -49,8 +70,8 @@ check_config                   Return the active IRIS connection state without m
 ```
 
 Eighty-one lines. This reads the tool router and opens no connection, so it works with IRIS
-down, with the wrong port, with no config file. That is the point of doing it second: if this
-prints 81 tools, the binary is installed correctly and everything that fails from here is a
+down, with the wrong port, with no config file. That is the point of doing it before step 3: if
+this prints 81 tools, the binary is installed correctly and everything that fails from here is a
 connection problem, not an install problem.
 
 To see what one tool takes:
@@ -64,17 +85,20 @@ Also free, also no connection.
 
 ## Step 3 — Point it at IRIS, and check what it aimed at
 
-The fastest way is environment variables:
+Five environment variables, matching the container from step 1:
 
 ```bash
 export IRIS_HOST=localhost
-export IRIS_WEB_PORT=52773      # 52780 for the iris-community:2026.2 private web server
+export IRIS_WEB_PORT=52773
 export IRIS_USERNAME=_SYSTEM
 export IRIS_PASSWORD=SYS
 export IRIS_NAMESPACE=USER
 ```
 
-Then ask what it thinks it is connected to, before you run anything that writes:
+`IRIS_WEB_PORT` is the web port, not the `1972` you may have seen in JDBC strings. These tools
+speak HTTP to IRIS, so `52773` is the one that matters.
+
+Ask what it thinks it is connected to before running anything that writes:
 
 ```bash
 iris-agentic-dev tool check_config
@@ -85,68 +109,33 @@ iris-agentic-dev tool check_config
   "connected": true,
   "connection_source": "env_vars",
   "host": "localhost",
-  "port": 52780,
+  "port": 52773,
   "namespace": "USER",
-  "iris_version": "IRIS for UNIX ... 2026.2.0L (Build 208U) ...",
+  "iris_version": "IRIS for UNIX ... 2026.1 (Build 234U) ...",
   "write_tools_enabled": true,
   "destructive_tools_enabled": false
 }
 ```
 
-Read `connection_source` first. `env_vars` means it used what you just exported. Anything else
-means it did not.
+Two fields to read. `connection_source` says where the target came from; `env_vars` means it
+used what you just exported. And `iris_version` is the honest one: it is only filled in if IRIS
+answered. `connected: true` with `iris_version: null` means the port is open but your
+credentials were refused, which is what you get if you skipped the password step above.
 
-**Discovery will pick an instance for you.** With no config file and no environment variables,
-the binary falls back to it: Docker container names, then VS Code Server Manager, then a port scan.
-That is convenient and it is also how you end up writing to the wrong instance. On the machine
-this guide was written on, a bare `check_config` reported:
-
-```json
-{
-  "connection_source": "auto_discovered",
-  "container": "dxlab-r39-iris",
-  "port": 45083,
-  "fallback_warning": "No .iris-agentic-dev.toml config file found. Connection established via fallback discovery (Docker/Server Manager/port scan). Set OBJECTSCRIPT_WORKSPACE or create a .iris-agentic-dev.toml in your project root to pin the target instance."
-}
-```
-
-Three IRIS containers were running and it picked one. It said so in `connection_source`,
-`container` and `fallback_warning`, but only because something asked. Nothing else in the tool
-surface prints that.
-
-For anything past a first experiment, pin the target in a file instead:
+With no environment variables and no config file, the binary goes looking instead: Docker
+container names, then VS Code Server Manager, then a port scan. With one IRIS running that
+usually lands on the right one and says so in `connection_source`. With several, it picks one.
+Pin the target in a file before that matters:
 
 ```bash
 iris-agentic-dev init        # writes ./.iris-agentic-dev.toml
 ```
 
-Set `container` or `host`/`web_port` in it and commit it. Credentials stay in
-`IRIS_USERNAME`/`IRIS_PASSWORD`, not in the file. The full precedence order (config file, then
-environment, then Server Manager, then discovery) is in [connecting.md](connecting.md).
+Set `container` or `host`/`web_port` in it and commit it; credentials stay in the environment,
+not in the file. The full precedence order and every field are in
+[connecting.md](connecting.md).
 
-## Step 4 — Prove IRIS answers
-
-```bash
-iris-agentic-dev tool iris_test_server \
-  --args '{"host":"localhost","web_port":52780,"username":"_SYSTEM","password":"SYS"}'
-```
-
-```json
-{
-  "reachable": true,
-  "auth": true,
-  "atelier_version": "8",
-  "latency_ms": 7,
-  "iris_version": "IRIS for UNIX ... 2026.2.0L (Build 208U) ...",
-  "error": null
-}
-```
-
-`reachable` and `auth` are separate answers on purpose. Reachable with `auth: false` is a
-password problem; unreachable is a host, port or prefix problem. They get fixed in different
-places.
-
-Then a real query:
+## Step 4 — Run a query
 
 ```bash
 iris-agentic-dev tool iris_query \
@@ -162,10 +151,11 @@ iris-agentic-dev tool iris_query \
 }
 ```
 
-The whole loop ran there: your terminal, HTTP, Atelier, IRIS, and back, with no MCP server and
-no editor in it.
+That table is IRIS describing its own classes, which is a decent first thing to poke at if
+ObjectScript is new to you. The whole loop ran there: your terminal, HTTP, Atelier, IRIS, and
+back, with no MCP server and no editor in it.
 
-## Step 5 — Three things worth doing from the terminal
+## Step 5 — Three more things worth doing from the terminal
 
 Read a class out of IRIS:
 
@@ -181,7 +171,7 @@ iris-agentic-dev tool iris_execute --args '{"code":"Write $ZVERSION"}'
 
 ```json
 {
-  "output": "IRIS for UNIX ... 2026.2.0L (Build 208U) ...",
+  "output": "IRIS for UNIX ... 2026.1 (Build 234U) ...",
   "namespace": "USER",
   "execution_path": "atelier",
   "auth_user": "_SYSTEM",
@@ -196,12 +186,13 @@ iris-agentic-dev tool iris_namespace_list
 ```
 
 ```json
-{ "count": 3, "namespaces": ["%SYS", "BENCHMARK", "USER"], "success": true }
+{ "count": 2, "namespaces": ["%SYS", "USER"], "success": true }
 ```
 
-All 81 tools work this way, and [tools.md](tools.md) is the catalogue. A note on state: a
-session token from `iris_ws_open`, and `iris_doc`'s checkout prompt, live in the process that
-created them, so they do not survive between two `tool` invocations. Use `batch` for those.
+A fresh container has those two. `USER` is yours to experiment in; leave `%SYS` alone until you
+know why you are in it.
+
+All 81 tools work this way and [tools.md](tools.md) is the catalogue.
 
 ## Step 6 — Hand it to your editor
 
@@ -225,12 +216,15 @@ created them, so they do not survive between two `tool` invocations. Use `batch`
 }
 ```
 
+The editor gets its own copy of the environment, because it does not inherit the `export` lines
+from your shell.
+
 OpenCode, Cursor and VS Code + Copilot each want a different shape. They are in the README's
 three Quick start sections, and Cursor has its own walkthrough in
 [cursor-quickstart.md](cursor-quickstart.md).
 
-Before restarting your editor, confirm the server answers. This is the same handshake the
-editor performs:
+Before restarting your editor, confirm the server answers. This is the same handshake the editor
+performs:
 
 ```bash
 printf '%s\n' \
@@ -267,6 +261,42 @@ deciding to install them.
 
 The errors you are most likely to hit first, verbatim.
 
+**401 Unauthorized on everything.** Almost always the expired password from step 1. Run the
+`UnExpireUserPasswords` command and try again. To see whether the problem is the network or the
+credentials, ask for the two answers separately. This tool takes the target explicitly rather
+than reading your environment:
+
+```bash
+iris-agentic-dev tool iris_test_server \
+  --args '{"host":"localhost","web_port":52773,"username":"_SYSTEM","password":"SYS"}'
+```
+
+```json
+{
+  "reachable": true,
+  "auth": false,
+  "error": "Authentication failed (HTTP 401)",
+  "latency_ms": 5
+}
+```
+
+`reachable: true` with `auth: false` is a credentials problem. Unreachable is a host, port or
+prefix problem. They get fixed in different places.
+
+The same 401 reaching you through a different tool looks worse than it is:
+
+```json
+{
+  "error": "HTTP 401 Unauthorized",
+  "error_code": "IRIS_UNREACHABLE",
+  "hint": "Check IRIS_HOST and IRIS_WEB_PORT (and IRIS_WEB_PREFIX if using a non-root gateway)",
+  "attempted_url": "http://localhost:52773/api/atelier/v1/USER/action/query"
+}
+```
+
+Trust the `error` line and ignore the `hint`: 401 is your credentials, and the host and port in
+`attempted_url` were both fine. The code and hint are wrong for this case and are being fixed.
+
 **Wrong field name.** The message lists the fields that exist, which is faster than the docs:
 
 ```text
@@ -283,21 +313,6 @@ available tools:
   ...
 ```
 
-**Wrong password.** Reachable, rejected:
-
-```json
-{
-  "error": "HTTP 401 Unauthorized",
-  "error_code": "IRIS_UNREACHABLE",
-  "hint": "Check IRIS_HOST and IRIS_WEB_PORT (and IRIS_WEB_PREFIX if using a non-root gateway)",
-  "attempted_url": "http://localhost:52780/api/atelier/v1/USER/action/query"
-}
-```
-
-Trust the `error` line and ignore the `hint` here: 401 is your credentials, and the host and
-port in `attempted_url` were both fine. The code and hint are wrong for this case and are being
-fixed.
-
 **Wrong port, or IRIS down.** This one is ugly, and the shape is the tell rather than the text:
 
 ```text
@@ -305,12 +320,12 @@ error: ErrorData { code: ErrorCode(-32603), message: "HTTP error: error sending 
 url (http://localhost:59999/api/atelier/v1/USER/action/query)", data: None }
 ```
 
-Nothing is listening at that URL. Check the port in the message against `docker ps` or your
-Web Gateway. A raw struct like this instead of a JSON error means the failure happened below
-the layer that formats errors properly.
+Nothing is listening at that URL. Check the port in the message against `docker ps`. A raw
+struct like this instead of a JSON error means the failure happened below the layer that formats
+errors properly.
 
-**No tools in the editor.** Run the step 6 handshake. If it prints 81 tools, the binary is
-fine and the editor's config has the wrong command path.
+**No tools in the editor.** Run the step 6 handshake. If it prints 81 tools, the binary is fine
+and the editor's config has the wrong command path.
 
 The symptom table in [troubleshooting.md](troubleshooting.md) covers the rest, including
 `SESSION_STALE`, Web Gateway prefixes, and Windows Server Manager credentials.
@@ -324,3 +339,9 @@ The symptom table in [troubleshooting.md](troubleshooting.md) covers the rest, i
 | Understand the skill system                  | [skills.md](skills.md)                                  |
 | Work out who did what to an instance         | [agent-attribution.md](agent-attribution.md)            |
 | See whether any of this is measured to help  | [results.md](../specs/121-benchmark-program/results.md) |
+
+When you are done with the container:
+
+```bash
+docker rm -f iris-quickstart
+```
