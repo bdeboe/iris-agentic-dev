@@ -39,15 +39,28 @@ from tests.e2e.skill_eval.rollout_namespace import (
     existing_namespaces,
 )
 
-pytestmark = pytest.mark.skipif(
-    subprocess.run(
-        ["docker", "ps", "--filter", "name=iris-dev-iris", "--format", "{{.Names}}"],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    != "iris-dev-iris",
-    reason="iris-dev-iris is not running, and IRIS is the only thing that can answer isolation",
-)
+pytestmark = [
+    # Load-bearing for CI: ci.yml filters on `not requires_iris`. Without the marker the filter
+    # excuses nothing and the skipif below is the only thing keeping these off a runner with no
+    # container -- which also means `pytest -m requires_iris` collected zero of them.
+    pytest.mark.requires_iris,
+    pytest.mark.skipif(
+        subprocess.run(
+            [
+                "docker",
+                "ps",
+                "--filter",
+                "name=iris-dev-iris",
+                "--format",
+                "{{.Names}}",
+            ],
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        != "iris-dev-iris",
+        reason="iris-dev-iris is not running, and IRIS is the only thing that can answer isolation",
+    ),
+]
 
 CLASS_NAME = "Rollout.Marker"
 

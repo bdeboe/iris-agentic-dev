@@ -20,7 +20,7 @@ The IRIS container the tasks run against:
 docker ps --filter name=iris-dev-iris
 ```
 
-If it is not up, start it — every check is a fixture that talks to it. Then:
+If it is not up, start it. Every check below is a fixture that talks to it. Then:
 
 ```bash
 cd iris-agentic-dev
@@ -48,10 +48,12 @@ minute, which looks like the same green and is not: nothing checked whether a si
 still discriminates. Add `-v` if you want to watch it move.
 
 CI runs the same tests with `-m "not requires_iris and not network_curl and not billable"`.
-The live task validation is not in that filter — it excuses itself, with a module-level
-`skipif` that shells out to `docker ps`. So CI genuinely does not check task
-discrimination, and the only place that happens is a developer machine or the nightly.
-Which is the reason to run it here with the container up.
+The live task validation carries `requires_iris`, so CI deselects it by name, and it also
+skips itself on a module-level `skipif` that shells out to `docker ps`. Two mechanisms,
+because a marker is how a filter selects and a skipif is how a run survives a missing
+container. Either way CI does not check task discrimination: the only places that happens
+are a developer machine and the nightly. Which is the reason to run it here with the
+container up.
 
 The corpus and the split, which is the check that refuses to load a corpus where any task
 ID is missing from both sides of `tests/e2e/tasks/benchmark/split.toml`:
@@ -76,7 +78,7 @@ python3 -m tests.e2e.skill_eval.ladder --dry-run --spent 13.10
 so you can see the answer before committing to it, not after.
 
 Regenerate the published per-tool table from the committed run artifact. It rewrites
-`lift-results.md` in place, so `git diff` is the assertion — a clean diff means the
+`lift-results.md` in place, so `git diff` is the assertion. A clean diff means the
 document still matches its data:
 
 ```bash
@@ -100,8 +102,8 @@ python3 -m tests.e2e.skill_eval.ladder \
 It writes `<run_id>.runs.jsonl` as it goes, one line per session, before it writes any
 report. That file is the run; the report is a view of it.
 
-The skills rung is a separate invocation, and it answers a different question — whether
-the bundled skills add anything on top of the tools:
+The skills rung is a separate invocation, and it answers a different question: whether
+the bundled skills add anything on top of the tools.
 
 ```bash
 python3 -m tests.e2e.skill_eval.ladder --ladder skill --skill all
@@ -109,7 +111,7 @@ python3 -m tests.e2e.skill_eval.ladder --ladder skill --skill all
 
 ### When a run dies halfway
 
-4.25 hours serial is long enough that something will. Nothing is lost — ask what is still
+4.25 hours serial is long enough that something will. Nothing is lost. Ask what is still
 owed, then run only that:
 
 ```bash
@@ -149,8 +151,8 @@ Tasks live in `tests/e2e/tasks/benchmark/corpus/`. Each needs three things:
 2. A reference solution that passes it.
 3. A fixture that fails it before the agent touches anything.
 
-The third is the one people skip, and without it a task that passes in all three arms
-tells you nothing — it may have been passing before the agent arrived.
+Skip the third and a task that passes in all three arms tells you nothing, because it may
+have been passing before the agent arrived.
 
 Add the ID to the `holdout` side of `split.toml`. New tasks belong there: the train side
 exists for the GEPA optimizer to fit against, and a task that has been tuned against

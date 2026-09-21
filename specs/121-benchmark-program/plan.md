@@ -72,6 +72,29 @@ way 118 did it.
 
 _No FAIL gates._
 
+### Post-design re-check (T051)
+
+Five rows moved. No row moved to FAIL.
+
+| Principle                  | Then                     | Now                                                                                                                                                                                                                                                                                     |
+| -------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V. Output Shape Parity     | PASS, predicted          | PASS, exercised. The report gained `scoring_mode` and the baseline file went to schema 2 with provenance and merge-by-skill. Both additions; nothing renamed. `test_published_figures.py` now reads `scoring_mode`, so the contract has a consumer that fails when it moves.            |
+| VII. Dependency Minimalism | PASS, about scipy        | PASS, and wider than intended. The graded corpus is scored by an ObjectScript check, so the harness has no reason to need the model SDK to load — and did, through a chain of imports. Fixed, and `test_the_harness_imports_without_the_anthropic_sdk` blocks it with a meta_path shim. |
+| IX. Tool Lift Requirement  | PASS, no lift owed       | PASS, with a number. The instrument exists and the tools measure **+0.829 [+0.714, +0.944]** on 41 graded holdout pairs. IX's +0.20 bar predates any harness that could tell +0.20 from noise at this corpus size; FR-008's floor is what makes it checkable.                           |
+| XI. No Vacuous Tests       | PASS, about loud skips   | PASS, and the skips were loud. What was quiet is a class XI does not reach: a test that opens an untracked file, a CI step that names three files out of ~1000, a marker CI filters on that no test carries. Three of the six registry rows in the amendment are that class.            |
+| XIII. Single-Source        | PASS, three single sites | PASS, four. `_floor_for` is the only place a floor is computed, `assert_publishable_from_holdout` the only publish gate, `comparison.py` the only interval, and `test_published_figures.py` pins `scoring_mode` to the one literal `ladder.py` writes.                                  |
+
+Two corrections to what is written above:
+
+- **Two new bug classes became six.** The four extra came out of running the program rather than
+  designing it, which is the argument for cranking it before merging. All six are in
+  `constitution-amendment.md` and every one names a detector that exists and fails.
+- **"Written through Bash, the way 118 did it" is wrong on both halves.** 118 did not write through
+  Bash; it staged `specs/118-skill-eval-harness-repair/constitution-amendment.md` and left the
+  constitution alone. That is the right precedent: the file is in `protected_files.extra`, so a
+  shell redirect past the hook would be defeating the gate rather than satisfying the task. 121's
+  amendment is staged the same way and stays unapplied until the owner applies it.
+
 ## Project Structure
 
 ### Documentation (this feature)

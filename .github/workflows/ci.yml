@@ -91,7 +91,10 @@ jobs:
         #
         # What the marker filter drops, and why each is not a gap:
         #   requires_iris  — no container in this job. Covered by the Rust integration jobs and
-        #                    by the nightly, which does have one.
+        #                    by the nightly, which does have one. Those 70 tests also carry a
+        #                    module-level skipif on `docker ps`, so they would survive without the
+        #                    filter; the marker is what lets anyone select them deliberately, and
+        #                    test_iris_markers.py fails if it ever stops matching them.
         #   network_curl   — reaches raw.githubusercontent.com; a GitHub outage is not a defect
         #                    in this repo.
         #   billable       — spawns a real agent session. skill-regression.yml is the only

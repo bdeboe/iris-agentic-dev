@@ -83,7 +83,7 @@ brew install iris-agentic-dev
 not touched by Homebrew. Run `iris-agentic-dev skill install` after upgrading to
 pick up new skills. Files installed before the `managed_by` marker was introduced
 (or installed by other means) will be skipped as unrecognized; pass `--force` to
-overwrite them and stamp them for automatic updates going forward.
+overwrite them and stamp them so later upgrades pick them up.
 
 ### Mac direct download (Apple Silicon)
 
@@ -390,14 +390,14 @@ connection.
 
 Skills and the MCP server are independent — installing the binary installs no skills.
 
-**What they are measured to be worth: nothing yet.** On a graded holdout of 41 task-pairs,
+**So far they are measured to be worth nothing.** On a graded holdout of 41 task-pairs,
 every task scored by an ObjectScript check rather than a model, adding the skills on top of
-the tools moved the pass rate by +0.098 with an interval of [-0.034, +0.229] — six tasks
-won, two lost, p=0.1445. That is indistinguishable from no effect, and the rule that calls
-it that was written down before the first session ran. See
+the tools moved the pass rate by +0.098 with an interval of [-0.034, +0.229]. Six tasks won,
+two lost, p=0.1445. That is indistinguishable from no effect, and the rule that calls it
+that was written down before the first session ran. See
 [`specs/121-benchmark-program/skills-verdict.md`](specs/121-benchmark-program/skills-verdict.md).
 
-The tools are a different story: the same run measured them at **+0.829** [+0.714, +0.944]
+The tools did better. The same run measured them at **+0.829** [+0.714, +0.944]
 over a bare model, 34 of 41 tasks won and none lost
 ([`results.md`](specs/121-benchmark-program/results.md)).
 
