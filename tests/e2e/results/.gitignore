@@ -1,2 +1,13 @@
+# Run dumps are local noise — there are hundreds and they are reproducible from the
+# .runs.jsonl beside them. Ignored by default.
 *.json
-# keep dir
+
+# Except the handful that are evidence. A test opens each of these unguarded, and a document
+# quotes figures from them, so a clean checkout has to have them or the test is a pass that only
+# happens on the machine that produced the file. They are force-added; if you add another, add it
+# here too. `test_published_figures.py` fails when a test names a result file the repo does not
+# carry, which is how pilot-121.json was found after three tests had depended on it for weeks.
+!pilot-121.json
+!ladder-121-tools-holdout.json
+!ladder-121-skills-pooled.json
+!skill-baseline.json

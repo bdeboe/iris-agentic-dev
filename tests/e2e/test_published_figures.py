@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 
 import pytest
 
@@ -31,6 +32,9 @@ _REPO_ROOT = os.path.dirname(
 ARTIFACT = os.path.join(
     _REPO_ROOT, "tests", "e2e", "results", "ladder-121-tools-holdout.json"
 )
+
+#: Result-artifact filenames as they appear in test source. Matches bare names and path fragments.
+_ARTIFACT_RE = re.compile(r"([A-Za-z0-9][A-Za-z0-9._-]*\.jsonl?)")
 
 #: Documents that quote a figure from that run, and must therefore quote this one.
 CITING_DOCUMENTS = (
@@ -136,6 +140,54 @@ def test_the_artifact_was_machine_graded_not_model_graded():
     assert mode == GRADED_SCORING_MODE, (
         f"scoring_mode is {mode!r}, not {GRADED_SCORING_MODE!r}. If the ladder renamed it, update "
         f"this constant deliberately — an unrecognised mode is not evidence of machine grading"
+    )
+
+
+def test_every_result_artifact_a_test_depends_on_is_tracked():
+    """An artifact a test opens without guarding has to be in the repo, or the test is a local pass.
+
+    `tests/e2e/results/.gitignore` ignores `*.json`, which is right for the hundred run dumps and
+    wrong for the handful that are evidence. Three tests in `test_pilot.py` opened
+    `pilot-121.json` unguarded while it sat untracked: green on the machine that produced it, red on
+    every clean checkout. A `git clone` found it in seconds and nothing before that did, because CI
+    ran three named files and none of them were these.
+    """
+    results_dir = os.path.join(_REPO_ROOT, "tests", "e2e", "results")
+    tracked = subprocess.run(
+        ["git", "ls-files", "tests/e2e/results"],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if tracked.returncode != 0:
+        pytest.skip(f"not a git work tree: {tracked.stderr.strip()}")
+    tracked_names = {
+        os.path.basename(line) for line in tracked.stdout.splitlines() if line
+    }
+
+    named = set()
+    for directory in ("tests/e2e", "tests/e2e/skill_eval", "benchmark/harbor"):
+        full_dir = os.path.join(_REPO_ROOT, directory)
+        if not os.path.isdir(full_dir):
+            continue
+        for entry in sorted(os.listdir(full_dir)):
+            if not (entry.startswith("test_") and entry.endswith(".py")):
+                continue
+            with open(os.path.join(full_dir, entry), encoding="utf-8") as handle:
+                body = handle.read()
+            for candidate in _ARTIFACT_RE.findall(body):
+                if os.path.isfile(os.path.join(results_dir, candidate)):
+                    named.add((directory, entry, candidate))
+
+    missing = sorted(
+        f"{directory}/{test_file} -> {artifact}"
+        for directory, test_file, artifact in named
+        if artifact not in tracked_names
+    )
+    assert not missing, (
+        f"these tests name a result artifact that exists here but is not in the repo: {missing}. "
+        f"Either `git add -f` it, because a test depends on it, or stop depending on it"
     )
 
 
