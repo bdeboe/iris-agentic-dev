@@ -1,6 +1,6 @@
 # Getting started
 
-Fifteen minutes from nothing to an agent that can read and write ObjectScript on IRIS. This
+Fifteen minutes from nothing to Claude Code reading and writing ObjectScript on IRIS. This
 assumes one IRIS running in Docker on your own machine and no prior IRIS experience. Six steps,
 each one ending in output you can compare against what is printed here.
 
@@ -8,8 +8,9 @@ If you already run IRIS somewhere else, or more than one instance, or Enterprise
 Web Gateway, read [connecting.md](connecting.md) instead. Everything here still applies; only
 step 3 changes.
 
-Three things can be wrong: the IRIS instance, the connection, and the editor config. Steps 1 to
-5 rule out the first two, so when step 6 fails you already know which one you are looking at.
+Three things can be wrong: the IRIS instance, the connection, and Claude Code's config. Steps 1
+to 5 rule out the first two, so when step 6 fails you already know which one you are looking at.
+Another editor works the same way; only step 6 changes.
 
 Every command below was run while writing this, against the container step 1 starts, and
 `tests/e2e/test_getting_started.py` checks that each subcommand, tool and argument named here
@@ -192,37 +193,54 @@ know why you are in it.
 
 All 81 tools work this way and [tools.md](tools.md) is the catalogue.
 
-## Step 6 — Hand it to your editor
+## Step 6 — Hand it to Claude Code
 
-**Claude Code.** Add this to `~/.claude.json`:
+One command, no config file to edit by hand:
 
-```json
-{
-  "mcpServers": {
-    "iris-agentic-dev": {
-      "command": "iris-agentic-dev",
-      "args": ["mcp"],
-      "env": {
-        "IRIS_HOST": "localhost",
-        "IRIS_WEB_PORT": "52773",
-        "IRIS_USERNAME": "_SYSTEM",
-        "IRIS_PASSWORD": "SYS",
-        "IRIS_NAMESPACE": "USER"
-      }
-    }
-  }
-}
+```bash
+claude mcp add iris-agentic-dev --scope user \
+  -e IRIS_HOST=localhost -e IRIS_WEB_PORT=52773 \
+  -e IRIS_USERNAME=_SYSTEM -e IRIS_PASSWORD=SYS -e IRIS_NAMESPACE=USER \
+  -- iris-agentic-dev mcp
 ```
 
-The editor gets its own copy of the environment, because it does not inherit the `export` lines
-from your shell.
+```text
+Added stdio MCP server iris-agentic-dev with command: iris-agentic-dev mcp to user config
+```
 
-OpenCode, Cursor and VS Code + Copilot each want a different shape. They are in the README's
-three Quick start sections, and Cursor has its own walkthrough in
-[cursor-quickstart.md](cursor-quickstart.md).
+The `-e` flags repeat step 3 because Claude Code starts the server itself, with a fresh
+environment. It does not inherit the `export` lines from your shell.
 
-Before restarting your editor, confirm the server answers. This is the same handshake the editor
-performs:
+`--scope user` makes the server available in every directory you run `claude` in.
+`--scope project` writes a `.mcp.json` in the current directory instead, which you can commit for
+a team; that one reads `⏸ Pending approval` until someone opens Claude Code there and accepts it.
+
+Confirm the server starts before opening a session:
+
+```bash
+claude mcp list
+```
+
+```text
+iris-agentic-dev: iris-agentic-dev mcp - ✔ Connected
+```
+
+Now run `claude` and ask for something only IRIS can answer:
+
+```text
+Use iris_namespace_list and tell me what namespaces this instance has.
+```
+
+You see the tool call, then `%SYS` and `USER`, the same two as step 5. If the answer comes back
+with no tool call in it, add "do not answer from memory". The model knows what an IRIS namespace
+is and will guess.
+
+Past that you can stop naming tools and describe the job: "read %SYSTEM.OBJ out of IRIS and tell
+me what Compile does with its qspec argument". Claude Code picks the tool, and
+[tools.md](tools.md) is there for when you want to name one anyway.
+
+**If Claude Code shows no iad tools**, test the server on its own. This is the same handshake
+Claude Code performs:
 
 ```bash
 printf '%s\n' \
@@ -231,10 +249,13 @@ printf '%s\n' \
   | iris-agentic-dev mcp | head -2
 ```
 
-Two JSON-RPC responses: `serverInfo` naming the version, then 81 tools. If that works and your
-editor still shows no tools, the problem is the editor's config file, not this binary, and it is
-almost always a path. An editor GUI does not inherit your shell `PATH`, so use the absolute path
-from `which iris-agentic-dev`.
+Two JSON-RPC responses: `serverInfo` naming the version, then 81 tools. If that works, the
+problem is the command path rather than the binary. A GUI-launched editor does not inherit your
+shell `PATH`, so pass the absolute path from `which iris-agentic-dev`.
+
+**Other editors.** OpenCode, Cursor and VS Code + Copilot each want a different config shape.
+They are in the README's three Quick start sections, and Cursor has its own walkthrough in
+[cursor-quickstart.md](cursor-quickstart.md).
 
 **Skills are separate.** Installing the binary installs no skills, and installing skills needs
 no binary at runtime:
@@ -322,8 +343,9 @@ Nothing is listening at that URL. Check the port in the message against `docker 
 struct like this instead of a JSON error means the failure happened below the layer that formats
 errors properly.
 
-**No tools in the editor.** Run the step 6 handshake. If it prints 81 tools, the binary is fine
-and the editor's config has the wrong command path.
+**No iad tools in Claude Code.** Run `claude mcp list`. Anything other than `✔ Connected` is the
+server failing to start, so run the step 6 handshake next; if that prints 81 tools, the binary is
+fine and the registered command path is wrong.
 
 The symptom table in [troubleshooting.md](troubleshooting.md) covers the rest, including
 `SESSION_STALE`, Web Gateway prefixes, and Windows Server Manager credentials.

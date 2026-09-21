@@ -163,7 +163,18 @@ if you have multiple servers configured.
 
 After [installing the binary](#install), configure your agent:
 
-**Claude Code** — add to `~/.claude.json`:
+**Claude Code** — register the server from the CLI:
+
+```bash
+claude mcp add iris-agentic-dev --scope user \
+  -e IRIS_HOST=localhost -e IRIS_WEB_PORT=52773 \
+  -e IRIS_USERNAME=_SYSTEM -e IRIS_PASSWORD=SYS -e IRIS_NAMESPACE=USER \
+  -- iris-agentic-dev mcp
+```
+
+`claude mcp list` should then show `iris-agentic-dev … ✔ Connected`. Use `--scope project` to
+write a committable `.mcp.json` in the current directory instead. The equivalent hand-written
+entry in `~/.claude.json` is:
 
 ```json
 {

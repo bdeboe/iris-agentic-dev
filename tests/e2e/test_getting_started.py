@@ -56,6 +56,35 @@ _LINK_RE = re.compile(r"\]\((?!https?://|#)([^)\s]+)")
 #: Named in prose as flags of the binary, not as subcommands.
 _NOT_SUBCOMMANDS = frozenset({"help"})
 
+#: Fence languages whose contents are commands someone types.
+_COMMAND_FENCES = frozenset({"bash", "sh", "shell", "console"})
+
+#: `claude mcp add iris-agentic-dev --scope user` passes the name as an argument, so the token
+#: after it is a flag's value rather than a subcommand. The binary's own invocation in that
+#: command is after the `--`, on a later line, so dropping this line checks less than nothing.
+_SERVER_NAME_CONTEXT = "claude mcp"
+
+
+def _lines_invoking_the_binary(guide: str) -> str:
+    """Prose and command blocks, without expected output.
+
+    `text` blocks hold what IRIS and the CLI print back, and `Added stdio MCP server
+    iris-agentic-dev with command:` reads to a regex as the subcommand `with`. Output is not
+    something a reader types, so it is not scanned for typed commands.
+    """
+    kept: list[str] = []
+    fence: str | None = None
+    for line in guide.splitlines():
+        if line.startswith("```"):
+            fence = None if fence is not None else line[3:].strip().lower() or "none"
+            continue
+        if fence is not None and fence not in _COMMAND_FENCES:
+            continue
+        if _SERVER_NAME_CONTEXT in line:
+            continue
+        kept.append(line)
+    return "\n".join(kept)
+
 
 def _guide() -> str:
     path = os.path.join(_REPO_ROOT, GUIDE)
@@ -121,7 +150,10 @@ def test_every_subcommand_the_guide_names_exists():
         f"could not parse subcommands from --help:\n{top_level.stdout}"
     )
 
-    named = set(_SUBCOMMAND_RE.findall(_guide())) - _NOT_SUBCOMMANDS
+    named = (
+        set(_SUBCOMMAND_RE.findall(_lines_invoking_the_binary(_guide())))
+        - _NOT_SUBCOMMANDS
+    )
     unknown = sorted(named - real)
     assert not unknown, (
         f"{GUIDE} names {unknown} as subcommands and the binary has no such command. "
