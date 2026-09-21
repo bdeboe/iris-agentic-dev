@@ -171,6 +171,59 @@ def test_ci_still_covers_the_files_it_used_to_name():
         )
 
 
+BINARY_MARKER = "requires_binary"
+
+
+def test_ci_runs_the_tests_that_need_a_built_binary():
+    """A test that skips for a missing binary is a test CI is not running.
+
+    `benchmark-lint` has python and no cargo, so the getting-started guard and the T007
+    `tools/list` check resolved nothing and skipped — and `provenance` falls back to a Homebrew
+    path, which on a runner is the #118 failure exactly: green over a suite that never ran. The
+    step has to select by marker and name the build in the same command, since only the job that
+    ran `cargo build` knows where it is.
+    """
+    steps = [
+        (label, run)
+        for _, label, run in _run_steps(_ci())
+        if f"-m {BINARY_MARKER}" in run or f"'{BINARY_MARKER}'" in run
+    ]
+    assert steps, (
+        f"no ci.yml step selects -m {BINARY_MARKER}. Without it every test marked that way "
+        f"skips on the runner and the job still passes"
+    )
+    for label, run in steps:
+        assert "IAD_BINARY" in run, (
+            f"ci.yml step `{label}` selects -m {BINARY_MARKER} without setting IAD_BINARY, so "
+            f"provenance falls through to a Homebrew path no runner has and the tests skip"
+        )
+        assert "target/debug/iris-agentic-dev" in run, (
+            f"ci.yml step `{label}` sets IAD_BINARY to something other than the build this job "
+            f"produced. Point it at target/debug/iris-agentic-dev or it is testing a release "
+            f"nobody in this run compiled"
+        )
+
+
+def test_something_actually_carries_the_binary_marker():
+    """The marker selection must not be vacuous.
+
+    `pytest -m` over a directory that contains no match deselects everything and exits 0, so
+    renaming the marker on the tests and leaving ci.yml alone turns the step into a no-op that
+    still reports success.
+    """
+    marked = []
+    for path in glob.glob(
+        os.path.join(_REPO_ROOT, "tests", "e2e", "**", "test_*.py"), recursive=True
+    ):
+        with open(path, encoding="utf-8") as handle:
+            if f"pytest.mark.{BINARY_MARKER}" in handle.read():
+                marked.append(os.path.relpath(path, _REPO_ROOT))
+    assert marked, (
+        f"no test under tests/e2e/ carries @pytest.mark.{BINARY_MARKER}, so the ci.yml step "
+        f"selecting it collects nothing and passes"
+    )
+
+
 def test_no_ci_step_opts_into_billable_sessions():
     """CI must never set the opt-in. A runner that spends money does it 365 nights a year."""
     from tests.e2e import billing

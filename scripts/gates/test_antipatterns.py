@@ -1076,6 +1076,54 @@ def test_baseline_counts_repeats() -> None:
     )
 
 
+def test_tool_name_refs() -> None:
+    """The only detector here that reads the tree rather than a mapping, so it had no canary.
+
+    It fires on any `iris_*` token a document names that the router does not answer to, which
+    is right for `iris_document` (remediation text pointed at a tool that never existed) and
+    wrong for two shapes a document legitimately contains: a response *field* named
+    `iris_version`, and a deliberately-misspelled tool inside a quoted error message. The first
+    was papered over with eleven baseline lines rather than named as a non-tool.
+    """
+    import check_tool_names as ctn
+
+    known = ctn.registered_tools() | ctn.ALLOWED
+
+    fires = ctn.scan_text(
+        "docs/example.md", "Call `iris_document` to read a class.", known
+    )
+    check(
+        "tool-name-refs fires on a tool that does not exist",
+        [name for _, name in fires] == ["iris_document"],
+        f"got {fires}",
+    )
+
+    field = ctn.scan_text(
+        "docs/example.md", '  "iris_version": "IRIS for UNIX ... 2026.2",', known
+    )
+    check(
+        "tool-name-refs ignores the iris_version response field",
+        field == [],
+        f"got {field}",
+    )
+
+    real = ctn.scan_text(
+        "docs/example.md", "Run `iris_query` against the namespace.", known
+    )
+    check("tool-name-refs ignores a registered tool", real == [], f"got {real}")
+
+    quoted = "error: unknown tool 'iris_quer'"
+    check(
+        "tool-name-refs fires on a misspelled tool in a file with no exemption",
+        [name for _, name in ctn.scan_text("docs/example.md", quoted, known)]
+        == ["iris_quer"],
+    )
+    check(
+        "tool-name-refs respects a path-scoped exemption for that same name",
+        ctn.scan_text("docs/getting-started.md", quoted, known) == [],
+    )
+
+
 def test_zz_every_canary_passed() -> None:
     """The one assertion in the file, and the reason `pytest` can be trusted on it.
 
@@ -1096,6 +1144,7 @@ def main() -> int:
     test_device_capture()
     test_scored_exception()
     test_unpowered_result()
+    test_tool_name_refs()
     test_both_classes_are_never_baselined()
     test_baseline_key_ignores_line_numbers()
     test_baseline_counts_repeats()

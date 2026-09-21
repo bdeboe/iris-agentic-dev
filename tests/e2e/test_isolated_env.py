@@ -228,6 +228,7 @@ def _mcp_tool_names(command: list[str], env: dict, timeout: int = 30) -> list[st
         proc.wait(timeout=5)
 
 
+@pytest.mark.requires_binary
 def test_the_configured_mcp_command_serves_tools():
     """The command written into the config has to actually answer `tools/list`.
 

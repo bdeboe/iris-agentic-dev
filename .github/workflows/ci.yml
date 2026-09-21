@@ -58,6 +58,20 @@ jobs:
         env:
           RUST_LOG: warn
           RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+      # The python tests that need a real build. They skip themselves without one, and
+      # `benchmark-lint` has no cargo, so the getting-started guard and the T007 tools/list
+      # check ran nowhere: the #118 pattern, where provenance falls back to a Homebrew path
+      # that does not exist on a runner. This job already built the binary, so it is the only
+      # job that can name it. Selected by marker, not by file, so a new marked test is covered
+      # by existing.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml pytest requests
+      - name: Python tests that need the built binary
+        run: |
+          IAD_BINARY="$PWD/target/debug/iris-agentic-dev" \
+            python -m pytest tests/e2e -m requires_binary -q
 
   benchmark-lint:
     runs-on: ubuntu-latest

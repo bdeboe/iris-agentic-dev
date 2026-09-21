@@ -22,6 +22,11 @@ def pytest_configure(config):
         f"{billing.BILLABLE_ENV}=1",
     )
     config.addinivalue_line("markers", "cli: drives a command-line entry point")
+    config.addinivalue_line(
+        "markers",
+        "requires_binary: needs a real iris-agentic-dev build; skips without one, so CI has "
+        "to select it by this marker with IAD_BINARY set or it reports green over nothing",
+    )
 
 
 def pytest_collection_modifyitems(config, items):

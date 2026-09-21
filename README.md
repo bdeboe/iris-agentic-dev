@@ -596,11 +596,13 @@ iris-agentic-dev --version                        # Print version
 
 | Guide                                          | Contents                                                                         |
 | ---------------------------------------------- | -------------------------------------------------------------------------------- |
+| [docs/getting-started.md](docs/getting-started.md) | Start here. Install, connect, first tool call, first errors, then your editor |
 | [docs/connecting.md](docs/connecting.md)       | Native IRIS, Docker, Server Manager, policy gates, env vars, discovery order     |
 | [docs/tools.md](docs/tools.md)                 | Full tool catalog with descriptions and error codes                              |
 | [docs/skills.md](docs/skills.md)               | Skill inventory, benchmark results, CLI install reference                        |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Symptom table, CLI commands, verbose logging                               |
 | [docs/ecosystem-integration.md](docs/ecosystem-integration.md) | Patterns for downstream projects and skill repos              |
+| [docs/cursor-quickstart.md](docs/cursor-quickstart.md) | Cursor IDE and Cursor CLI setup, fleet routing, vs VS Code + Copilot      |
 
 ---
 

@@ -29,6 +29,11 @@ ALLOWED = {
     "iris_agentic_dev",
     # Env vars and config keys are screaming-snake or lowercase but not tools.
     "iris_agentic_dev_skills_dir",
+    # A *response field*, on check_config, iris_info and iris_test_server. Nothing can call it,
+    # and every document that shows one of those responses contains it. It sat in the baseline
+    # eleven times instead of here, which is the wrong place for a permanent non-tool: a
+    # baseline line says "this mistake exists and we tolerate it", and this is not a mistake.
+    "iris_version",
 }
 
 # Path-scoped exemptions: `{relative path: {names}}`. A document whose subject is a wrong
@@ -41,6 +46,9 @@ ALLOWED_IN = {
     # The 1.3.2 notes describe fixing that remediation text and the two false positives the
     # tool-name extractor itself produced, so they quote all three names.
     "docs/release-notes/v1.3.2.md": {"iris_document", "iris_graph", "iris_opt"},
+    # The getting-started guide quotes the unknown-tool error verbatim, misspelling included,
+    # because the point is that the CLI answers a typo by printing the catalogue.
+    "docs/getting-started.md": {"iris_quer"},
 }
 
 
@@ -87,46 +95,57 @@ DECLARED = re.compile(
 )
 
 
+def scan_text(rel: str, text: str, known: set[str]) -> list[tuple[int, str]]:
+    """One file's findings as `(line number, name)`, first occurrence of each name only.
+
+    Split out of `main` so the canary in `test_antipatterns.py` can hand it a string. This
+    detector reads the tree while the others take a `{path: text}` mapping, which is why it
+    was the one detector with no canary — and why `iris_version` accumulated eleven baseline
+    lines rather than an argument about whether it is a tool name.
+    """
+    # Rust items and bindings declared in this file, plus any path-scoped exemptions.
+    file_known = known | set(DECLARED.findall(text)) | ALLOWED_IN.get(str(rel), set())
+    found: list[tuple[int, str]] = []
+    seen: set[str] = set()
+    for lineno, line in enumerate(text.splitlines(), 1):
+        for match in re.finditer(r"\biris_[a-z0-9_]+\b", line):
+            name = match.group(0)
+            if name in file_known:
+                continue
+            # `..._impl` is the naming convention for the Rust function behind a tool,
+            # never a name an agent can call. Comments and section banners reference
+            # these constantly.
+            if name.endswith("_impl"):
+                continue
+            if LOCAL_SYMBOL.search(line[: match.start()]):
+                continue
+            # `iris_dev_bin()` is a zero-arg Rust function. No tool is ever referenced
+            # with empty parens — a call an agent makes carries arguments — so this
+            # form is code even when the identifier is declared in another file.
+            if line[match.end() : match.end() + 2] == "()":
+                continue
+            # Trailing `_`-joined identifiers (iris_doc_search_impl) are code.
+            if re.match(r"[a-z0-9_]", line[match.end() : match.end() + 1] or " "):
+                continue
+            if name in seen:
+                continue
+            seen.add(name)
+            found.append((lineno, name))
+    return found
+
+
 def main() -> int:
     known = registered_tools() | ALLOWED
     findings = 0
-    seen = set()
     for path in sorted(targets()):
         try:
             text = path.read_text()
         except (OSError, UnicodeDecodeError):
             continue
         rel = path.relative_to(ROOT)
-        # Rust items and bindings declared in this file, plus any path-scoped exemptions.
-        file_known = (
-            known | set(DECLARED.findall(text)) | ALLOWED_IN.get(str(rel), set())
-        )
-        for lineno, line in enumerate(text.splitlines(), 1):
-            for match in re.finditer(r"\biris_[a-z0-9_]+\b", line):
-                name = match.group(0)
-                if name in file_known:
-                    continue
-                # `..._impl` is the naming convention for the Rust function behind a tool,
-                # never a name an agent can call. Comments and section banners reference
-                # these constantly.
-                if name.endswith("_impl"):
-                    continue
-                if LOCAL_SYMBOL.search(line[: match.start()]):
-                    continue
-                # `iris_dev_bin()` is a zero-arg Rust function. No tool is ever referenced
-                # with empty parens — a call an agent makes carries arguments — so this
-                # form is code even when the identifier is declared in another file.
-                if line[match.end() : match.end() + 2] == "()":
-                    continue
-                # Trailing `_`-joined identifiers (iris_doc_search_impl) are code.
-                if re.match(r"[a-z0-9_]", line[match.end() : match.end() + 1] or " "):
-                    continue
-                key = (rel, name)
-                if key in seen:
-                    continue
-                seen.add(key)
-                print(f"{rel}\t{lineno}\t{name}")
-                findings += 1
+        for lineno, name in scan_text(str(rel), text, known):
+            print(f"{rel}\t{lineno}\t{name}")
+            findings += 1
     return 0 if findings == 0 else 1
 
 
