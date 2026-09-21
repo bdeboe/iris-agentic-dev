@@ -8,9 +8,8 @@ If you already run IRIS somewhere else, or more than one instance, or Enterprise
 Web Gateway, read [connecting.md](connecting.md) instead. Everything here still applies; only
 step 3 changes.
 
-The order is deliberate. Three things can be wrong: the IRIS instance, the connection, and the
-editor config. Only the last one involves your editor, so this checks them in that order. Skip
-to step 6 and you cannot tell which of the three you are looking at.
+Three things can be wrong: the IRIS instance, the connection, and the editor config. Steps 1 to
+5 rule out the first two, so when step 6 fails you already know which one you are looking at.
 
 Every command below was run while writing this, against the container step 1 starts, and
 `tests/e2e/test_getting_started.py` checks that each subcommand, tool and argument named here
@@ -29,8 +28,8 @@ That image is on Docker Hub and needs no login. Give it a minute, then:
 docker ps --filter name=iris-quickstart
 ```
 
-The container's default password is expired the moment it starts, which every HTTP call answers
-as `401 Unauthorized` and nothing tells you why. Clear it:
+The default password starts out expired. Every HTTP call gets back `401 Unauthorized` until you
+clear it, and nothing in the 401 says that is why:
 
 ```bash
 docker exec iris-quickstart iris session IRIS -U%SYS \
@@ -70,9 +69,8 @@ check_config                   Return the active IRIS connection state without m
 ```
 
 Eighty-one lines. This reads the tool router and opens no connection, so it works with IRIS
-down, with the wrong port, with no config file. That is the point of doing it before step 3: if
-this prints 81 tools, the binary is installed correctly and everything that fails from here is a
-connection problem, not an install problem.
+down, with the wrong port, with no config file. If it prints 81 tools the binary is installed
+correctly, and everything that fails after this is a connection problem, not an install problem.
 
 To see what one tool takes:
 
@@ -81,7 +79,7 @@ iris-agentic-dev tool iris_query --schema
 ```
 
 That prints the description and the full JSON Schema: every parameter, its type, its default.
-Also free, also no connection.
+Free too, and still no connection.
 
 ## Step 3 — Point it at IRIS, and check what it aimed at
 
@@ -98,7 +96,7 @@ export IRIS_NAMESPACE=USER
 `IRIS_WEB_PORT` is the web port, not the `1972` you may have seen in JDBC strings. These tools
 speak HTTP to IRIS, so `52773` is the one that matters.
 
-Ask what it thinks it is connected to before running anything that writes:
+Check where it is pointed before running anything that writes:
 
 ```bash
 iris-agentic-dev tool check_config
@@ -117,10 +115,10 @@ iris-agentic-dev tool check_config
 }
 ```
 
-Two fields to read. `connection_source` says where the target came from; `env_vars` means it
-used what you just exported. And `iris_version` is the honest one: it is only filled in if IRIS
-answered. `connected: true` with `iris_version: null` means the port is open but your
-credentials were refused, which is what you get if you skipped the password step above.
+Two fields to read. `connection_source` says where the target came from, and `env_vars` means it
+used what you just exported. `iris_version` is only filled in if IRIS answered, so
+`connected: true` with `iris_version: null` means the port is open and your credentials were
+refused, which is what you get if you skipped the password step above.
 
 With no environment variables and no config file, the binary goes looking instead: Docker
 container names, then VS Code Server Manager, then a port scan. With one IRIS running that
