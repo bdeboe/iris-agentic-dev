@@ -390,18 +390,20 @@ connection.
 
 Skills and the MCP server are independent — installing the binary installs no skills.
 
-Tested with Claude Sonnet 4.6 on the ObjectScript repair suite (22 tasks):
+**What they are measured to be worth: nothing yet.** On a graded holdout of 41 task-pairs,
+every task scored by an ObjectScript check rather than a model, adding the skills on top of
+the tools moved the pass rate by +0.098 with an interval of [-0.034, +0.229] — six tasks
+won, two lost, p=0.1445. That is indistinguishable from no effect, and the rule that calls
+it that was written down before the first session ran. See
+[`specs/121-benchmark-program/skills-verdict.md`](specs/121-benchmark-program/skills-verdict.md).
 
-| Benchmark suite                | Baseline | With top skill | Lift |
-| ------------------------------ | -------- | -------------- | ---- |
-| ObjectScript repair (22 tasks) | 73%      | **100%**       | +27% |
+The tools are a different story: the same run measured them at **+0.829** [+0.714, +0.944]
+over a bare model, 34 of 41 tasks won and none lost
+([`results.md`](specs/121-benchmark-program/results.md)).
 
-The top skill is **`objectscript-review`** — a 205-word checklist that catches the 10 most
-common ObjectScript mistakes before the AI writes any code.
-
-Read the +27% as a rough signal — one run, one model, 22 tasks that may be in training
-data. [BENCHMARKING.md](./skills/BENCHMARKING.md) covers the caveats and lets you run it
-yourself.
+Older figures in this repo — including a +27% for `objectscript-review` on a 22-task repair
+suite — came from a harness that used a model as the judge, on a different corpus. They are
+not comparable to the numbers above and should not be read as current.
 
 **Install skills:**
 
@@ -437,11 +439,16 @@ into `.github/instructions/`.
 | `ensemble-production`        | Interoperability production lifecycle, logs, queues                                             | domain      |
 | `iris-devtester`             | `IRISContainer` factory methods and test fixture patterns                                       | domain      |
 
-> **Note**: some skills hurt if loaded globally. `objectscript-loop-patterns` measured
-> −19% lift when loaded for all tasks. Domain skills should only load when working in
-> those areas. See [BENCHMARKING.md](./skills/BENCHMARKING.md).
+> **Where the Benchmark column comes from**: the model-judged repair and SQL suites, not the
+> graded holdout above. Treat it as a description of what each skill was aimed at, not as a
+> measured effect — the graded run found no distinguishable lift from the skills as a set.
+> One skill is known to hurt: `objectscript-loop-patterns` measured −19% when loaded for all
+> tasks, which is why domain skills should load only in their domain. See
+> [BENCHMARKING.md](./skills/BENCHMARKING.md).
 
-See [`skills/`](./skills/) for the full list and how to contribute a skill.
+See [`skills/`](./skills/) for the full list and how to contribute a skill, and
+[`specs/121-benchmark-program/quickstart.md`](specs/121-benchmark-program/quickstart.md) to
+run the graded benchmark yourself.
 
 ---
 

@@ -51,28 +51,43 @@ not a hard gate; a well-written skill without benchmark coverage can still be ac
 
 How to show lift:
 
-1. **If your skill addresses an existing task category** (GEN, MOD, DBG, SCM, LEG):
-   run the benchmark harness (`benchmark/021/`) with and without the skill and include the
-   before/after scores in your PR description.
+1. **If your skill addresses something the corpus already covers**, run the ladder with and
+   without the skill and include the before/after in your PR description. Paste the comparison
+   line the harness prints, not a summary of it — it carries the item count and the interval,
+   and a lift without those is not a result anyone can check.
 
-2. **If your skill covers a new domain** (e.g. Python interoperability, HealthShare, TrakCare):
-   ideally add at least **3 benchmark tasks** in `benchmark/021/tasks/` for that domain alongside
-   the skill and show +20% lift on those tasks. Tasks paired with a skill are strongly preferred
-   — they prove the skill works rather than documenting what you hope it does.
+2. **If your skill covers a new domain** (e.g. Python interoperability, HealthShare, TrakCare),
+   add tasks for it in `tests/e2e/tasks/benchmark/corpus/` alongside the skill. Tasks paired with
+   a skill are strongly preferred — they prove the skill works rather than documenting what you
+   hope it does.
 
-Run the harness:
+   A task needs a check that prints exactly `PASS` or `FAIL` against live IRIS, a reference
+   solution that passes it, and a fixture that fails it before the agent touches anything. No
+   model grades a task. Add the task ID to the `holdout` side of
+   `tests/e2e/tasks/benchmark/split.toml`; new tasks default there, and the loader refuses a
+   corpus where any ID is missing from both sides.
+
+Run the ladder:
 
 ```bash
 cd iris-agentic-dev
 export IRIS_HOST=localhost IRIS_WEB_PORT=52780
 export IRIS_USERNAME=_SYSTEM IRIS_PASSWORD=SYS
-export ANTHROPIC_API_KEY=sk-ant-...
-python -m benchmark.021.runner
+export PYTHONPATH=.
+python -m tests.e2e.skill_eval.ladder --help
 ```
 
-See [`benchmark/021/README.md`](benchmark/021/README.md) for full instructions and
-[`skills/skills/objectscript-review/`](skills/skills/objectscript-review/)
+It spawns real agent sessions and costs real money, so it asks before spending: see
+`--dry-run` for the session count and estimated cost first.
+
+See [`specs/121-benchmark-program/quickstart.md`](specs/121-benchmark-program/quickstart.md) for
+the full walkthrough and [`skills/skills/objectscript-review/`](skills/skills/objectscript-review/)
 for a reference skill example.
+
+A note on where the numbers come from: a second Python harness lived at `benchmark/021/` until
+spec 121 retired it. Anything you find citing it — older `lift-results.md` files, for instance —
+was measured under an LLM judge on a different corpus and is not comparable to a figure from the
+graded ladder.
 
 ## Bug reports
 

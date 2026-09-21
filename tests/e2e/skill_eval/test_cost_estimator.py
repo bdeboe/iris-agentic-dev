@@ -244,7 +244,7 @@ def test_the_shipped_rate_table_prices_the_model_the_scorer_asks_for():
     Dict membership passed on my laptop and failed on the runner for exactly that reason.
     """
     import tests.e2e.skill_eval  # noqa: F401  — sys.path shim for `runner`
-    from runner._client import haiku_model
+    from tests.e2e.skill_eval.scorer_client import haiku_model
 
     assert cost_estimator._rate_for(haiku_model()) is not None, (
         f"{haiku_model()} has no declared rate, so the run's cost cannot be derived"

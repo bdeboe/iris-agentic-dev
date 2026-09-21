@@ -302,7 +302,7 @@ def unscored_session(task_id: str, condition: str, reason: str) -> dict:
 
     `score: None`, never `0` — `runner.judge.unscored`'s contract.
     """
-    from runner.judge import unscored
+    from tests.e2e.skill_eval.judge import unscored
 
     return {**unscored(reason), "task_id": task_id, "condition": condition}
 
@@ -343,7 +343,7 @@ def run_task_and_score(
     from tests.e2e.skill_eval.fire_rate import _install_skill_local
 
     # Ensure benchmark judge is importable
-    from runner.judge import score_result
+    from tests.e2e.skill_eval.judge import score_result
 
     # Look in targeted tasks dir first, then fall back to benchmark tasks dir
     _TARGETED_DIR = os.path.abspath(

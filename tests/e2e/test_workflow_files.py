@@ -81,3 +81,130 @@ def test_every_step_runs_something(path):
                 f"{os.path.basename(path)}: job `{job_name}` step `{label}` has neither "
                 f"`uses` nor a non-empty `run:`"
             )
+
+
+# --- the benchmark harness has to run somewhere ----------------------------------------------------
+#
+# Spec 121 added about 900 tests under `tests/e2e/` and CI ran three files. A harness nothing
+# exercises is a harness that reports success while broken, which is the whole reason the nightly
+# spent weeks scoring a bare model as a failing skill. These four assertions are in this file
+# because CI already runs it, so they are live the moment the branch merges.
+
+
+def _ci() -> dict:
+    return _load(os.path.join(_WORKFLOW_DIR, "ci.yml"))
+
+
+def _run_steps(workflow: dict):
+    """(job_name, step_label, run_body) for every step that runs a shell command."""
+    for job_name, job in (workflow.get("jobs") or {}).items():
+        if "uses" in job:
+            continue
+        for position, step in enumerate(job.get("steps") or [], start=1):
+            run = step.get("run")
+            if isinstance(run, str) and run.strip():
+                label = step.get("name") or f"step {position}"
+                yield job_name, label, run
+
+
+HARNESS_SUITES = ("tests/e2e/skill_eval", "benchmark/harbor")
+
+
+def _covers(run: str, suite: str) -> bool:
+    """Does this `pytest` invocation collect `suite`, directly or via an ancestor directory?
+
+    `pytest tests/e2e` covers `tests/e2e/skill_eval`, so matching the exact string would fail on a
+    broader step — which is the wrong direction to push a fix.
+    """
+    if "pytest" not in run:
+        return False
+    parts = suite.split("/")
+    return any("/".join(parts[:depth]) in run for depth in range(1, len(parts) + 1))
+
+
+def test_ci_runs_the_benchmark_harness_suite():
+    """Some job has to invoke pytest over the harness directories."""
+    bodies = [run for _, _, run in _run_steps(_ci())]
+    for suite in HARNESS_SUITES:
+        assert any(_covers(run, suite) for run in bodies), (
+            f"no ci.yml step runs pytest over {suite}/. Spec 121's harness lives there and "
+            f"nothing on master would notice it breaking"
+        )
+
+
+def test_ci_runs_the_harness_as_a_directory_not_a_file_list():
+    """A hand-listed set of files silently stops covering the next file someone adds.
+
+    This is the anti-rot property: the suite is named by directory, so a new test file is gated by
+    existing. The billable tests are excluded by their marker at collection time, not by being
+    listed here — see `tests/e2e/billing.py`.
+    """
+    for _, label, run in _run_steps(_ci()):
+        if "pytest" not in run:
+            continue
+        assert ".py" not in run, (
+            f"ci.yml step `{label}` names individual test files. Name the directory instead and "
+            f"let markers do the excluding, or the next file added is covered by nothing — which "
+            f"is how ~1000 tests under tests/e2e sat behind three named files"
+        )
+
+
+def test_ci_still_covers_the_files_it_used_to_name():
+    """The two guards that were named steps before the directory sweep replaced them.
+
+    A release workflow broken in ordering can only otherwise be found by cutting a tag, and an
+    unparseable workflow shows up as a 0-second run with no jobs — ci.yml sat dead on master for two
+    days that way. Widening the step must not have dropped either.
+    """
+    load_bearing = (
+        "tests/e2e/test_release_workflow.py",
+        "tests/e2e/test_workflow_files.py",
+    )
+    bodies = [run for _, _, run in _run_steps(_ci())]
+    for path in load_bearing:
+        assert any(_covers(run, path) for run in bodies), (
+            f"nothing in ci.yml collects {path}. It was a named step until the suite was widened "
+            f"to a directory; if the directory no longer contains it, restore a step for it"
+        )
+        assert os.path.isfile(os.path.join(_REPO_ROOT, path)), (
+            f"{path} does not exist, so the directory sweep cannot be running it"
+        )
+
+
+def test_no_ci_step_opts_into_billable_sessions():
+    """CI must never set the opt-in. A runner that spends money does it 365 nights a year."""
+    from tests.e2e import billing
+
+    workflows = {os.path.basename(path): _load(path) for path in _workflow_files()}
+    for name, workflow in workflows.items():
+        scopes = [workflow.get("env") or {}]
+        for job in (workflow.get("jobs") or {}).values():
+            if "uses" in job:
+                continue
+            scopes.append(job.get("env") or {})
+            for step in job.get("steps") or []:
+                scopes.append(step.get("env") or {})
+        for scope in scopes:
+            assert billing.BILLABLE_ENV not in scope, (
+                f"{name} sets {billing.BILLABLE_ENV} in an env block. The four commands whose job "
+                f"is to spend set it themselves for the length of the call; a workflow that "
+                f"exports it opts every collected test in"
+            )
+        for _, label, run in _run_steps(workflow):
+            assert f"{billing.BILLABLE_ENV}=1" not in run, (
+                f"{name} step `{label}` exports {billing.BILLABLE_ENV}=1 inline"
+            )
+
+
+def test_the_nightly_is_the_only_workflow_that_starts_a_session():
+    """Exactly one workflow is allowed to spend, and it is named so a diff has to justify a second."""
+    spenders = set()
+    for path in _workflow_files():
+        workflow = _load(path)
+        for _, _, run in _run_steps(workflow):
+            if "skill_eval.nightly_canary" in run or "skill_eval.ladder" in run:
+                spenders.add(os.path.basename(path))
+    assert spenders == {"skill-regression.yml"}, (
+        f"workflows that start agent sessions: {sorted(spenders) or 'none'}. Only "
+        f"skill-regression.yml is budgeted for it"
+    )

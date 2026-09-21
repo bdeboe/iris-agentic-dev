@@ -172,7 +172,7 @@ def format_scorer_cost(record: dict) -> str:
 def format_dry_run(est: dict, n_covered: int, n_uncovered: int) -> str:
     # Names the model the scorer will ask for. "Judge calls (Haiku)" was a label, not a fact:
     # the Bedrock path resolves that constant to a Sonnet-class model.
-    from runner._client import haiku_model
+    from tests.e2e.skill_eval.scorer_client import haiku_model
 
     lines = [
         "Skill eval dry run:",

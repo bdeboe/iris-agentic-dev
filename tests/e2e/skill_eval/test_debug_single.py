@@ -11,10 +11,9 @@ pytestmark = pytest.mark.billable
 def test_debug_ensemble_one_run():
     import sys
 
-    sys.path.insert(0, "benchmark/021")
     from tests.e2e.skill_eval.evaluator import load_eval_config
     import tests.e2e.skill_eval.lift as lift_mod
-    from runner import judge as judge_mod
+    from tests.e2e.skill_eval import judge as judge_mod
 
     orig = judge_mod.score_result
 

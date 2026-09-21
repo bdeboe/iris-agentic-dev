@@ -9,7 +9,6 @@ pytestmark = pytest.mark.billable
 
 @pytest.mark.skipif(not os.environ.get("OPENAI_API_KEY"), reason="needs key")
 def test_debug_vector_cold():
-    sys.path.insert(0, "benchmark/021")
     from tests.e2e.isolated_env import IsolatedEnv
     from tests.e2e.opencode_runner import collect_events
     from tests.e2e.skill_eval.lift import (

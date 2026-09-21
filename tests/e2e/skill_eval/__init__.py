@@ -1,13 +1,11 @@
-"""Skill regression and lift measurement suite (040).
+"""Skill regression and lift measurement suite (040), and the graded benchmark harness (121).
 
-Benchmark judge import: sys.path shim to benchmark/021 is applied here.
-After importing this package, `from runner.judge import score_result` works.
+This package used to begin by inserting `benchmark/021` into `sys.path` so that
+`from runner.judge import score_result` would work. Spec 121 T043/T044 retired that tree and moved
+the two modules anyone actually imported — the scorer's Anthropic client and the judge — in here as
+`scorer_client` and `judge`. Import them by name.
+
+The shim is worth one sentence of warning rather than silent deletion: an import that only resolves
+because a package's `__init__` mutated `sys.path` works everywhere until someone runs a single file
+directly, and then fails with a `ModuleNotFoundError` naming a module that is right there on disk.
 """
-import sys
-import os
-
-_BENCHMARK_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "benchmark", "021")
-)
-if _BENCHMARK_DIR not in sys.path:
-    sys.path.insert(0, _BENCHMARK_DIR)

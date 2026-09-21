@@ -169,13 +169,21 @@ decision to build the corpus is made on it rather than on expectation.
 
 Only runs if T030 said go. This is the phase the $50–80 cap is for.
 
-- [ ] T031 [P] [US2] Grow the corpus to 50 machine-checkable tasks, each satisfying FR-004 and
+- [x] T031 [P] [US2] Grow the corpus to 50 machine-checkable tasks, each satisfying FR-004 and
       FR-022. ObjectScript fixtures and reference solutions go through `objectscript-guardrails` and
       `objectscript-review` first, per the Constitution Check
-- [ ] T032 [US1] Commit the train/holdout split per T004, with the guard test asserting the two ID
+      — **landed at 42 `CORPUS` tasks, not 50.** The graded corpus is 62 counting the 12 `SKILL` and
+      8 `PILOT` tasks, and the tools rung runs the 41 holdout pairs. 41 clears FR-008's floor of 37,
+      so the figures publish; the shortfall costs power, not validity. Recorded rather than rounded
+      up: the target was 50 and the corpus has 42
+- [x] T032 [US1] Commit the train/holdout split per T004, with the guard test asserting the two ID
       sets are disjoint and their union is the corpus (governance detector 2)
-- [ ] T033 [US1] Add the publish path's leakage guard: computing a published figure over a
+- [x] T033 [US1] Add the publish path's leakage guard: computing a published figure over a
       train-split task ID raises, with a unit test that it does
+      — implemented all along in `split.assert_holdout_only`, reached from
+      `comparison.assert_publishable_from_holdout`. Verified against the real artifact: the 41
+      holdout IDs pass, and injecting train task `CORPUS-07` raises `SplitLeak`. This was a
+      bookkeeping miss, not a gap
 - [x] T034 [US1] Cost estimate before the first billable session, checked against the $80 cap, and
       the run refuses to start if the estimate exceeds it (FR-015), with a unit test for the refusal
 - [x] T035 [US1] Run the full arm ladder from the holdout split: 41 holdout tasks × 3 arms × 1 run
@@ -225,14 +233,35 @@ Constitution IX points at a directory that is really there.
 
 ## Phase 6: One harness, publicly runnable (US6)
 
-- [ ] T043 [US6] Decide per system — `tests/e2e/skill_eval/`, `benchmark/021/`,
+- [x] T043 [US6] Decide per system — `tests/e2e/skill_eval/`, `benchmark/021/`,
       `tools/gepa-optimizer/` — survive, fold in, or delete. Record the decision and act on it
-- [ ] T044 [US6] Delete every system that does not survive, and fix every document pointing at one
+      — **four systems, not three.** `crates/iris-agentic-dev-core/src/benchmark/` is the shipped
+      `iris-agentic-dev benchmark` subcommand with its tasks embedded via `include_str!`; deleting it
+      breaks a released CLI, so it survives and does a different job. `skill_eval` survives as the
+      graded harness. `gepa-optimizer` is not a harness — it consumes the train split, which is why
+      the split exists. `benchmark/021` retired. Decision asserted by
+      `tests/e2e/test_one_harness.py`, not just recorded
+- [x] T044 [US6] Delete every system that does not survive, and fix every document pointing at one
       (FR-018)
-- [ ] T045 [US6] Close the `light-skills/BENCHMARKING.md` promise spec 059 recorded as broken: it
+      — **absorb-then-retire, because the survivor imported the retired tree.** `lift.py`,
+      `preflight.py`, `cost_estimator.py`, `__main__.py` and two debug tests all reached
+      `benchmark/021/runner/` through a `sys.path.insert` in `skill_eval/__init__.py`. `_client.py`
+      and `judge.py` moved in as `scorer_client.py` and `judge.py`; `anthropic` is now lazy, so the
+      package imports without the SDK. 69 tracked files deleted, plus `benchmark/run_021.py` and the
+      9 adapter tests whose subject was its driver. The 88 untracked result directories on this disk
+      are untouched — specs 071 and 085 cite them and nothing else has a copy
+- [x] T045 [US6] Close the `light-skills/BENCHMARKING.md` promise spec 059 recorded as broken: it
       points at the real harness or it goes
-- [ ] T046 [US6] Write `specs/121-benchmark-program/quickstart.md` and link it from the README:
+      — the file is `skills/BENCHMARKING.md` now (`light-skills/` was renamed). It documents the
+      shipped subcommand, which is legitimate, so it stays and says so: a note at the top separates
+      its 22 model-judged repair tasks from the graded ladder and links the quickstart, because the
+      two produce numbers that cannot be compared
+- [x] T046 [US6] Write `specs/121-benchmark-program/quickstart.md` and link it from the README:
       fresh clone, Docker, a model credential, one command (FR-017)
+      — every command in it was executed while writing it. Linked from the README's skills section
+      and from `CONTRIBUTING.md`. The README's own `+27%` headline went with it: it was measured
+      under the retired model judge and read as current, so the skills section now leads with the
+      graded verdict and `test_published_figures.py` fails if either figure drifts from the artifact
 - [ ] T047 [US6] Verify on a machine with no repo-specific state that the documented steps reproduce
       the published pass rates within the reported MDE (SC-008)
 

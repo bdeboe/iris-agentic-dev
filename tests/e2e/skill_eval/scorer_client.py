@@ -1,7 +1,16 @@
-"""Shared Anthropic client factory — uses Bedrock if available, direct API otherwise."""
+"""Shared Anthropic client factory — uses Bedrock if available, direct API otherwise.
+
+Moved here from `benchmark/021/runner/_client.py` by spec 121 T044, with the judge that reads it.
+The name changed from `_client` to `scorer_client` on the way: inside a package this size, a module
+called `_client` reads as "the client" when what it builds is specifically the *scorer's* client, and
+the harness also talks to an agent driver and to IRIS.
+
+`anthropic` is imported lazily, inside `make_client`. At module scope it made the whole package
+unimportable without the SDK installed, which is not a dependency the graded benchmark has — that
+corpus is scored by an ObjectScript check, not by a model.
+"""
 
 import os
-import anthropic
 
 # Bedrock cross-region inference model IDs
 _BEDROCK_HAIKU = (
@@ -24,6 +33,8 @@ def _use_bedrock() -> bool:
 
 def make_client():
     """Return an Anthropic client configured for Bedrock or direct API."""
+    import anthropic
+
     if _use_bedrock():
         return anthropic.AnthropicBedrock(
             aws_region=os.environ.get("AWS_REGION", "us-east-1"),

@@ -189,7 +189,7 @@ def _provenance(run_id: str, lift_data: dict, probe, runs: int) -> dict:
     comes off `OpencodeDriver` rather than a string here — the day `prime-agent` takes over,
     swapping the driver is what changes this line, and nothing above it.
     """
-    from runner._client import haiku_model
+    from tests.e2e.skill_eval.scorer_client import haiku_model
 
     from tests.e2e.skill_eval.opencode_driver import OpencodeDriver
 

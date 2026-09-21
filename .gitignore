@@ -25,7 +25,11 @@ Thumbs.db
 *.log
 target/
 .claude/settings.local.json
-benchmark/021/results/
+# Spec 121 retired the benchmark/021 harness, but its result directories were never tracked and
+# still sit on the disks that produced them. Kept ignored rather than deleted: specs 071 and 085
+# cite `benchmark/021/results/<run>/` as the evidence behind their published lift, so on any machine
+# that ran those, this is the only copy.
+benchmark/021/
 docs/*.txt
 # Article drafts go in ~/writing/iris-agentic-dev/ — not tracked here
 docs/roadmap-internal.md

@@ -1,11 +1,25 @@
-"""LLM-as-judge scoring using Claude Haiku as arbiter (Bedrock or direct API)."""
+"""LLM-as-judge scoring using Claude Haiku as arbiter (Bedrock or direct API).
+
+Moved here from `benchmark/021/runner/judge.py` when spec 121 T043/T044 retired that tree. It was
+never a spare copy: `lift.py`, `preflight.py` and `cost_estimator.py` all imported it through a
+`sys.path` shim in this package's `__init__.py`, so the harness that survives was reaching into the
+harness that does not. Absorbing the two modules it actually needs is what made the retirement
+possible — see `tests/e2e/test_one_harness.py`.
+
+Scope, so nobody reads this as the graded benchmark's scorer: it is not. The 121 corpus is graded by
+an ObjectScript check printing `PASS` or `FAIL`, and no model scores those tasks (FR-002). This judge
+belongs to the older 040 skill-eval path, where the thing being measured is a transcript rather than
+a compiled result. The two must not be confused in a report.
+"""
 
 import json
 
-try:
-    from ._client import CREDENTIAL_VARS, haiku_model, make_client, resolved_model
-except ImportError:
-    from _client import CREDENTIAL_VARS, haiku_model, make_client, resolved_model
+from tests.e2e.skill_eval.scorer_client import (
+    CREDENTIAL_VARS,
+    haiku_model,
+    make_client,
+    resolved_model,
+)
 
 RUBRIC = """You are evaluating an AI coding agent's performance on an IRIS development task.
 
