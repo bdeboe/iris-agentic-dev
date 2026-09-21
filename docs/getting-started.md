@@ -3,10 +3,9 @@
 Fifteen minutes from nothing to an agent that can read and write ObjectScript on your IRIS
 instance. Six steps, each one ending in output you can compare against what is printed here.
 
-The order is deliberate. Three of the four common ways to fail happen before your editor is
-involved at all, so this checks the binary before the connection, and the connection before
-the editor. If you skip to step 6 and it does not work, you will not know which of the three
-went wrong.
+The order is deliberate. Three things can be wrong: the install, the connection, and the
+editor config. Only the last one involves your editor, so this checks them in that order.
+Skip to step 6 and you cannot tell which of the three you are looking at.
 
 Every command below was run against `iris-community:2026.2` on the way to writing this, and
 `tests/e2e/test_getting_started.py` checks that each subcommand, tool and argument named here
@@ -15,7 +14,7 @@ still exists.
 ## What you need
 
 - IRIS with the Atelier REST API reachable over HTTP. A community Docker image has it; so does
-  native IRIS on IIS or Apache. Enterprise IRIS without a Web Gateway does not — see
+  native IRIS on IIS or Apache. Enterprise IRIS without a Web Gateway does not; see
   [connecting.md](connecting.md).
 - Credentials for a user that can read the namespace you care about.
 - An editor with MCP support, for step 6 only. Steps 1–5 need nothing but a terminal.
@@ -60,7 +59,7 @@ To see what one tool takes:
 iris-agentic-dev tool iris_query --schema
 ```
 
-That prints the description and the full JSON Schema — every parameter, its type, its default.
+That prints the description and the full JSON Schema: every parameter, its type, its default.
 Also free, also no connection.
 
 ## Step 3 — Point it at IRIS, and check what it aimed at
@@ -97,8 +96,8 @@ iris-agentic-dev tool check_config
 Read `connection_source` first. `env_vars` means it used what you just exported. Anything else
 means it did not.
 
-**The trap worth ten seconds.** With no config file and no environment variables, the binary
-falls back to discovery: Docker container names, then VS Code Server Manager, then a port scan.
+**Discovery will pick an instance for you.** With no config file and no environment variables,
+the binary falls back to it: Docker container names, then VS Code Server Manager, then a port scan.
 That is convenient and it is also how you end up writing to the wrong instance. On the machine
 this guide was written on, a bare `check_config` reported:
 
@@ -111,9 +110,9 @@ this guide was written on, a bare `check_config` reported:
 }
 ```
 
-Three IRIS containers were running and it picked one. It said so, in `connection_source`,
-`container` and `fallback_warning` — but only because something asked. Nothing else in the
-tool surface prints that.
+Three IRIS containers were running and it picked one. It said so in `connection_source`,
+`container` and `fallback_warning`, but only because something asked. Nothing else in the tool
+surface prints that.
 
 For anything past a first experiment, pin the target in a file instead:
 
@@ -122,8 +121,8 @@ iris-agentic-dev init        # writes ./.iris-agentic-dev.toml
 ```
 
 Set `container` or `host`/`web_port` in it and commit it. Credentials stay in
-`IRIS_USERNAME`/`IRIS_PASSWORD`, not in the file. The full precedence order — config file, then
-environment, then Server Manager, then discovery — is in [connecting.md](connecting.md).
+`IRIS_USERNAME`/`IRIS_PASSWORD`, not in the file. The full precedence order (config file, then
+environment, then Server Manager, then discovery) is in [connecting.md](connecting.md).
 
 ## Step 4 — Prove IRIS answers
 
@@ -163,7 +162,8 @@ iris-agentic-dev tool iris_query \
 }
 ```
 
-That is the whole loop: your terminal, HTTP, Atelier, IRIS, back. No MCP server, no editor.
+The whole loop ran there: your terminal, HTTP, Atelier, IRIS, and back, with no MCP server and
+no editor in it.
 
 ## Step 5 — Three things worth doing from the terminal
 
@@ -205,7 +205,7 @@ created them, so they do not survive between two `tool` invocations. Use `batch`
 
 ## Step 6 — Hand it to your editor
 
-**Claude Code** — add to `~/.claude.json`:
+**Claude Code.** Add this to `~/.claude.json`:
 
 ```json
 {
@@ -240,9 +240,9 @@ printf '%s\n' \
 ```
 
 Two JSON-RPC responses: `serverInfo` naming the version, then 81 tools. If that works and your
-editor still shows no tools, the problem is the editor's config file, not this binary — and it
-is almost always a path. An editor GUI does not inherit your shell `PATH`, so use the absolute
-path from `which iris-agentic-dev`.
+editor still shows no tools, the problem is the editor's config file, not this binary, and it is
+almost always a path. An editor GUI does not inherit your shell `PATH`, so use the absolute path
+from `which iris-agentic-dev`.
 
 **Skills are separate.** Installing the binary installs no skills, and installing skills needs
 no binary at runtime:
@@ -259,9 +259,9 @@ objectscript-guardrails      installed        installed    n/a
 ...
 ```
 
-What the skills are measured to be worth — currently nothing, on a graded holdout — is in the
-README's [Skills](../README.md#skills--improve-ai-output-for-objectscript) section. Read it
-before deciding to install them.
+On a graded holdout the skills are so far measured at nothing. The numbers are in the README's
+[Skills](../README.md#skills--improve-ai-output-for-objectscript) section; read it before
+deciding to install them.
 
 ## When it does not work
 
@@ -274,7 +274,7 @@ error: bad params for iris_query: unknown field `sql`, expected one of `query`, 
 `namespace`, `force`, `confirm`, `mode`, `table`, `max_rows_affected`, `server`
 ```
 
-**Wrong tool name.** Same idea — it prints the catalogue rather than guessing:
+**Wrong tool name.** Same idea, and it prints the catalogue rather than guessing:
 
 ```text
 error: unknown tool 'iris_quer'
