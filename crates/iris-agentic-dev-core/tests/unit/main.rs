@@ -39,6 +39,7 @@ mod test_elicitation;
 mod test_elicitation_sweep;
 mod test_enum_contract;
 mod test_env_gate;
+mod test_example_scrub;
 mod test_fresh_container_setup_unit;
 mod test_gate_check;
 mod test_gate_classification;

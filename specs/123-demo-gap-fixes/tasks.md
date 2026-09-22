@@ -24,18 +24,18 @@
 
 ## Phase 3: US3 — the published example (P2)
 
-- [ ] T009 [US3] Write `tests/unit/test_example_scrub.rs` and add its `mod` line. It covers
+- [x] T009 [US3] Write `tests/unit/test_example_scrub.rs` and add its `mod` line. It covers
       FR-009, FR-010 and FR-011, and must fail while the directory is absent.
-- [ ] T010 [US3] Add `/.iad-local/` to `.gitignore`. Create a local denylist holding the names.
-- [ ] T011 [US3] Build `docs/examples/todo-app/` from `demos/todo-app/`:
+- [x] T010 [US3] Add `/.iad-local/` to `.gitignore`. Create a local denylist holding the names.
+- [x] T011 [US3] Build `docs/examples/todo-app/` from `demos/todo-app/`:
   - copy the two classes;
   - replace names with roles in `STEPS.md` and `transcript.md`;
   - remove the false `InitialExpression` claim and add the transcript note (FR-016);
   - strip home paths.
-- [ ] T012 [US3] Scrub test green, with the denylist present and with it absent.
-- [ ] T013 [US3] Write `tests/integration/test_todo_example_live.rs` to research R4 and R5, and
+- [x] T012 [US3] Scrub test green, with the denylist present and with it absent.
+- [x] T013 [US3] Write `tests/integration/test_todo_example_live.rs` to research R4 and R5, and
       add its `mod` line (FR-012, FR-013).
-- [ ] T014 [US3] Gate: the round-trip test passes live and leaves no `IADEx123` classes, rows,
+- [x] T014 [US3] Gate: the round-trip test passes live and leaves no `IADEx123` classes, rows,
       globals or `/iadex123-todo` app behind.
 
 ## Phase 4: US4 — follow-ups (P3)

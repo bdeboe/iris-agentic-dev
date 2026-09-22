@@ -70,6 +70,13 @@ REST dispatch works without `Type=2` is established by the test itself. If it do
 creates the application through `iris_execute` as the demo did, and that becomes a finding for
 `followups.md`.
 
+**Result** (2026-09-22): it works. `iris_admin(create_webapp)` without `Type` served every route on
+`/iadex123-todo`, so no fallback and no finding. The leftover probe could not use
+`%Dictionary.ClassDefinition` from `iris_execute`, because the non-configurable code-edit gate
+refuses it (`CODE_EDIT_BLOCKED`). Classes are checked with `iris_doc(mode="get")` instead, and the
+probe must see all four artifacts before teardown so that its empty answer afterwards means
+something.
+
 **Alternatives rejected**:
 
 - Calling handler impls directly. That skips `call_tool`, so the test would not prove the example
