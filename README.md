@@ -161,6 +161,24 @@ if you have multiple servers configured.
 
 ## Quick start: Claude Code / OpenCode
 
+**Claude Code plugin** — the shortest route, and the only one that works on a machine with
+nothing installed yet, because the plugin carries a setup skill that knows how to install the
+binary:
+
+```text
+/plugin marketplace add intersystems-community/iris-agentic-dev
+/plugin install iris-dev
+> set up iris-agentic-dev against a local IRIS container
+```
+
+That brings the MCP server, every bundled skill, and the compile-on-save hooks. The binary still has
+to land on your PATH, which is what the third line is for: the setup skill installs it, finds or
+starts an IRIS, clears the expired default password on a fresh container, and verifies with a
+query. If you would rather do that part yourself, follow [Install](#install) first and the skill
+will skip ahead.
+
+The manual route below is still here, and is what to use for any other host.
+
 After [installing the binary](#install), configure your agent:
 
 **Claude Code** — add to `~/.claude.json`:
