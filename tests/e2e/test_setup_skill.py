@@ -56,6 +56,21 @@ _BREW_TAP_RE = re.compile(r"(?<![\w-])brew tap\s+(\S+)")
 #: Fence languages holding commands a reader types. `text` and `json` fences are output.
 _COMMAND_FENCES = frozenset({"bash", "sh", "shell", "console"})
 
+#: The release workflow's upload list is the only place that knows what a tag publishes, so it
+#: is what the docs have to agree with. Reading it keeps the check offline: asking GitHub would
+#: pass on a stale release and fail on a runner with no network.
+_RELEASE_WORKFLOW = os.path.join(_REPO_ROOT, ".github", "workflows", "release.yml")
+
+#: `iris-agentic-dev-<platform>` as it appears in an asset name or a download URL.
+_ASSET_RE = re.compile(r"iris-agentic-dev-(?:linux|macos|windows)-[a-z0-9_]+(?:\.exe)?")
+
+
+def _released_assets() -> set[str]:
+    with open(_RELEASE_WORKFLOW, encoding="utf-8") as handle:
+        assets = set(_ASSET_RE.findall(handle.read()))
+    assert assets, f"{_RELEASE_WORKFLOW} names no release assets; the regex has rotted"
+    return assets
+
 
 def _binary() -> str:
     candidate = os.environ.get("IAD_BINARY") or os.path.join(
@@ -213,6 +228,39 @@ def test_every_document_names_the_homebrew_tap_that_exists():
     assert not wrong, (
         f"these lines name a Homebrew tap that is not {_HOMEBREW_TAP}, so `brew tap` fails "
         f"for anyone who follows them: {wrong}"
+    )
+
+
+def test_the_skill_downloads_assets_a_release_actually_publishes():
+    """A wrong asset name is a 404 on the reader's first command.
+
+    `releases/latest/download/<name>` does not fail usefully: GitHub answers 404 and `curl -f`
+    leaves an empty file behind, so the next line reports a permission or exec error instead of
+    a missing download.
+    """
+    named = set(_ASSET_RE.findall(_skill_text()))
+    assert named, (
+        "the skill names no download asset, so step 2 cannot work without Homebrew"
+    )
+    unknown = sorted(named - _released_assets())
+    assert not unknown, (
+        f"the skill downloads assets no release publishes: {unknown}. A tag builds only what "
+        f"{os.path.relpath(_RELEASE_WORKFLOW, _REPO_ROOT)} uploads."
+    )
+
+
+def test_the_skill_covers_every_platform_a_release_builds():
+    """Measured in a container with no Homebrew: the binaries are per-architecture.
+
+    The `linux-aarch64` asset runs on an ARM Linux host and `linux-x86_64` does not, so a skill
+    that names only the x86_64 one sends every ARM Linux reader to `cannot execute binary
+    file`. Requiring full coverage also means adding a platform to the release cannot ship
+    without the install instructions following it.
+    """
+    missing = sorted(_released_assets() - set(_ASSET_RE.findall(_skill_text())))
+    assert not missing, (
+        f"a release publishes these and the setup skill never mentions them: {missing}. "
+        "Anyone on that platform has no install command."
     )
 
 

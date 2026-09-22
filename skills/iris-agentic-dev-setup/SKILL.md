@@ -31,20 +31,33 @@ brew install iris-agentic-dev
 The tap is `intersystems-community/tap`, which Homebrew resolves to the
 `intersystems-community/homebrew-tap` repository. There is no per-project tap.
 
-Mac without Homebrew (Apple Silicon):
+Without Homebrew, download the release binary for this machine. There is one per architecture
+and they are not interchangeable: the wrong one gets as far as `chmod` and then fails with
+`cannot execute binary file`, or on an Intel Mac with `Bad CPU type in executable`. So read the
+architecture rather than picking a line:
 
 ```bash
-curl -fsSL https://github.com/intersystems-community/iris-agentic-dev/releases/latest/download/iris-agentic-dev-macos-arm64 \
+case "$(uname -s)-$(uname -m)" in
+  Darwin-arm64) ASSET=iris-agentic-dev-macos-arm64 ;;
+  Darwin-x86_64) ASSET=iris-agentic-dev-macos-x86_64 ;;
+  Linux-x86_64) ASSET=iris-agentic-dev-linux-x86_64 ;;
+  Linux-aarch64) ASSET=iris-agentic-dev-linux-aarch64 ;;
+  *) echo "no published binary for $(uname -s)-$(uname -m); build from source" >&2 ;;
+esac
+curl -fsSL "https://github.com/intersystems-community/iris-agentic-dev/releases/latest/download/$ASSET" \
   -o /usr/local/bin/iris-agentic-dev && chmod +x /usr/local/bin/iris-agentic-dev
+```
+
+On a Mac, clear the download quarantine flag as well, or the first run is killed by Gatekeeper:
+
+```bash
 xattr -d com.apple.quarantine /usr/local/bin/iris-agentic-dev 2>/dev/null
 ```
 
-Linux x86_64:
-
-```bash
-curl -fsSL https://github.com/intersystems-community/iris-agentic-dev/releases/latest/download/iris-agentic-dev-linux-x86_64 \
-  -o /usr/local/bin/iris-agentic-dev && chmod +x /usr/local/bin/iris-agentic-dev
-```
+If `/usr/local/bin` is not writable, put the binary in any directory on PATH and use that path
+in step 5. An asset name that does not exist shows up as `curl: (56) ... error: 404` and writes
+no file, so the `&&` stops before `chmod`. Either way, check that
+`iris-agentic-dev --version` prints a version before moving on.
 
 Windows: download `iris-agentic-dev-windows-x86_64.exe` from the
 [releases page](https://github.com/intersystems-community/iris-agentic-dev/releases/latest) and

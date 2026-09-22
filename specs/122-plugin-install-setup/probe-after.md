@@ -89,3 +89,51 @@ None of these are filed. They belong next to the defects already drafted in
 stopped or read. One leftover the probe could not clear itself: an empty `.git` it created while
 testing a hypothesis about the config loader needing a repo root (it does not), removal blocked by
 a guard hook; it went with the temp directory.
+
+## The install channel, measured on a host with no Homebrew (closing Phase 4)
+
+T018 got the binary by copying the Homebrew install, so the download channel the skill actually
+tells a bare machine to use was never exercised. Docker gives a host where the formula is
+genuinely absent, so that half is now measured without a model session and without network luck.
+
+Facts checked against the source of truth rather than against local state:
+
+- `intersystems-community/homebrew-tap` exists on `master` with `Formula/iris-agentic-dev.rb` at
+  version 1.4.2. So `brew tap intersystems-community/tap && brew install iris-agentic-dev` is a
+  real pair of commands, independent of this machine already having the formula.
+- `gh release view v1.4.2` publishes five binaries: `linux-x86_64`, `linux-aarch64`,
+  `macos-arm64`, `macos-x86_64`, `windows-x86_64.exe`.
+
+Run in `debian:stable-slim`, `command -v brew` empty:
+
+| Platform           | Asset selected                   | Result                   |
+| ------------------ | -------------------------------- | ------------------------ |
+| `linux/amd64`      | `iris-agentic-dev-linux-x86_64`  | `iris-agentic-dev 1.4.2` |
+| `linux/arm64`      | `iris-agentic-dev-linux-aarch64` | `iris-agentic-dev 1.4.2` |
+| this Mac (`arm64`) | `iris-agentic-dev-macos-arm64`   | `iris-agentic-dev 1.4.2` |
+
+`tool --list` and `skill list` both answer on the downloaded binary with no IRIS and no config,
+so the install leaves a usable CLI, not just a file that runs `--version`.
+
+Two things that changed the skill:
+
+1. **Step 2 named two of the five assets.** An ARM Linux reader was sent to the x86_64 binary,
+   which on a real ARM host stops at `cannot execute binary file`, and an Intel Mac reader to the
+   arm64 one, which stops at `Bad CPU type in executable`. Step 2 now reads `uname` and selects.
+   Two new tests read `.github/workflows/release.yml` and require that the skill name every asset
+   a tag publishes and no asset it does not, so adding a platform to the release cannot ship
+   without the install instructions following it.
+2. **A wrong asset name fails at the download, not later.** `curl -fsSL` on a name that does not
+   exist exits 56 with `error: 404` and writes no file, so the `&&` stops before `chmod`. The
+   skill said the error would surface at `chmod` or first run; it now says what actually happens.
+
+One check came back inconclusive and is not evidence either way: running the x86_64 binary inside
+the `linux/arm64` container succeeded. That is Docker Desktop's binfmt handler on the shared VM
+kernel, not portability — a real ARM Linux host has no such handler. Which is why the fix is the
+`uname` selector rather than a note saying it does not matter.
+
+What is still not measured: whether an agent reading this skill on a machine with no formula
+names the Homebrew channel from the skill rather than from `brew info`. T019 could not answer that
+here and this does not either — the commands are now known good, but the model's source for them
+is not. Answering it needs Claude Code running on a foreign host, which means credentials on that
+host, so it stays open rather than getting a workaround.

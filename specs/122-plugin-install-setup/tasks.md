@@ -134,13 +134,24 @@ wrong tap each fail exactly one test), every command in the skill has been run l
   host where the formula is genuinely absent: a CI runner, or a container. Transcript summary
   in `research.md`.
 
-**Gate**: PARTIAL. The probe ends at rows from IRIS (SC-001), and the channel guess is gone, but
-neither the install channel nor the cause of its disappearance is measured, because this machine has
-the formula installed and PATH stripping does not hide it. Both need a host where it is absent: a CI
-runner or a container. The probe also turned up three tool findings, all reproduced by hand and
-recorded in `probe-after.md`; the first, that a connection pin is advisory and falls back silently to
-whatever else answers, is a data-safety issue and belongs with the drafted defects, not in this
-feature.
+- [x] **T024** Measure the install channel on a host where Homebrew is genuinely absent, which
+      T018 could not do. `debian:stable-slim` with `command -v brew` empty, both architectures:
+      the skill's step 2 downloads and runs, `1.4.2` on each, and `tool --list` / `skill list`
+      answer on the downloaded binary with no IRIS and no config. The tap and formula checked
+      against `intersystems-community/homebrew-tap` rather than against this machine's install.
+      It found step 2 naming two of the five published assets, so ARM Linux and Intel Mac readers
+      were both sent to a binary their host cannot execute; step 2 now selects on `uname`, and two
+      new tests hold the skill and `release.yml` in agreement. Record in `probe-after.md`.
+
+**Gate**: PASSED for the install channel, OPEN for the model's source of it. The probe ends at rows
+from IRIS (SC-001), and T024 measures the download path on a brew-free host, so "install from
+nothing" is now evidence rather than inference. What T019 asked — whether an agent names the
+Homebrew channel from the skill or from `brew info` finding the formula already here — is still
+unanswered, and answering it needs Claude Code on a foreign host, which means credentials on that
+host. Left open rather than worked around. The probe also turned up three tool findings, all
+reproduced by hand and recorded in `probe-after.md`; the first, that a connection pin is advisory
+and falls back silently to whatever else answers, is a data-safety issue and belongs with the
+drafted defects, not in this feature.
 
 ## Phase 5 — docs
 
@@ -161,7 +172,7 @@ feature.
       `cargo fmt --all -- --check` and `cargo clippy --features testing --all-targets -- -D warnings`
       clean. Full Rust suite against live `iris-dev-iris` with CI's env and skip list: 5,234 passed,
       0 failed. Without `IRIS_HOST` and friends exported, 96 of those fail on `IRIS_HOST must be
-  set` and on discovery finding an unrelated container; that is the invocation, not the code,
+set` and on discovery finding an unrelated container; that is the invocation, not the code,
       and it is why the CI job sets them.
 
 **Gate**: PASSED for everything except the Phase 4 probe.
