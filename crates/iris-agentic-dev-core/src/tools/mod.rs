@@ -6150,7 +6150,7 @@ Methods:
     }
 
     #[tool(
-        description = "Remove a skill from the registry by name.",
+        description = "Remove a skill from the registry by name. Destructive tier: requires IRIS_DESTRUCTIVE_TOOLS_ENABLED=1.",
         annotations(destructive_hint = true),
         output_schema = output_schemas::oneof_output_schema::<SkillForgetResponse>()
     )]
@@ -6648,7 +6648,7 @@ Methods:
     }
 
     #[tool(
-        description = "Manage the learning agent skill registry. action=list returns all skills, action=describe returns one skill, action=search finds skills by keyword, action=forget removes a skill, action=propose mines recent tool calls and synthesizes a new skill (requires ≥5 calls).",
+        description = "Manage the learning agent skill registry. action=list returns all skills, action=describe returns one skill, action=search finds skills by keyword, action=forget removes a skill, action=propose mines recent tool calls and synthesizes a new skill (requires ≥5 calls). forget is a destructive action (requires IRIS_DESTRUCTIVE_TOOLS_ENABLED=1).",
         output_schema = output_schemas::oneof_output_schema::<SkillResponse>()
     )]
     async fn skill(
@@ -6812,7 +6812,7 @@ Methods:
     // ── 052: iris_global ───────────────────────────────────────────────────────
 
     #[tool(
-        description = "Read, write, kill, or list IRIS global nodes. action: get=read a node or subtree, set=write a node, kill=delete a node/subtree, list=enumerate subscripts. PHI and system-blocklist gates enforced before any IRIS call. Pass acknowledgePhi=true to bypass per-global PHI gate. Skill: iris-agentic-dev. `server` (optional): name of a registered IRIS instance. If omitted, uses the default connection. Use `iris_servers` to list available instances.",
+        description = "Read, write, kill, or list IRIS global nodes. action: get=read a node or subtree, set=write a node, kill=delete a node/subtree, list=enumerate subscripts. kill is a destructive action (requires IRIS_DESTRUCTIVE_TOOLS_ENABLED=1). PHI and system-blocklist gates enforced before any IRIS call. Pass acknowledgePhi=true to bypass per-global PHI gate. Skill: iris-agentic-dev. `server` (optional): name of a registered IRIS instance. If omitted, uses the default connection. Use `iris_servers` to list available instances.",
         output_schema = output_schemas::oneof_output_schema::<IrisGlobalResponse>()
     )]
     async fn iris_global(
@@ -7485,7 +7485,7 @@ Methods:
     }
 
     #[tool(
-        description = "Create, update, or delete an Ensemble credential. action: create|update|delete. id: credential ID (required). username/password: required for create, optional for update. namespace: optional. Write-gated: suppressed on Live instances unless IRIS_ALLOW_PROD=1.",
+        description = "Create, update, or delete an Ensemble credential. action: create|update|delete. id: credential ID (required). username/password: required for create, optional for update. namespace: optional. Destructive tier: create/update/delete require IRIS_DESTRUCTIVE_TOOLS_ENABLED=1, and are suppressed on Live instances unless IRIS_ALLOW_PROD=1.",
         annotations(destructive_hint = true),
         output_schema = output_schemas::oneof_output_schema::<IrisCredentialManageResponse>()
     )]
@@ -7532,7 +7532,7 @@ Methods:
     // ─── 024-interop-depth: Lookup tables (US3) ───
 
     #[tool(
-        description = "Read, write, delete, or list Ensemble lookup table entries. action: get|set|delete|list_keys|list_tables. table: table name (required except list_tables). key: required for get/set/delete. value: required for set. namespace: optional. get/list_keys/list_tables always available; set/delete write-gated. Skill: ensemble-production.",
+        description = "Read, write, delete, or list Ensemble lookup table entries. action: get|set|delete|list_keys|list_tables. table: table name (required except list_tables). key: required for get/set/delete. value: required for set. namespace: optional. get/list_keys/list_tables always available; set/delete are destructive actions (require IRIS_DESTRUCTIVE_TOOLS_ENABLED=1). Skill: ensemble-production.",
         annotations(destructive_hint = true),
         output_schema = output_schemas::oneof_output_schema::<IrisLookupManageResponse>()
     )]
@@ -7616,13 +7616,16 @@ Methods:
         Read actions (always available): list_namespaces, list_databases, list_users, list_roles, \
         list_user_roles, check_permission, list_webapps, get_webapp, \
         view_locks, view_processes, journal_search, namespace_mappings, database_status. \
-        Write actions (require IRIS_WRITE_TOOLS_ENABLED=1): create_user, update_user, delete_user, \
-        create_namespace, delete_namespace, create_webapp, delete_webapp, \
+        Write actions (require IRIS_WRITE_TOOLS_ENABLED=1): \
         clear_password_change_flag, unlock_user, fresh_container_setup, mirror_add_async. \
         mirror_add_async joins this IRIS instance to an existing mirror set as an async DR member. \
         Params: mirror_name (required), primary_host (required), primary_port (default 2188), \
         instance_name (default IRIS), async_member_type (0=DR, 1=ReadOnly, 2=ReadWrite; default 0). \
-        Destructive actions (require IRIS_DESTRUCTIVE_TOOLS_ENABLED=1): mirror_failover. \
+        Destructive actions (require IRIS_DESTRUCTIVE_TOOLS_ENABLED=1): create_user, update_user, \
+        delete_user, create_namespace, delete_namespace, create_webapp, delete_webapp, \
+        mirror_failover. \
+        The user, namespace and webapp actions, clear_password_change_flag, unlock_user and \
+        fresh_container_setup also require IRIS_ADMIN_TOOLS=1. \
         mirror_failover promotes this backup member to primary (irreversible without manual recovery). \
         Params: confirm (required, must be true). \
         fresh_container_setup runs the full first-boot sequence on a fresh IRIS container: \
@@ -8250,7 +8253,7 @@ Methods:
     }
 
     #[tool(
-        description = "Remove a server from the iad-native configuration. Only servers with source=iad-native can be removed (vscode, fleet, and env sources are read-only). Also removes the OS keychain entry. Returns {removed: true, name, note}. Error codes: REMOVE_NOT_ALLOWED (source is not iad-native), SERVER_NOT_FOUND (not in pool).",
+        description = "Remove a server from the iad-native configuration. Destructive tier: requires IRIS_DESTRUCTIVE_TOOLS_ENABLED=1. Only servers with source=iad-native can be removed (vscode, fleet, and env sources are read-only). Also removes the OS keychain entry. Returns {removed: true, name, note}. Error codes: REMOVE_NOT_ALLOWED (source is not iad-native), SERVER_NOT_FOUND (not in pool).",
         annotations(destructive_hint = true),
         output_schema = output_schemas::oneof_output_schema::<IrisRemoveServerResponse>()
     )]
@@ -8866,7 +8869,7 @@ Methods:
     }
 
     #[tool(
-        description = "Kill (delete) an entire IRIS global. WRITE-GATED. Requires a confirm_token from global_preview (valid 5 minutes). global: global name. confirm_token: token from global_preview. server: optional registered instance name. Error codes: CONFIRM_REQUIRED (call global_preview first), CONFIRM_EXPIRED (token expired), CONFIRM_MISMATCH (token for different global/server). Skill: iris-agentic-dev.",
+        description = "Kill (delete) an entire IRIS global. Destructive tier: requires IRIS_DESTRUCTIVE_TOOLS_ENABLED=1. Requires a confirm_token from global_preview (valid 5 minutes). global: global name. confirm_token: token from global_preview. server: optional registered instance name. Error codes: CONFIRM_REQUIRED (call global_preview first), CONFIRM_EXPIRED (token expired), CONFIRM_MISMATCH (token for different global/server). Skill: iris-agentic-dev.",
         annotations(destructive_hint = true),
         output_schema = output_schemas::oneof_output_schema::<GlobalKillResponse>()
     )]
@@ -9020,7 +9023,7 @@ Methods:
     }
 
     #[tool(
-        description = "Create a new namespace on an IRIS instance. WRITE-GATED. name: namespace name. db_path: optional database directory (defaults to name). server: optional registered instance name. Skill: iris-agentic-dev.",
+        description = "Create a new namespace on an IRIS instance. Destructive tier: requires IRIS_DESTRUCTIVE_TOOLS_ENABLED=1. name: namespace name. db_path: optional database directory (defaults to name). server: optional registered instance name. Skill: iris-agentic-dev.",
         annotations(destructive_hint = true),
         output_schema = output_schemas::oneof_output_schema::<IrisNamespaceCreateResponse>()
     )]
