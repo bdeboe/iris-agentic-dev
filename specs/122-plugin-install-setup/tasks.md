@@ -29,23 +29,25 @@ FR-004/SC-004 expect the 34 bundled skills plus three named root ones rather tha
 
 ## Phase 1 — manifests
 
-- [ ] **T005** Write `tests/e2e/test_plugin_manifest.py`, failing, asserting: (a) both manifests are
+- [x] **T005** Write `tests/e2e/test_plugin_manifest.py`, failing, asserting: (a) both manifests are
       valid JSON; (b) every `mcpServers.*.command` is a bare name or path whose basename is
       `iris-agentic-dev`; (c) no `env` value in either manifest is a `${...}` placeholder; (d)
       `marketplace.json` exists and names the plugin that `plugin.json` declares; (e) the version in
       `marketplace.json`, `plugin.json` and the workspace `Cargo.toml` agree.
-- [ ] **T006** Add `.claude-plugin/marketplace.json` per T001, with a top-level description.
-- [ ] **T007** Fix `plugin.json`: command `iris-agentic-dev`, `env` block removed per FR-003.
-- [ ] **T008** Add a CI step running `claude plugin validate --json` on both manifests, asserting an
+- [x] **T006** Add `.claude-plugin/marketplace.json` per T001, with a top-level description.
+- [x] **T007** Fix `plugin.json`: command `iris-agentic-dev`, `env` block removed per FR-003.
+- [x] **T008** Add a CI step running `claude plugin validate --json` on both manifests, asserting an
       empty `errors` array and no warning outside the `CLAUDE.md`-at-root allowlist. Not `--strict`:
       T001 showed it can never pass here. If the CLI is absent from the runner, assert the manifest
       shape in Python instead and say so in the step name. A step that silently skips is the #118
       pattern.
-- [ ] **T009** Verify the round trip by hand: `claude plugin marketplace add <local checkout>`, then
+- [x] **T009** Verify the round trip by hand: `claude plugin marketplace add <local checkout>`, then
       `claude plugin install iris-dev@iris-agentic-dev`, then `claude mcp list` showing the plugin's
       server connected. Paste the output into `research.md`.
 
-**Gate**: T005 passes, and T009's output is in the repo.
+**Gate**: PASSED — all eight tests in `test_plugin_manifest.py` green, mutation-checked (a
+reverted command name and one `${IRIS_HOST}` env value fail two of them), and T009's install
+output is in `research.md`.
 
 ## Phase 2 — skills parity
 

@@ -91,6 +91,13 @@ jobs:
         # tracked by git is green locally and red in CI, every time.
         run: python -m pytest tests/e2e/skill_eval/test_task_corpus.py -q
 
+      - name: Verify the plugin manifests describe an installable plugin (shape only, no claude CLI here)
+        # Nothing else reads .claude-plugin/*.json. A wrong MCP command in there
+        # compiles and ships: the manifest named `iris-dev`, which no release
+        # installs, for four months. The `claude plugin validate` half of this file
+        # skips on a runner without the CLI; these assertions do not.
+        run: python -m pytest tests/e2e/test_plugin_manifest.py -q
+
   windows-handshake:
     runs-on: windows-latest
     steps:

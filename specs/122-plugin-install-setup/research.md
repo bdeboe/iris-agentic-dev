@@ -150,3 +150,43 @@ connected without spawning a session.
 `/tmp/skills-probe` and `/tmp/mp-min` held the probes; the `skills-probe`
 marketplace and its five plugins were removed after the runs so they do not sit in
 user settings.
+
+## Phase 1 round trip (T009)
+
+Both manifests in place, the MCP command fixed and the `env` block gone, installed from this
+checkout:
+
+```console
+$ claude plugin marketplace add /Users/tdyar/ws/iris-agentic-dev
+✔ Successfully added marketplace: iris-agentic-dev (declared in user settings)
+
+$ claude plugin install iris-dev@iris-agentic-dev
+✔ Successfully installed plugin: iris-dev@iris-agentic-dev (scope: user)
+
+$ claude mcp list | grep plugin:iris-dev
+plugin:iris-dev:iris-dev: iris-agentic-dev mcp - ✔ Connected
+```
+
+`claude plugin details iris-dev` at this point, before the skills declaration lands:
+
+```text
+Component inventory
+  Skills (3)  iris-coverage-run, iris-coverage-setup, pyprod
+  Agents (0)
+  Hooks (2)  PostToolUse, FileChanged  (harness-only — no model context cost)
+  MCP servers (0)
+  LSP servers (0)
+```
+
+Three skills, which is fact 4 from the spec reproduced exactly: the 34 bundled ones are
+invisible until T011 declares their directory.
+
+One inconsistency to know about: `plugin details` reports `MCP servers (0)` for a plugin whose
+server `claude mcp list` shows connected. `mcp list` is the one to trust, and it is also the
+one a test should read, since it reports the connection rather than just the declaration.
+
+`plugin validate --json` on both manifests: `errors: []` for every report, and the only
+warning anywhere is the allowlisted `CLAUDE.md`-at-root one, which appears under `contents[]`
+rather than under `manifest` — worth knowing when writing the assertion, since a check that
+only reads `manifest.warnings` would see a clean report and miss everything about the plugin's
+actual contents.
