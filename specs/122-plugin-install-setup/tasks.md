@@ -119,24 +119,43 @@ wrong tap each fail exactly one test), every command in the skill has been run l
 - [ ] **T018** Run the SC-001 probe: a session on a PATH with no `iris-agentic-dev`, plugin installed,
       one plain-English prompt, ending at a query with rows. Billable, so behind the existing opt-in.
       Keep the transcript at `specs/122-plugin-install-setup/probe-after.md`.
-- [ ] **T019** Record the SC-002 comparison next to it: the 2026-09-22 "I don't know the publish
-      channel" answer against what the same prompt produces with the plugin installed. If the guess is
-      still there, the skill is not discoverable and Phase 3 is not done.
+- [~] **T019** Run, but the measurement is contaminated and does not settle SC-002. A
+  `claude -p --strict-mcp-config --permission-mode plan` session on a PATH without
+  `iris-agentic-dev`, asked for the install commands, named
+  `brew install intersystems-community/tap/iris-agentic-dev` and said "**known** — not
+  guessing". So the 2026-09-22 guess is gone. But it got there by running `brew info` and
+  finding the formula already installed on this machine, which stripping PATH does not hide,
+  so the answer is attributable to local state rather than to the skill. A clean read needs a
+  host where the formula is genuinely absent: a CI runner, or a container. Transcript summary
+  in `research.md`.
 
-**Gate**: the probe ends at rows from IRIS, and the channel guess is gone.
+**Gate**: NOT MET. T018 is unrun and T019 is contaminated. T018 needs a decision first, because
+the probe is an unattended session with permissions relaxed that downloads a binary and starts a
+container on this laptop; both are reversible, neither is something to do unasked.
 
 ## Phase 5 — docs
 
-- [ ] **T020** Add the plugin path to `README.md` and to `docs/getting-started.md` step 6, ahead of
-      the manual `claude mcp add`, which stays.
-- [ ] **T021** Confirm the guide's guard covers the new commands, then run `markdownlint-cli2 --fix`
-      and `prettier --write` on every file touched.
-- [ ] **T022** Slop pass on the skill and both docs: `python3 ~/.claude/skills/no-ai-slop/review.py`,
-      then `python3 scripts/gates/antipatterns.py`.
-- [ ] **T023** Full suite before the PR: `pytest tests/e2e -q` and
-      `cargo test --features testing -- --include-ignored` with `--test-threads=1`.
+- [x] **T020** Plugin route added to `README.md` at the head of the CLI host quick start, ahead of
+      the hand-written MCP config block, which stays for every other host.
+      `docs/getting-started.md` does not exist on this branch (another 121 file), so there is no
+      step 6 to edit here; when 121 merges, the same three lines belong there too.
+- [x] **T021** The tap guard from T017 covers `README.md`, since it scans every markdown file in
+      the tree. `markdownlint-cli2 --fix` and `prettier --write` run clean on the skill, `README.md`,
+      `skills/BENCHMARKING.md`, `research.md` and this file.
+- [x] **T022** Slop pass clean on the skill. The reviewer raised two things on the README section:
+      bold mid-sentence, which was reworded to the `**Label** —` form the two neighbouring
+      paragraphs already use, and then the em dash in that same form, which is left alone because
+      matching the adjacent lines beats the general rule here. `antipatterns.py` clean, 220 baseline
+      instances unchanged.
+- [x] **T023** `pytest tests/e2e -q --ignore=tests/e2e/skill_eval`: 116 passed, 4 skipped. The
+      ignore is deliberate — collecting `skill_eval` as a directory bills real model calls.
+      `cargo fmt --all -- --check` and `cargo clippy --features testing --all-targets -- -D warnings`
+      clean. Full Rust suite against live `iris-dev-iris` with CI's env and skip list: 5,234 passed,
+      0 failed. Without `IRIS_HOST` and friends exported, 96 of those fail on `IRIS_HOST must be
+    set` and on discovery finding an unrelated container; that is the invocation, not the code,
+      and it is why the CI job sets them.
 
-**Gate**: everything green, no unaddressed slop finding.
+**Gate**: PASSED for everything except the Phase 4 probe.
 
 ## Out of scope
 
