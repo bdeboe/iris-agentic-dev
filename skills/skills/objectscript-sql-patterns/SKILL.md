@@ -157,7 +157,17 @@ Return (tag %INLIST $ListFromString(..Tags, ","))
 
 // CORRECT — use $ListFind in ObjectScript:
 Return ($ListFind($ListFromString(..Tags, ","), tag) > 0)
+
+// WRONG — $ZDATETIME is ObjectScript, not SQL. SQLCODE -12 "A term expected",
+// with the parser's position marker at the $:  ... VALUES ( ? , $
+Set sql = "INSERT INTO Demo.Todo (Title, Created) VALUES (?, $ZDATETIME($HOROLOG,3))"
+
+// CORRECT — CURRENT_TIMESTAMP is the SQL spelling:
+Set sql = "INSERT INTO Demo.Todo (Title, Created) VALUES (?, CURRENT_TIMESTAMP)"
 ```
+
+A column whose property has an `InitialExpression` can simply be left out of the INSERT; see
+`iris-sql`, "Key IRIS INSERT constraints".
 
 ## 8. $HOROLOG Date Arithmetic
 

@@ -17,10 +17,10 @@
 ## Phase 2: US2 — SQL facts in skills (P2)
 
 - [x] T005 [US2] Reproduce both facts live and record them (research R1, R2; FR-008).
-- [ ] T006 [US2] Add the `$ZDATETIME` example to `objectscript-sql-patterns` §7 (FR-006).
-- [ ] T007 [US2] Add the `InitialExpression` bullet to `iris-sql` "Key IRIS INSERT constraints",
+- [x] T006 [US2] Add the `$ZDATETIME` example to `objectscript-sql-patterns` §7 (FR-006).
+- [x] T007 [US2] Add the `InitialExpression` bullet to `iris-sql` "Key IRIS INSERT constraints",
       plus the one-line pointer from `objectscript-sql-patterns` (FR-007).
-- [ ] T008 [US2] Gate: the `skills` target and any skill-content tests in `unit` pass.
+- [x] T008 [US2] Gate: the skill-content tests in `unit` pass (there is no separate `skills` target in core).
 
 ## Phase 3: US3 — the published example (P2)
 
