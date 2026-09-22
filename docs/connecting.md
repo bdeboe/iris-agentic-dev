@@ -184,7 +184,7 @@ fallback. The response includes `stored_plaintext: true` and a warning:
   "added": true,
   "stored_plaintext": true,
   "warning": "Credential stored in plaintext in servers.json — use VS Code Server Manager for production credentials.",
-  "note": "Restart iad for the pool to include this server."
+  "note": "Call iris_reload_pool to make this server routable via the `server` param."
 }
 ```
 

@@ -72,6 +72,7 @@ mod test_perf_monitoring;
 mod test_policy_audit_config;
 mod test_policy_gate;
 mod test_policy_patterns;
+mod test_pool_reload_wording;
 mod test_probe_server_offline;
 mod test_reload_pool;
 mod test_role_gate;

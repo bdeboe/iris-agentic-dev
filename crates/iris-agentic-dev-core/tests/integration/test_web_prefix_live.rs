@@ -46,7 +46,7 @@ async fn remove(name: &str) {
 }
 
 /// Register `name` against the live container, optionally under `prefix`, and probe it from a fresh
-/// pool (the running pool does not hot-reload).
+/// pool (the running pool changes only on `iris_reload_pool`).
 async fn add_and_probe(name: &str, prefix: Option<&str>) -> serde_json::Value {
     let (host, port) = live_target();
     let password = std::env::var("IRIS_PASSWORD").unwrap_or_else(|_| "SYS".into());

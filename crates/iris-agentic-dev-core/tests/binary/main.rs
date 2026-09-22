@@ -10,6 +10,7 @@
 mod cli_discovery;
 mod invalid_params;
 mod nopws_101;
+mod pool_reload_hint;
 mod rejection_message;
 mod schema_batch1;
 mod schema_batch2;

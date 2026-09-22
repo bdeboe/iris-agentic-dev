@@ -8157,7 +8157,7 @@ Methods:
     }
 
     #[tool(
-        description = "Add a new IRIS server to the iad-native configuration. Pass `web_prefix` (e.g. \"/hs20261\") for an instance behind a shared web gateway — without it the entry resolves to the gateway root and every call goes to the wrong place; registering the same name again updates the entry. The credential is stored in the OS keychain when available. On headless hosts (MCP in Claude Desktop, Remote SSH, CI) where no keychain exists, the credential is stored in plaintext in servers.json as a fallback — the response includes stored_plaintext: true and a warning in that case. The running pool does not hot-reload; restart iad after adding a server to make it available via the `server` param. Returns {added: true, name, note}.",
+        description = "Add a new IRIS server to the iad-native configuration. Pass `web_prefix` (e.g. \"/hs20261\") for an instance behind a shared web gateway — without it the entry resolves to the gateway root and every call goes to the wrong place; registering the same name again updates the entry. The credential is stored in the OS keychain when available. On headless hosts (MCP in Claude Desktop, Remote SSH, CI) where no keychain exists, the credential is stored in plaintext in servers.json as a fallback — the response includes stored_plaintext: true and a warning in that case. Call `iris_reload_pool` afterwards to make it available via the `server` param in the running server; no restart needed. Returns {added: true, name, note}.",
         output_schema = output_schemas::oneof_output_schema::<IrisAddServerResponse>()
     )]
     async fn iris_add_server(
@@ -8235,7 +8235,7 @@ Methods:
                     "name": p.name,
                     "stored_plaintext": true,
                     "warning": "Credential stored in plaintext in servers.json — use VS Code Server Manager for production credentials.",
-                    "note": "Restart iad for the pool to include this server."
+                    "note": "Call iris_reload_pool to make this server routable via the `server` param."
                 }));
             }
             return err_result(serde_json::json!({
@@ -8248,12 +8248,12 @@ Methods:
         ok_json(serde_json::json!({
             "added": true,
             "name": p.name,
-            "note": "Restart iad for the pool to include this server."
+            "note": "Call iris_reload_pool to make this server routable via the `server` param."
         }))
     }
 
     #[tool(
-        description = "Remove a server from the iad-native configuration. Destructive tier: requires IRIS_DESTRUCTIVE_TOOLS_ENABLED=1. Only servers with source=iad-native can be removed (vscode, fleet, and env sources are read-only). Also removes the OS keychain entry. Returns {removed: true, name, note}. Error codes: REMOVE_NOT_ALLOWED (source is not iad-native), SERVER_NOT_FOUND (not in pool).",
+        description = "Remove a server from the iad-native configuration. Destructive tier: requires IRIS_DESTRUCTIVE_TOOLS_ENABLED=1. Only servers with source=iad-native can be removed (vscode, fleet, and env sources are read-only). Also removes the OS keychain entry. Call `iris_reload_pool` afterwards to drop it from the running pool. Returns {removed: true, name, note}. Error codes: REMOVE_NOT_ALLOWED (source is not iad-native), SERVER_NOT_FOUND (not in pool).",
         annotations(destructive_hint = true),
         output_schema = output_schemas::oneof_output_schema::<IrisRemoveServerResponse>()
     )]
@@ -8312,7 +8312,7 @@ Methods:
         ok_json(serde_json::json!({
             "removed": true,
             "name": p.name,
-            "note": "Restart iad for the pool to reflect the removal."
+            "note": "Call iris_reload_pool to drop this server from the running pool."
         }))
     }
 
@@ -8544,7 +8544,7 @@ Methods:
     }
 
     #[tool(
-        description = "Import IRIS server definitions from VS Code / Cursor Server Manager into the iad-native config. Reads intersystems.servers from VS Code and Cursor settings.json. Servers already present in the iad-native config are skipped (no overwrite). Passwords are resolved from the OS keychain; servers where no keychain entry exists are imported without a password (listed in no_keychain). Returns {imported, skipped, no_keychain: [...]}. Restart iad after importing.",
+        description = "Import IRIS server definitions from VS Code / Cursor Server Manager into the iad-native config. Reads intersystems.servers from VS Code and Cursor settings.json. Servers already present in the iad-native config are skipped (no overwrite). Passwords are resolved from the OS keychain; servers where no keychain entry exists are imported without a password (listed in no_keychain). Returns {imported, skipped, no_keychain: [...]}. Call `iris_reload_pool` after importing to make them routable.",
         output_schema = output_schemas::oneof_output_schema::<IrisImportServersResponse>()
     )]
     async fn iris_import_servers(
@@ -8632,7 +8632,7 @@ Methods:
             "skipped": skipped,
             "no_keychain": no_keychain,
             "note": if imported > 0 {
-                "Restart iad for the pool to include imported servers."
+                "Call iris_reload_pool to make the imported servers routable."
             } else {
                 "No new servers to import."
             }

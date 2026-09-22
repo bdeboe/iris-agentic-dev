@@ -950,8 +950,8 @@ fn saved_server(path: &std::path::Path, name: &str) -> Option<Value> {
 /// `iris_remove_server` is refused with the tier off, and the saved server is still in
 /// `servers.json` afterwards (FR-025, spec.md Edge Cases).
 ///
-/// The pool is built once at startup and does not hot-reload — the tool's own success note says to
-/// restart — so the two halves of this measure different things on purpose. `iris_servers` proves
+/// The pool is built at startup and changes only on `iris_reload_pool`, so the two halves of this
+/// measure different things on purpose. `iris_servers` proves
 /// the seed reached the pool *as `iad-native`*, without which `iris_remove_server` refuses with
 /// `REMOVE_NOT_ALLOWED` and the tier is never consulted at all. The file on disk is what proves
 /// survival.
