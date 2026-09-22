@@ -37,10 +37,13 @@ transcript afterwards turned up three things wrong with iad itself, each checked
    (`iris_query`'s "destructive SQL blocked", `check_config`'s `destructive_tools_source`) use the
    word without claiming a tier. Three more name other gates entirely
    (`Execute-gated` twice, `PHI-gated` once).
-3. **Two SQL facts the demo paid for are in no skill.** `$ZDATETIME($HOROLOG,3)` inside an SQL
-   INSERT fails with SQLCODE -12, and `CURRENT_TIMESTAMP` is the SQL spelling. A property's
-   `InitialExpression` fires on `%Save()` but not on an SQL INSERT, so a column populated only by
-   `InitialExpression` stays empty when rows arrive through SQL.
+3. **One SQL fact the demo paid for is in no skill, and one the demo wrote down is false.**
+   `$ZDATETIME($HOROLOG,3)` inside an SQL INSERT fails with SQLCODE -12, and `CURRENT_TIMESTAMP`
+   is the SQL spelling. The demo's `STEPS.md` also says a property's `InitialExpression` fires on
+   `%Save()` but not on an SQL INSERT. Reproduced on `iris-dev-iris` (2026.2.0L build 208U), that
+   is wrong: an INSERT that omits the column gets the `InitialExpression` value, including the
+   braced `{$ZDateTime($Horolog,3)}` form (`research.md` R2). The agent asserted it without
+   checking, which is the more useful thing for a skill to correct.
 
 The demo itself sits untracked in `demos/todo-app/`. It is the clearest evidence this project has
 of which work iad does and which the host does (12 of 25 calls, the twelve that touched IRIS), but
@@ -80,11 +83,11 @@ An agent writing ObjectScript that builds SQL, or a developer reading the skills
 facts where they look for that kind of mistake.
 
 **Why this priority**: the demo agent recovered from the -12 in one step by itself; the
-`InitialExpression` behaviour would have cost more had the demo needed that column. Real, but it
-costs time, not correctness.
+`InitialExpression` belief sends an agent to populate columns by hand that IRIS already fills.
+Real, but it costs time, not correctness.
 
 **Independent Test**: each fact is reproduced live against `iris-dev-iris` with the exact error or
-empty value recorded, and the skill text quotes what the reproduction returned.
+value recorded, and the skill text quotes what the reproduction returned.
 
 **Acceptance Scenarios**:
 
@@ -92,7 +95,8 @@ empty value recorded, and the skill text quotes what the reproduction returned.
    read, **Then** it has a third example: `$ZDATETIME` inside an INSERT, the SQLCODE the live
    reproduction returned, and `CURRENT_TIMESTAMP` as the fix.
 2. **Given** `iris-sql`'s "Key IRIS INSERT constraints" list, **When** read, **Then** it states
-   that `InitialExpression` runs on `%Save()` and not on SQL INSERT, with the fix.
+   that `InitialExpression` also supplies the value when an SQL INSERT omits the column, so it
+   need not be populated by hand.
 3. **Given** `objectscript-sql-patterns`, **When** read, **Then** one line points to the
    `iris-sql` entry for the `InitialExpression` case.
 4. **Given** the reproduction returns something other than what this spec says, **Then** the skill
@@ -126,8 +130,10 @@ the app on a throwaway path and exercises it the way step 5 of `STEPS.md` does.
    serves the list fragment, add raises the outstanding count, toggle lowers it, delete removes
    the row, and the application, rows and classes are all gone afterwards, whether the test
    passed or failed.
-5. **Given** the destructive tier is off, **When** the round-trip test runs, **Then** it panics
-   with the reason, as constitution XI requires of every skip, unless `IAD_ALLOW_SKIP=1` is set.
+5. **Given** the round-trip test, **When** it starts, **Then** it declares the write,
+   destructive and admin tiers in its own server environment, so the tiers are never the reason
+   it cannot run; **Given** no reachable IRIS, **Then** it panics with the reason, as
+   constitution XI requires of every skip, unless `IAD_ALLOW_SKIP=1` is set.
 6. **Given** `STEPS.md` and `transcript.md`, **When** read, **Then** the customer and colleague
    appear only as roles ("a PM", "a customer").
 
@@ -160,8 +166,9 @@ not mean rediscovering them.
   "PHI-gated"): those are different gates, not tier claims, and the test ignores them rather
   than failing.
 - A `mixed()` map whose default is destructive and whose description lists some actions but not
-  others: every action that falls through to the default must still be named as destructive, or
-  the description must say that unlisted actions are destructive.
+  others: every action that falls through to the default must still be named as destructive.
+  A blanket "anything else is destructive" is not parsed, because it would let a new action ship
+  unnamed.
 - A tool the table does not list at all is read-only by default; a description claiming a gate
   for it fails.
 - The round-trip test's throwaway path already exists from an aborted earlier run: the test
@@ -188,7 +195,8 @@ not mean rediscovering them.
 - **FR-006**: `objectscript-sql-patterns` §7 MUST gain the `$ZDATETIME`-in-INSERT example with the
   SQLCODE as reproduced live.
 - **FR-007**: `iris-sql`'s INSERT constraints list MUST gain the `InitialExpression` fact as
-  reproduced live, and `objectscript-sql-patterns` MUST point to it in one line.
+  reproduced live (it applies on SQL INSERT), and `objectscript-sql-patterns` MUST point to it in
+  one line.
 - **FR-008**: Each fact in FR-006 and FR-007 MUST be reproduced on `iris-dev-iris` before its text
   is written, and the reproduction recorded in this spec directory.
 - **FR-009**: `docs/examples/todo-app/` MUST contain exactly the two classes, `STEPS.md` and
@@ -202,6 +210,9 @@ not mean rediscovering them.
 - **FR-014**: `followups.md` MUST hold drafts (d) and (e) as US4 describes.
 - **FR-015**: Nothing on this branch is pushed, merged or tagged before the PM's presentation;
   local commits only.
+- **FR-016**: Every claim about IRIS behaviour in the published `STEPS.md` MUST have been checked
+  live; the false `InitialExpression` claim is removed, and `transcript.md` carries a one-line note
+  at the top saying so, since the transcript records what the agent wrote at the time.
 
 ### Key Entities
 

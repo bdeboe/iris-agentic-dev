@@ -1,0 +1,53 @@
+# Tasks: fix what the todo-app demo exposed
+
+**Input**: [spec.md](spec.md), [plan.md](plan.md), [research.md](research.md)
+**Tests**: required, and written first in every phase.
+
+## Phase 1: US1 — tier claims match the gate table (P1)
+
+- [x] T001 [US1] Write `crates/iris-agentic-dev-core/tests/unit/test_description_tiers.rs` to the
+      grammar in research R6 and add its `mod` line to `tests/unit/main.rs`.
+- [x] T002 [US1] Run it on unchanged descriptions and confirm it fails on exactly 18 units (FR-003).
+      Save the failure list to `specs/123-demo-gap-fixes/evidence/tiers-before.txt`.
+- [x] T003 [US1] Correct the descriptions in `src/tools/mod.rs` for `iris_admin`, `global_kill`,
+      `iris_namespace_create`, `iris_credential_manage`, `iris_lookup_manage`, `iris_global`,
+      `skill`, `iris_remove_server` and `skill_forget` (FR-004). Change only the text.
+- [x] T004 [US1] Gate: the tier test passes, and so does the whole `unit` target.
+
+## Phase 2: US2 — SQL facts in skills (P2)
+
+- [x] T005 [US2] Reproduce both facts live and record them (research R1, R2; FR-008).
+- [ ] T006 [US2] Add the `$ZDATETIME` example to `objectscript-sql-patterns` §7 (FR-006).
+- [ ] T007 [US2] Add the `InitialExpression` bullet to `iris-sql` "Key IRIS INSERT constraints",
+      plus the one-line pointer from `objectscript-sql-patterns` (FR-007).
+- [ ] T008 [US2] Gate: the `skills` target and any skill-content tests in `unit` pass.
+
+## Phase 3: US3 — the published example (P2)
+
+- [ ] T009 [US3] Write `tests/unit/test_example_scrub.rs` and add its `mod` line. It covers
+      FR-009, FR-010 and FR-011, and must fail while the directory is absent.
+- [ ] T010 [US3] Add `/.iad-local/` to `.gitignore`. Create a local denylist holding the names.
+- [ ] T011 [US3] Build `docs/examples/todo-app/` from `demos/todo-app/`:
+  - copy the two classes;
+  - replace names with roles in `STEPS.md` and `transcript.md`;
+  - remove the false `InitialExpression` claim and add the transcript note (FR-016);
+  - strip home paths.
+- [ ] T012 [US3] Scrub test green, with the denylist present and with it absent.
+- [ ] T013 [US3] Write `tests/integration/test_todo_example_live.rs` to research R4 and R5, and
+      add its `mod` line (FR-012, FR-013).
+- [ ] T014 [US3] Gate: the round-trip test passes live and leaves no `IADEx123` classes, rows,
+      globals or `/iadex123-todo` app behind.
+
+## Phase 4: US4 — follow-ups (P3)
+
+- [ ] T015 [US4] Write `followups.md` with drafts (d) and (e) (FR-014). File neither.
+- [ ] T016 [US4] Once spec 121 merges, fold the drafted defects from specs 121, 122 and 123 into
+      one list. This stays open until then.
+
+## Phase 5: Polish
+
+- [ ] T017 Run `cargo fmt --all`, `cargo clippy --all-targets --features testing -- -D warnings`
+      and the full `unit` target.
+- [ ] T018 Record the SC-006 `tools/list` byte count before and after in `quickstart.md`.
+- [ ] T019 Run markdownlint and prettier on every changed `.md`, then make local commits. No push
+      (FR-015).

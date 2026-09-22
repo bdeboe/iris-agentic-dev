@@ -1,0 +1,21 @@
+thread 'test_description_tiers::descriptions_agree_with_the_gate_table'  panicked at crates/iris-agentic-dev-core/tests/unit/test_description_tiers.rs:293:5:
+18 tool/action units disagree with write_gate::CLASSIFICATION:
+  global_kill:- — description says write for the tool, table resolves destructive; resolves destructive, description does not say so
+  iris_admin:create_namespace — description says write, table resolves destructive; resolves destructive, description does not say so
+  iris_admin:create_user — description says write, table resolves destructive; resolves destructive, description does not say so
+  iris_admin:create_webapp — description says write, table resolves destructive; resolves destructive, description does not say so
+  iris_admin:delete_namespace — description says write, table resolves destructive; resolves destructive, description does not say so
+  iris_admin:delete_user — description says write, table resolves destructive; resolves destructive, description does not say so
+  iris_admin:delete_webapp — description says write, table resolves destructive; resolves destructive, description does not say so
+  iris_admin:update_user — description says write, table resolves destructive; resolves destructive, description does not say so
+  iris_credential_manage:create — description says write for the tool, table resolves destructive; resolves destructive, description does not say so
+  iris_credential_manage:delete — description says write for the tool, table resolves destructive; resolves destructive, description does not say so
+  iris_credential_manage:update — description says write for the tool, table resolves destructive; resolves destructive, description does not say so
+  iris_global:kill — resolves destructive, description does not say so
+  iris_lookup_manage:delete — description says write, table resolves destructive; resolves destructive, description does not say so
+  iris_lookup_manage:set — description says write, table resolves destructive; resolves destructive, description does not say so
+  iris_namespace_create:- — description says write for the tool, table resolves destructive; resolves destructive, description does not say so
+  iris_remove_server:- — resolves destructive, description does not say so
+  skill:forget — resolves destructive, description does not say so
+  skill_forget:- — resolves destructive, description does not say so
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
