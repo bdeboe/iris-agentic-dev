@@ -160,10 +160,15 @@ iris-agentic-dev tool check_config --json
 ```
 
 Read `connected`, `port` and `container`, and check the last two against what step 3 or 4 gave
-you. `connected: true` on its own does not prove you reached the right instance: when
-authentication fails, discovery keeps looking and can settle on an unrelated container that
-does answer, reporting `connected: true` against a database nobody asked about. The port is the
-tell.
+you. `connected: true` on its own does not prove you reached the right instance.
+
+A pin is advisory. `--container`, `--web-port` and their `IRIS_*` environment equivalents are
+honoured while the target they name answers; the moment it does not, for a dead port or an
+expired password alike, discovery carries on looking and settles on whatever else on the machine
+does answer. It then reports `connected: true` against a database nobody asked about. Measured:
+`check_config --container iris-nope --web-port 59999` came back `connected: true` on another
+container entirely. The two fields it prints are honest about where it landed, which is why
+reading them is the check, and `connected` on its own is not.
 
 Then prove it can read:
 

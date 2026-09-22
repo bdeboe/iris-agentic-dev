@@ -116,9 +116,14 @@ wrong tap each fail exactly one test), every command in the skill has been run l
 
 ## Phase 4 — the measurement
 
-- [ ] **T018** Run the SC-001 probe: a session on a PATH with no `iris-agentic-dev`, plugin installed,
-      one plain-English prompt, ending at a query with rows. Billable, so behind the existing opt-in.
-      Keep the transcript at `specs/122-plugin-install-setup/probe-after.md`.
+- [x] **T018** Run, contained: temp cwd, PATH without `/opt/homebrew/bin`, no MCP tools at all
+      (`--strict-mcp-config` with an empty config, which leaves plugin skills loaded), binary
+      installed into a temp bin dir, one throwaway `iad-probe` container, both removed afterwards.
+      One prompt, no follow-ups. It ended at five rows from a container it started, and pinned the
+      rows to that container by reading a marker table through the binary, through raw Atelier REST
+      and through `iris sql` inside the container. Caveat: it got the binary by copying the
+      Homebrew install rather than downloading a release, since PATH stripping does not hide the
+      Cellar, so the install channel itself is still unmeasured. Record in `probe-after.md`.
 - [~] **T019** Run, but the measurement is contaminated and does not settle SC-002. A
   `claude -p --strict-mcp-config --permission-mode plan` session on a PATH without
   `iris-agentic-dev`, asked for the install commands, named
@@ -129,9 +134,13 @@ wrong tap each fail exactly one test), every command in the skill has been run l
   host where the formula is genuinely absent: a CI runner, or a container. Transcript summary
   in `research.md`.
 
-**Gate**: NOT MET. T018 is unrun and T019 is contaminated. T018 needs a decision first, because
-the probe is an unattended session with permissions relaxed that downloads a binary and starts a
-container on this laptop; both are reversible, neither is something to do unasked.
+**Gate**: PARTIAL. The probe ends at rows from IRIS (SC-001), and the channel guess is gone, but
+neither the install channel nor the cause of its disappearance is measured, because this machine has
+the formula installed and PATH stripping does not hide it. Both need a host where it is absent: a CI
+runner or a container. The probe also turned up three tool findings, all reproduced by hand and
+recorded in `probe-after.md`; the first, that a connection pin is advisory and falls back silently to
+whatever else answers, is a data-safety issue and belongs with the drafted defects, not in this
+feature.
 
 ## Phase 5 — docs
 
@@ -152,7 +161,7 @@ container on this laptop; both are reversible, neither is something to do unaske
       `cargo fmt --all -- --check` and `cargo clippy --features testing --all-targets -- -D warnings`
       clean. Full Rust suite against live `iris-dev-iris` with CI's env and skip list: 5,234 passed,
       0 failed. Without `IRIS_HOST` and friends exported, 96 of those fail on `IRIS_HOST must be
-    set` and on discovery finding an unrelated container; that is the invocation, not the code,
+  set` and on discovery finding an unrelated container; that is the invocation, not the code,
       and it is why the CI job sets them.
 
 **Gate**: PASSED for everything except the Phase 4 probe.
