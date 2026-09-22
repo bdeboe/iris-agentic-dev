@@ -12,17 +12,31 @@ The demo worked: one prompt, 25 tool calls, 4 min 53 s, a live app at `/todo`. R
 transcript afterwards turned up three things wrong with iad itself, each checked on `master`
 (`5f38c46`) on 2026-09-22:
 
-1. **Tool descriptions contradict the gate table on nine actions.** `iris_admin`'s description says
-   `create_user`, `update_user`, `delete_user`, `create_namespace`, `delete_namespace`,
-   `create_webapp` and `delete_webapp` "require IRIS_WRITE_TOOLS_ENABLED=1". The `mixed()` entry
-   in `write_gate.rs` lists none of them, so they fall through to its `WriteClass::Destructive`
-   default. `global_kill` and `iris_namespace_create` both say `WRITE-GATED`; the table has
-   `de("global_kill")` and `de("iris_namespace_create")`. In the demo the agent read "write tier",
-   called `create_webapp`, and was refused with `iris_admin is a destructive tool and the
-destructive tier is disabled`. For `global_kill` the description understates the gate on the
-   single most destructive tool in the surface.
-2. **Of 93 tool descriptions, one enumerates per-action tiers and nine more make some gating
-   claim.** Nothing checks any of them against the table.
+1. **Tool descriptions contradict the gate table on eighteen actions across nine tools.** In the
+   demo the agent read "write tier" in `iris_admin`'s description, called `create_webapp`, and was
+   refused with `iris_admin is a destructive tool and the destructive tier is disabled`. Reading
+   all 81 registered descriptions against `CLASSIFICATION` in `write_gate.rs`:
+
+   | Tool                     | Description says                                                                                                             | Table resolves                      |
+   | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+   | `iris_admin`             | write: `create_user`, `update_user`, `delete_user`, `create_namespace`, `delete_namespace`, `create_webapp`, `delete_webapp` | destructive (the `mixed()` default) |
+   | `global_kill`            | `WRITE-GATED`                                                                                                                | destructive                         |
+   | `iris_namespace_create`  | `WRITE-GATED`                                                                                                                | destructive                         |
+   | `iris_credential_manage` | `Write-gated` for create, update, delete                                                                                     | destructive                         |
+   | `iris_lookup_manage`     | `set/delete write-gated`                                                                                                     | destructive                         |
+   | `iris_global`            | nothing about `kill`                                                                                                         | destructive                         |
+   | `skill`                  | nothing about `forget`                                                                                                       | destructive                         |
+   | `iris_remove_server`     | nothing                                                                                                                      | destructive                         |
+   | `skill_forget`           | nothing                                                                                                                      | destructive                         |
+
+   Fourteen are wrong claims; four are destructive actions described as if ungated. For
+   `global_kill` the description understates the gate on the single most destructive tool in the
+   surface.
+
+2. **Nothing checks any of this.** Ten descriptions mention a gate in some form, and two of those
+   (`iris_query`'s "destructive SQL blocked", `check_config`'s `destructive_tools_source`) use the
+   word without claiming a tier. Three more name other gates entirely
+   (`Execute-gated` twice, `PHI-gated` once).
 3. **Two SQL facts the demo paid for are in no skill.** `$ZDATETIME($HOROLOG,3)` inside an SQL
    INSERT fails with SQLCODE -12, and `CURRENT_TIMESTAMP` is the SQL spelling. A property's
    `InitialExpression` fires on `%Save()` but not on an SQL INSERT, so a column populated only by
@@ -45,7 +59,7 @@ could have predicted, and on `global_kill` it misstates the protection around pe
 It is the only finding that is wrong rather than missing.
 
 **Independent Test**: one test reads every tool description and the gate table and compares them.
-It fails today on exactly the nine actions above and passes once the text is corrected.
+It fails today on exactly the eighteen actions above and passes once the text is corrected.
 
 **Acceptance Scenarios**:
 
@@ -112,8 +126,8 @@ the app on a throwaway path and exercises it the way step 5 of `STEPS.md` does.
    serves the list fragment, add raises the outstanding count, toggle lowers it, delete removes
    the row, and the application, rows and classes are all gone afterwards, whether the test
    passed or failed.
-5. **Given** the destructive tier is off, **When** the round-trip test runs, **Then** it reports
-   that it did not run and why, rather than passing.
+5. **Given** the destructive tier is off, **When** the round-trip test runs, **Then** it panics
+   with the reason, as constitution XI requires of every skip, unless `IAD_ALLOW_SKIP=1` is set.
 6. **Given** `STEPS.md` and `transcript.md`, **When** read, **Then** the customer and colleague
    appear only as roles ("a PM", "a customer").
 
@@ -165,10 +179,10 @@ not mean rediscovering them.
   table resolves, and fail naming the tool, the action and both tiers on any mismatch.
 - **FR-002**: The same test MUST fail when a tool or action that resolves to the destructive tier
   has a description that does not say destructive.
-- **FR-003**: The test MUST be written and seen failing on all nine current mismatches before any
+- **FR-003**: The test MUST be written and seen failing on all eighteen current mismatches before any
   description changes.
-- **FR-004**: The descriptions of `iris_admin`, `global_kill` and `iris_namespace_create` MUST be
-  corrected so FR-001 and FR-002 pass, without changing any gate behaviour.
+- **FR-004**: The descriptions of the nine tools in the table above MUST be corrected so FR-001
+  and FR-002 pass, without changing any gate behaviour.
 - **FR-005**: Tool descriptions whose tools are read-only or write tier and silent on gating MUST
   NOT be required to add text.
 - **FR-006**: `objectscript-sql-patterns` §7 MUST gain the `$ZDATETIME`-in-INSERT example with the
@@ -203,7 +217,7 @@ not mean rediscovering them.
 ### Measurable Outcomes
 
 - **SC-001**: Zero disagreements between description tier claims and the gate table, down from
-  nine, and a regression reintroducing any one of them fails a test.
+  eighteen, and a regression reintroducing any one of them fails a test.
 - **SC-002**: Every destructive-tier tool and action is identified as destructive in its own
   description.
 - **SC-003**: Both SQL facts are in a skill, each backed by a recorded live reproduction.
@@ -212,7 +226,7 @@ not mean rediscovering them.
 - **SC-005**: The example app is built and exercised end to end by a test, and leaves nothing
   behind on the instance.
 - **SC-006**: The `tools/list` payload grows by no more than the corrected sentences (measured
-  against spec 114's method), since only three descriptions change.
+  against spec 114's method), since only nine descriptions change.
 
 ## Assumptions
 
