@@ -30,7 +30,7 @@ the prebuilt binary you already use for compile/execute/test:
 
 ```bash
 # Mac (Homebrew)
-brew tap intersystems-community/iris-agentic-dev
+brew tap intersystems-community/tap
 brew install iris-agentic-dev
 
 # Mac direct download (Apple Silicon)

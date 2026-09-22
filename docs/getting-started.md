@@ -43,7 +43,7 @@ throwaway container on your laptop and nowhere else.
 ## Step 2 — Install `iris-agentic-dev`, and prove it runs
 
 ```bash
-brew tap intersystems-community/iris-agentic-dev
+brew tap intersystems-community/tap
 brew install iris-agentic-dev
 iris-agentic-dev --version
 ```
