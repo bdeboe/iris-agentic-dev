@@ -98,6 +98,12 @@ jobs:
         # skips on a runner without the CLI; these assertions do not.
         run: python -m pytest tests/e2e/test_plugin_manifest.py -q
 
+      - name: Verify every skill in the tree reaches someone who installs the plugin
+        # The loader reads skills/<name>/SKILL.md and does not recurse, so the 34
+        # bundled skills one level deeper shipped with nothing announcing it. A
+        # skill nobody can load is worse than none: error messages point at it.
+        run: python -m pytest tests/e2e/test_plugin_skills.py -q
+
   windows-handshake:
     runs-on: windows-latest
     steps:

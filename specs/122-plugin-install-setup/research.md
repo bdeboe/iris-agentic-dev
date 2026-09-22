@@ -190,3 +190,35 @@ warning anywhere is the allowlisted `CLAUDE.md`-at-root one, which appears under
 rather than under `manifest` — worth knowing when writing the assertion, since a check that
 only reads `manifest.warnings` would see a clean report and miss everything about the plugin's
 actual contents.
+
+## Phase 2: how a declared skills path is read (T012)
+
+The `skills` array is not a list of parent directories. Each entry is read one of two ways,
+and the difference decides whether a skill ships:
+
+| `"skills"`                               | `plugin details` reports                                 |
+| ---------------------------------------- | -------------------------------------------------------- |
+| absent                                   | 3 — the `skills/` root scan only                         |
+| `["./skills/skills"]`                    | 37 — root scan plus every child of that directory        |
+| `["./skills/skills/iris-agentic-dev"]`   | 4 — the root scan plus **one** skill, `iris-agentic-dev` |
+| `["./skills/skills", ".../nopws-setup"]` | 38 — everything in the tree                              |
+
+The third row is the finding. `skills/skills/iris-agentic-dev` holds its own `SKILL.md`, so
+the loader treated it as a single skill rather than as a parent, and its child `nopws-setup`
+stayed invisible. The rule: a declared path with a `SKILL.md` is one skill; a path without one
+is a parent of skills; neither recurses.
+
+`nopws-setup` is not incidental. `tools/nopws.rs` and `tools/mod.rs` both tell a reader to go
+read `skills/skills/iris-agentic-dev/nopws-setup/SKILL.md` when an Enterprise build with no
+private web server refuses a connection, which is the moment someone most needs it. Shipping
+the plugin without it would have pointed people at a file they do not have.
+
+Final declaration, `plugin details iris-dev` reporting 38:
+
+```json
+"skills": ["./skills/skills", "./skills/skills/iris-agentic-dev/nopws-setup"]
+```
+
+`test_plugin_skills.py` models that rule and walks the whole `skills/` tree, so a new skill at
+any depth that no entry reaches fails the test. Mutation-checked both ways: dropping the nested
+entry fails two tests, dropping the array fails three.

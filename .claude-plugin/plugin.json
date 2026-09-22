@@ -15,6 +15,7 @@
     "skills",
     "interoperability"
   ],
+  "skills": ["./skills/skills", "./skills/skills/iris-agentic-dev/nopws-setup"],
   "mcpServers": {
     "iris-dev": {
       "command": "iris-agentic-dev",

@@ -51,19 +51,22 @@ output is in `research.md`.
 
 ## Phase 2 — skills parity
 
-- [ ] **T010** Write `tests/e2e/test_plugin_skills.py`, failing, asserting the skills the plugin
-      exposes are every skill the binary bundles plus exactly `iris-coverage-run`,
-      `iris-coverage-setup` and `pyprod`. Read the bundled list from `skill list`, and the plugin's
-      from the `skills` roots declared in `plugin.json`, rather than hardcoding names on either side.
-      A fourth root skill has to fail this test.
-- [ ] **T011** Add `"skills": ["./skills/skills"]` to `plugin.json`. No files move, so no reference to
-      `skills/skills/` changes.
-- [ ] **T012** Confirm the declaration loads what the test claims by installing the plugin from this
+- [x] **T010** Wrote `tests/e2e/test_plugin_skills.py`, failing first. It ended up stronger than the
+      task asked for: rather than allowlisting the three root skills, it walks the whole `skills/`
+      tree and requires every `SKILL.md` in it to be reachable by some entry in the declaration. So a
+      new skill at any depth that no entry covers fails, which is how `nopws-setup` was found. A
+      fourth test reads `plugin details` and compares the loader's own inventory against the tree.
+- [x] **T011** Added `"skills": ["./skills/skills", "./skills/skills/iris-agentic-dev/nopws-setup"]`
+      to `plugin.json`. The second entry is there because a declared path holding its own `SKILL.md`
+      loads as one skill instead of as a parent, so `nopws-setup` two levels down needed naming.
+      No files move, so no reference to `skills/skills/` changes.
+- [x] **T012** Confirm the declaration loads what the test claims by installing the plugin from this
       checkout and reading `claude plugin details iris-dev`, and paste the inventory into
       `research.md`. `plugin details` is the loader's own account, which is the only thing that can
       contradict the test.
 
-**Gate**: T010 passes, and `plugin details` lists the 37.
+**Gate**: PASSED — T010's four tests green and mutation-checked, and `plugin details iris-dev`
+lists 38: the 34 bundled, the three at `skills/` root, and `nopws-setup`.
 
 ## Phase 3 — the setup skill
 
