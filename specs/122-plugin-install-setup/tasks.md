@@ -70,26 +70,49 @@ lists 38: the 34 bundled, the three at `skills/` root, and `nopws-setup`.
 
 ## Phase 3 — the setup skill
 
-- [ ] **T013** Write `tests/e2e/test_setup_skill.py`, failing, reusing the guide checker in
-      `test_getting_started.py`: every `iris-agentic-dev` subcommand the skill names exists, every
-      tool is in the catalogue, every `--args` payload parses and uses declared fields. Factor the
-      shared helpers out rather than copying them.
-- [ ] **T014** Write `skills/iris-agentic-dev-setup/SKILL.md` covering FR-005 in order: detect the
-      binary with `command -v`; install per platform naming `intersystems-community/tap`; find an
-      existing IRIS with `docker ps` before starting one; start
-      `intersystemsdc/iris-community:latest` when there is none; clear the expired default password;
-      resolve the web port from `docker port` rather than assuming 52773; register with
-      `claude mcp add` using the absolute path; verify with `check_config` and one query.
-- [ ] **T015** Add the FR-007 branch to the skill: `iris_test_server` splits reachable from
-      authenticated, the expired default password is named as the first cause of a 401 on a fresh
-      container, and the known-wrong `IRIS_UNREACHABLE` code on a 401 is called out so a reader does
-      not chase the hint.
-- [ ] **T016** Run every command in the skill against a live container while writing it, the standard
-      `docs/getting-started.md` is held to. Use a throwaway container name and remove it afterwards.
-- [ ] **T017** Extend `test_install_instructions.py` so the tap guard covers the new skill file, and
-      confirm it fails when the tap is wrong there.
+- [x] **T013** Wrote `tests/e2e/test_setup_skill.py`, failing first (four failures, all on the
+      missing skill file). `test_getting_started.py` is not on this branch — it lives on the
+      unmerged `121-benchmark-program` — so the checker is written here against `--help`
+      `Commands:`, `tool --list` and `tool <name> --schema --json`. **The shared factoring happens
+      when 121 merges**, whichever way round that is; the two checkers overlap on subcommand and
+      tool-name extraction. A missing skill file asserts rather than skips: a skip would let the
+      whole feature disappear with CI green, which is the #118 pattern this policy exists for.
+- [x] **T014** Wrote `skills/iris-agentic-dev-setup/SKILL.md`. It sits at `skills/` root, not under
+      `skills/skills/`: the root is what the loader scans implicitly, and a directory under
+      `skills/skills/` would have to be added to `bundled.rs` to keep
+      `embedded_catalog_matches_the_skills_directory_on_disk` green. A setup skill has no business
+      in the binary's embedded catalog anyway, since it has to be readable before the binary exists.
+- [x] **T015** FR-007 branch written from measured output rather than from the error strings. Three
+      findings went into it that the task did not anticipate:
+      (a) an ad-hoc `iris_test_server` probe does **not** default `username`/`password` from the
+      active config, so omitting them returns `auth: false` against a perfectly healthy server;
+      (b) an expired password and a wrong password produce byte-identical
+      `reachable: true, auth: false, "Authentication failed (HTTP 401)"`;
+      (c) when authentication fails, discovery keeps looking and can settle on an **unrelated**
+      container that does answer, reporting `connected: true`. `IRIS_WEB_PORT=9773` was honoured
+      once the password was cleared and ignored while it was expired. So `connected: true` never
+      proves you reached the instance you started, and the skill tells the reader to check
+      `port`/`container`.
+- [x] **T016** Every command in the skill run live against a throwaway `iad-quickstart` container
+      (community 2026.1, ports 9772/9773), removed afterwards. `docker ps --filter expose=1972`,
+      `docker port`, the `UnExpireUserPasswords` exec, the authenticated `curl`, `check_config`,
+      `query` (6,870 rows) and both `iris_test_server` branches all ran. `claude mcp add` was run
+      in a temp directory and removed. The health-wait loop in the skill polls the REST endpoint
+      because **this image declares no healthcheck** — `docker inspect` reports an empty health
+      status forever, so the obvious wait never returns.
+      Not runnable yet: `claude plugin marketplace add intersystems-community/iris-agentic-dev`.
+      `.claude-plugin/marketplace.json` is 404 on `master`, so the remote form only starts working
+      when this branch lands. Phase 1 verified the same round trip from a local checkout.
+- [x] **T017** `test_install_instructions.py` is also a 121 file, so the tap guard went into
+      `test_setup_skill.py` as a repo-wide markdown scan, which is FR-006's actual scope. It found
+      one offender: `skills/BENCHMARKING.md:23` named `intersystems-community/iris-agentic-dev`,
+      whose `homebrew-` repository does not exist, so the first command in the benchmarking guide
+      404s. Fixed here. 121 fixes the same line, and the change is identical, so the merge is clean.
 
-**Gate**: T013 and T017 pass; the skill's commands have all been run.
+**Gate**: PASSED — all five tests in `test_setup_skill.py` green and mutation-checked (a bad
+subcommand, a bad tool name, an undeclared `--args` key, a description with no trigger phrase and a
+wrong tap each fail exactly one test), every command in the skill has been run live, and
+`claude plugin details iris-dev` now reports 39 skills including `iris-agentic-dev-setup`.
 
 ## Phase 4 — the measurement
 

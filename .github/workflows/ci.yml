@@ -59,6 +59,20 @@ jobs:
           RUST_LOG: warn
           RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
 
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install pytest
+      # Runs here rather than in benchmark-lint because three of its five checks read the
+      # real CLI surface (`--help`, `tool --list`, `tool <name> --schema`) and skip without
+      # a built binary. This job already built it, so nothing skips. A setup skill naming a
+      # subcommand the CLI dropped is a first-run failure for the one person who cannot
+      # debug it.
+      - name: Verify the setup skill only tells agents to run commands that exist
+        run: python -m pytest tests/e2e/test_setup_skill.py -q
+        env:
+          IAD_BINARY: ./target/debug/iris-agentic-dev
+
   benchmark-lint:
     runs-on: ubuntu-latest
     steps:

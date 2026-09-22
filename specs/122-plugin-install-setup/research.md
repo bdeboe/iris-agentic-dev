@@ -222,3 +222,72 @@ Final declaration, `plugin details iris-dev` reporting 38:
 `test_plugin_skills.py` models that rule and walks the whole `skills/` tree, so a new skill at
 any depth that no entry reaches fails the test. Mutation-checked both ways: dropping the nested
 entry fails two tests, dropping the array fails three.
+
+## Phase 3: what a fresh container actually does (T015, T016)
+
+A throwaway `iad-quickstart` (`intersystemsdc/iris-community:latest`, resolving to 2026.1 Build
+234U on ARM64), ports 9772/9773.
+
+**No healthcheck on the image.** Forty polls of
+`docker inspect -f '{{.State.Health.Status}}'` returned empty every time, so the usual
+wait-for-healthy loop never terminates. The REST endpoint is the readiness signal: a `401` from
+`/api/atelier/` means IRIS is up and asking for credentials.
+
+**The expired default password, and what it breaks.** Before
+`##class(Security.Users).UnExpireUserPasswords("*")`:
+
+```text
+$ iris-agentic-dev tool iris_test_server --args '{"host":"localhost","web_port":9773,"username":"_SYSTEM","password":"SYS"}'
+{"auth":false,"error":"Authentication failed (HTTP 401)","host":"localhost","iris_version":null,
+ "latency_ms":10,"port":9773,"reachable":true}
+```
+
+After it:
+
+```text
+{"atelier_version":"8","auth":true,"error":null,"host":"localhost",
+ "iris_version":"IRIS for UNIX (Ubuntu Server LTS for ARM64 Containers) 2026.1 (Build 234U) ...",
+ "latency_ms":14,"port":9773,"reachable":true}
+```
+
+Same bytes as a wrong password in the failing case. Nothing distinguishes expired from wrong, which
+is why the skill names the expiry as the first thing to check rather than the credentials.
+
+**An ad-hoc probe does not inherit credentials.** Omitting `username`/`password` returns
+`auth: false` against the same healthy server that answers `auth: true` when they are passed
+explicitly. A reader who trusts the shorter form concludes the credentials are broken.
+
+**Discovery walks away from an authentication failure.** `IRIS_WEB_PORT=9773` with the password
+expired:
+
+```text
+{'connected': True, 'connection_source': 'auto_discovered', 'port': 45083,
+ 'iris_version': '... 2026.3.0AI (Build 141U) ...'}
+```
+
+Port 45083 is `dxlab-r39-iris`, an unrelated container. After clearing the expiry, the same command
+reports `port: 9773, container: 'iad-quickstart'`. So an explicit port is honoured only while
+authentication succeeds, and `connected: true` on its own says nothing about which database you
+reached. On a one-instance laptop this is invisible; on a developer machine with ten it is a wrong
+answer that looks right. The skill therefore has the reader compare `port` and `container` against
+what they started, and pin both rather than leaving it to discovery.
+
+**`claude mcp add` round trip**, run in a temp directory and removed afterwards:
+
+```text
+$ claude mcp add iad-scratch /Users/tdyar/ws/iris-agentic-dev/target/debug/iris-agentic-dev mcp \
+    --env IRIS_WEB_PORT=9773 --env IRIS_CONTAINER=iad-quickstart
+Added stdio MCP server iad-scratch with command: .../iris-agentic-dev mcp to local config
+$ claude mcp list
+iad-scratch: .../target/debug/iris-agentic-dev mcp - ✔ Connected
+```
+
+**The remote marketplace form does not work yet.**
+`gh api repos/intersystems-community/iris-agentic-dev/contents/.claude-plugin/marketplace.json`
+returns 404 on `master`, so `claude plugin marketplace add intersystems-community/iris-agentic-dev`
+has nothing to read until this branch lands. The local-checkout round trip in Phase 1 is the same
+path with a different source.
+
+**Loader inventory after the setup skill landed:** `claude plugin details iris-dev` reports
+`Skills (39)`, including `iris-agentic-dev-setup`. Thirty-eight before, so the implicit `skills/`
+root scan picked it up with no manifest change.
