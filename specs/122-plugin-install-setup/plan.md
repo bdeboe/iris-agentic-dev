@@ -68,25 +68,28 @@ docs/
 
 ## The skills-layout decision
 
-`skills/skills/<name>/` is where the binary's `skill install` reads from, and moving 34 directories
-breaks every path that names them: the eval harness, `skills/AGENTS.md`, the benchmark doc, and the
-Rust code that embeds them. Two options:
+Settled by T002, not by reading: `plugin.json` takes a `skills` array of parent directories, and
+`"skills": ["./skills/skills"]` loads all 34 without moving anything. The 34 directories stay where
+they are, so `include_str!` in `src/skills/bundled.rs`, the eval harness, `skills/AGENTS.md` and the
+benchmark doc all keep working. `research.md` has the probe table.
 
-1. **Move** `skills/skills/*` up to `skills/*` and fix every reference.
-2. **Point the plugin at the nested path** if the loader accepts a configured skills root.
-
-Option 2 is preferable if it exists, because the move touches the harness that spec 118 just
-repaired. Task T004 settles it by testing the loader rather than by reading about it. If no
-configuration exists, option 1 happens with a test asserting that both the binary and the plugin see
-the same set, so the two cannot drift again.
+The declaration adds to the default `skills/*` scan rather than replacing it, so the plugin ships 37:
+the 34 bundled ones plus `iris-coverage-run`, `iris-coverage-setup` and `pyprod`, which have sat at
+`skills/` root since #84 and are real skills the binary does not bundle. Shipping them is fine.
+Parity is therefore "the plugin exposes every bundled skill, plus exactly these three" — named in the
+test, so a fourth stray cannot appear unnoticed. Moving those three into `skills/skills/` would make
+the sets equal, but it would also add them to the binary's embedded catalog, which is a behaviour
+change this feature has no reason to make.
 
 ## Phases
 
-**Phase 0 — find out what the loader does.** Three questions, each answered by running the CLI, not
-by reading: what keys `marketplace.json` accepts (`name`, `owner`, `plugins[]`, and a top-level
-`description` to clear the validate warning — confirmed 2026-09-22); whether the skills root is
-configurable; and whether a plugin-supplied MCP server with no `env` block reaches the same
-connection resolution as a hand-registered one. Findings go in `research.md`.
+**Phase 0 — find out what the loader does.** Done, 2026-09-22; see `research.md`. The minimum
+`marketplace.json` is `name`, a top-level `description`, `owner.name` and `plugins[]`, with `author`
+in the plugin manifest it points at. The skills root is configurable and additive. A plugin MCP
+server with no `env` block resolves through `.iris-agentic-dev.toml` exactly as a hand-registered one
+does (`connection_source: "config_file"`). One finding changes the requirements: `--strict` validate
+can never pass on this repo, because the plugin root is the repo root and its `CLAUDE.md` draws a
+warning that is correct and not worth acting on.
 
 **Phase 1 — manifests, test-first.** `test_plugin_manifest.py` before the manifest edits: the
 command names a shipped executable, no `${...}` placeholder appears in an env block, and the version

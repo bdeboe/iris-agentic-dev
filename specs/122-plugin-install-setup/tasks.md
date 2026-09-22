@@ -7,21 +7,25 @@ Tests come before the thing they check, and each phase gate has to pass before t
 
 ## Phase 0 — find out what the loader does
 
-- [ ] **T001** Record the `marketplace.json` keys `claude plugin validate` accepts, and the minimum
-      that validates with no warnings. Confirmed so far: `name`, `owner.name`, `plugins[].name`,
-      `plugins[].source`, `plugins[].description`, plus a top-level `description` to clear the one
-      warning. Write it to `research.md` with the command and its output.
-- [ ] **T002** [P] Determine whether a plugin's skills root is configurable, or whether
-      `skills/<name>/SKILL.md` at the plugin root is the only place the loader looks. Answer by
-      installing a scratch plugin from a local path with skills one directory down, then listing what
-      loaded. Record in `research.md`.
-- [ ] **T003** [P] Determine what a plugin-supplied MCP server with no `env` block resolves to:
-      whether `.iris-agentic-dev.toml` discovery and the auto-discovery chain run the same as for a
-      hand-registered server. Record in `research.md` with a `check_config` output.
-- [ ] **T004** Decide the skills layout from T002 and write the decision into `plan.md` under "The
-      skills-layout decision", replacing the two options with the one taken and why.
+- [x] **T001** Record the `marketplace.json` keys `claude plugin validate` accepts, and the minimum
+      that validates clean. Minimum is `name`, a top-level `description`, `owner.name` and
+      `plugins[]`; `plugins[].description` is optional; the plugin manifest each `source` points at
+      needs `author`. `--strict` turns warnings into exit 1, and cannot pass on this repo — the
+      `CLAUDE.md`-at-root warning is inherent. `--json` is what a test should read.
+- [x] **T002** [P] Skills root is configurable: `"skills": ["./skills/skills"]` in `plugin.json`
+      loads every `<name>/SKILL.md` under that parent. The declaration is additive, not a
+      replacement, so the three skills at `skills/` root ship as well. Four scratch plugins,
+      `claude plugin details` output in `research.md`.
+- [x] **T003** [P] A plugin MCP server with no `env` block lands on
+      `connection_source: "config_file"` from the host's `.iris-agentic-dev.toml`, connected, with a
+      real `iris_version`. Same resolution as a hand-registered server. `check_config` output in
+      `research.md`.
+- [x] **T004** Decision written into `plan.md`: keep `skills/skills/` and declare it. No 34-directory
+      move, so `include_str!`, the eval harness and the docs stay intact.
 
-**Gate**: `research.md` answers all three questions with commands and output, not prose.
+**Gate**: PASSED — `research.md` answers all three with commands and output. Two requirements changed
+as a result: FR-001/SC-003 allowlist the `CLAUDE.md` warning instead of demanding zero warnings, and
+FR-004/SC-004 expect the 34 bundled skills plus three named root ones rather than an exact match.
 
 ## Phase 1 — manifests
 
@@ -32,9 +36,11 @@ Tests come before the thing they check, and each phase gate has to pass before t
       `marketplace.json`, `plugin.json` and the workspace `Cargo.toml` agree.
 - [ ] **T006** Add `.claude-plugin/marketplace.json` per T001, with a top-level description.
 - [ ] **T007** Fix `plugin.json`: command `iris-agentic-dev`, `env` block removed per FR-003.
-- [ ] **T008** Add a CI step running `claude plugin validate` on both manifests, if the CLI is
-      available on the runner; if it is not, assert the manifest shape in Python instead and say so in
-      the step name. A step that silently skips is the #118 pattern.
+- [ ] **T008** Add a CI step running `claude plugin validate --json` on both manifests, asserting an
+      empty `errors` array and no warning outside the `CLAUDE.md`-at-root allowlist. Not `--strict`:
+      T001 showed it can never pass here. If the CLI is absent from the runner, assert the manifest
+      shape in Python instead and say so in the step name. A step that silently skips is the #118
+      pattern.
 - [ ] **T009** Verify the round trip by hand: `claude plugin marketplace add <local checkout>`, then
       `claude plugin install iris-dev@iris-agentic-dev`, then `claude mcp list` showing the plugin's
       server connected. Paste the output into `research.md`.
@@ -43,16 +49,19 @@ Tests come before the thing they check, and each phase gate has to pass before t
 
 ## Phase 2 — skills parity
 
-- [ ] **T010** Write `tests/e2e/test_plugin_skills.py`, failing, asserting the set of skills the
-      plugin exposes equals the set `iris-agentic-dev skill install` writes. Read the binary's list
-      from `skill list` rather than hardcoding 34 names.
-- [ ] **T011** Apply the T004 decision. If it is the move, update every reference to
-      `skills/skills/`: `tests/e2e/`, `skills/AGENTS.md`, `skills/BENCHMARKING.md`, the raw
-      GitHub URL in that file, and any Rust that embeds the path.
-- [ ] **T012** Run the skill-eval harness's collection step (not a scored run) to prove the relocation
-      did not strand it: `pytest tests/e2e/skill_eval -q` with no billable opt-in.
+- [ ] **T010** Write `tests/e2e/test_plugin_skills.py`, failing, asserting the skills the plugin
+      exposes are every skill the binary bundles plus exactly `iris-coverage-run`,
+      `iris-coverage-setup` and `pyprod`. Read the bundled list from `skill list`, and the plugin's
+      from the `skills` roots declared in `plugin.json`, rather than hardcoding names on either side.
+      A fourth root skill has to fail this test.
+- [ ] **T011** Add `"skills": ["./skills/skills"]` to `plugin.json`. No files move, so no reference to
+      `skills/skills/` changes.
+- [ ] **T012** Confirm the declaration loads what the test claims by installing the plugin from this
+      checkout and reading `claude plugin details iris-dev`, and paste the inventory into
+      `research.md`. `plugin details` is the loader's own account, which is the only thing that can
+      contradict the test.
 
-**Gate**: T010 passes, T012 collects the same number of skills as before the change.
+**Gate**: T010 passes, and `plugin details` lists the 37.
 
 ## Phase 3 — the setup skill
 

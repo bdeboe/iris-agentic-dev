@@ -1,0 +1,152 @@
+# Phase 0 research: what the plugin loader actually does
+
+Every answer below is a command and its output, run on 2026-09-22 against
+`claude` on this machine. Nothing here is inferred from documentation.
+
+## Q1 — What does `marketplace.json` need? (T001)
+
+### The minimum that validates clean
+
+```json
+{
+  "name": "min-market",
+  "description": "Minimum marketplace manifest that validates clean under --strict.",
+  "owner": { "name": "probe" },
+  "plugins": [{ "name": "min-plugin", "source": "./p" }]
+}
+```
+
+`plugins[].description` is optional. `description` at the top level is not:
+
+```console
+$ claude plugin validate --strict /tmp/mp-min   # description removed
+⚠ Found 1 warning:
+  ❯ description: No marketplace description provided. Adding a description helps
+    users understand what this marketplace offers
+✘ Validation failed (--strict treats warnings as errors)
+$ echo $?
+1
+```
+
+Put it back and the same command exits 0:
+
+```console
+$ claude plugin validate --strict /tmp/mp-min
+✔ Validation passed
+$ echo $?
+0
+```
+
+The plugin manifest each `source` points at needs `author`, or every plugin in the
+marketplace draws a warning:
+
+```console
+$ claude plugin validate /tmp/skills-probe
+⚠ Found 3 warnings:
+  ❯ plugins[0] plugin.json → author: No author information provided. Consider adding
+    author details for plugin attribution
+  ❯ plugins[1] plugin.json → author: ...
+  ❯ plugins[2] plugin.json → author: ...
+```
+
+`--json` gives a machine-readable report with `success`, `strict`, `target`,
+`manifest.{errors,warnings,notes}` and `contents`, which is what a CI step should
+assert on rather than grepping the human output.
+
+### One warning this repo cannot clear
+
+```console
+$ claude plugin validate --strict /Users/tdyar/ws/iris-agentic-dev/.claude-plugin/plugin.json
+Validating plugin: /Users/tdyar/ws/iris-agentic-dev/CLAUDE.md
+⚠ Found 1 warning:
+  ❯ root: CLAUDE.md at the plugin root is not loaded as project context. To ship
+    context with your plugin, use a skill (skills/<name>/SKILL.md) instead.
+✘ Validation failed (--strict treats warnings as errors)
+$ echo $?
+1
+```
+
+The plugin root is the repo root, and the repo root has a `CLAUDE.md` because it is
+a repo someone works in. The warning is correct and not actionable: that file is
+project context for contributors, not plugin content. So **`--strict` cannot be the
+CI gate** here. FR-001 and SC-003 have to say "no errors, and the only warning is
+this one", and the test should assert on the JSON report's `errors` array with an
+allowlist of exactly this warning. A blanket "no warnings" gate would be a gate
+nobody can ever pass, which is worse than no gate.
+
+## Q2 — Is the skills root configurable? (T002)
+
+Yes. Four scratch plugins, installed from a local marketplace, inspected with
+`claude plugin details`:
+
+| Probe | Layout                                              | `plugin.json` `skills` | Skills loaded             |
+| ----- | --------------------------------------------------- | ---------------------- | ------------------------- |
+| a     | `skills/root-skill/SKILL.md`                        | absent                 | `root-skill`              |
+| b     | `skills/skills/nested-skill/SKILL.md`               | absent                 | none                      |
+| c     | `skills/skills/nested-skill/SKILL.md`               | `["./skills/skills"]`  | `nested-skill`            |
+| d     | `skills/stray-skill/` + `skills/skills/real-skill/` | `["./skills/skills"]`  | `real-skill, stray-skill` |
+
+```console
+$ claude plugin details probe-b
+  Skills (0)
+
+$ claude plugin details probe-c
+  Skills (1)  nested-skill
+
+$ claude plugin details probe-d
+  Skills (2)  real-skill, stray-skill
+```
+
+Two things follow. A `skills` array in `plugin.json` takes a parent directory and
+loads every `<name>/SKILL.md` under it, so one entry covers all 34. And probe-d
+shows the declaration **adds to** the default `skills/*` scan rather than replacing
+it — the stray root skill loaded anyway.
+
+So the plugin will ship 37 skills: the 34 bundled ones from `skills/skills/`, plus
+the three that already live at `skills/` root and have always been there
+(`iris-coverage-run`, `iris-coverage-setup`, `pyprod`). `skills/kb/` has no
+`SKILL.md` and does not load. The four "stray directories" in the spec's fact 4
+were three skills and a reference directory, which is a better starting position
+than the spec assumed.
+
+## Q3 — What does a plugin MCP server with no `env` block resolve to? (T003)
+
+The same connection the CLI resolves. Probe plugin, `mcpServers.probe-iad` with a
+command and `args: ["mcp"]` and no `env` at all:
+
+```console
+$ claude mcp list
+plugin:probe-e:probe-iad: /Users/tdyar/ws/iris-agentic-dev/target/debug/iris-agentic-dev mcp - ✔ Connected
+```
+
+A session calling `check_config` on it, with `iris-dev-iris` running and no
+`IRIS_*` variable set anywhere in the environment:
+
+```json
+{
+  "connected": true,
+  "connection_source": "config_file",
+  "config_file": "/Users/tdyar/ws/iris-agentic-dev/.iris-agentic-dev.toml",
+  "container": "iris-dev-iris",
+  "host": "localhost",
+  "port": 52780,
+  "namespace": "USER",
+  "iris_version": "IRIS for UNIX (Ubuntu Server LTS for ARM64 Containers) 2026.2.0L (Build 208U) Thu May 28 2026 00:52:48 EDT",
+  "server_version": "1.4.2+v1.4.2-22-g9d1bbd8-dirty"
+}
+```
+
+`connection_source: "config_file"` is the answer: the plugin-started server found
+`.iris-agentic-dev.toml` in the host's working directory and used it, exactly as a
+hand-registered server does. Deleting the `${IRIS_HOST}`-style `env` block per
+FR-003 costs nothing and removes the empty-string failure mode.
+
+Also worth recording: plugin servers appear in `claude mcp list` under
+`plugin:<plugin-name>:<server-name>`, so a test can assert the plugin's server
+connected without spawning a session.
+
+## Scratch state
+
+`/tmp/skills-probe` and `/tmp/mp-min` held the probes; the `skills-probe`
+marketplace and its five plugins were removed after the runs so they do not sit in
+user settings.

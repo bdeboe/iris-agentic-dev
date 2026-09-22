@@ -23,9 +23,10 @@ unreachable. Four facts, each checked on 2026-09-22:
    installs one executable, `iris-agentic-dev`. The manifest works on my machine only because a
    stale `~/.local/bin/iris-dev` from 2026-07-30 is on PATH, which is also feeding the
    stale-MCP-process warnings from the container guard.
-4. Plugin skills load from `skills/<name>/SKILL.md` at the plugin root. The 34 skills are at
-   `skills/skills/<name>/SKILL.md`, so `/plugin install` would ship four stray directories
-   (`iris-coverage-run`, `iris-coverage-setup`, `kb`, `pyprod`) and none of the real ones.
+4. Plugin skills load from `skills/<name>/SKILL.md` at the plugin root. The 34 bundled skills are at
+   `skills/skills/<name>/SKILL.md`, so `/plugin install` ships only the three that happen to sit at
+   the root (`iris-coverage-run`, `iris-coverage-setup`, `pyprod`) and none of the bundled ones.
+   `claude plugin details probe-b` reports `Skills (0)` for exactly this layout; see `research.md`.
 
 The binary cannot install itself, so the only channel that reaches a machine with nothing on it is
 the plugin marketplace. That is what makes the skill idea work: the plugin carries the skill, and
@@ -124,15 +125,19 @@ the directories under the skills root.
 ### Functional Requirements
 
 - **FR-001**: The repo MUST contain `.claude-plugin/marketplace.json` that
-  `claude plugin marketplace add <path-or-repo>` accepts and `claude plugin validate` passes with
-  no warnings.
+  `claude plugin marketplace add <path-or-repo>` accepts and `claude plugin validate` reports no
+  errors for. The one warning about `CLAUDE.md` at the plugin root is expected and allowlisted: the
+  plugin root is the repo root, that file is contributor context, and the warning is not actionable.
+  `--strict` is therefore not the gate. See `research.md`.
 - **FR-002**: `plugin.json`'s MCP command MUST be an executable that a released install provides.
   `iris-agentic-dev` is the only one.
 - **FR-003**: The plugin's MCP entry MUST NOT set connection variables to `${VAR}` placeholders
   that may be unset. Connection resolution stays with `.iris-agentic-dev.toml`, explicit env, and
   discovery, in the order `docs/connecting.md` documents.
-- **FR-004**: The plugin MUST ship the same skills as `iris-agentic-dev skill install`, discovered
-  from the directory layout rather than listed in a manifest.
+- **FR-004**: The plugin MUST ship every skill the binary bundles, declared as a directory root in
+  `plugin.json` rather than as a list of names, so a new skill appears without a manifest edit. The
+  three skills already at `skills/` root ship too; they are named in the parity test so a fourth
+  cannot appear unnoticed.
 - **FR-005**: A setup skill MUST cover, in order: detect the binary, install it for the platform,
   find or start an IRIS, clear the expired default password, resolve the web port, register the MCP
   server, verify with `check_config` and one real query.
@@ -166,8 +171,9 @@ add` reads. Names the owner and the plugins the repo offers, with a source path 
   session, transcript kept.
 - **SC-002**: The channel guess disappears. The same probe that produced _"I don't know the publish
   channel for this binary"_ names `intersystems-community/tap` with no placeholder.
-- **SC-003**: `claude plugin validate` reports no errors and no warnings for both manifests.
-- **SC-004**: The skills the plugin loads equal the skills `skill install` writes. Asserted, not
-  eyeballed.
+- **SC-003**: `claude plugin validate --json` reports an empty `errors` array for both manifests, and
+  its only warning is the allowlisted `CLAUDE.md`-at-root one.
+- **SC-004**: The skills the plugin loads are every bundled skill plus the three named root ones.
+  Asserted, not eyeballed.
 - **SC-005**: Time from `/plugin marketplace add` to a query returning rows is under five minutes on
   a machine that already has Docker, with the image pull excluded.
