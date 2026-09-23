@@ -1992,3 +1992,10 @@ comes back as-is, so `redact` is not a safe default for XML or custom message bo
 | `DESTRUCTIVE_REQUIRES_WRITES`         | `destructive_tools_enabled = true` set while `write_tools_enabled = false` — invalid config                    |
 | `FETCH_FAILED`                        | `compare_document` could not fetch source from one or both servers                                             |
 | `HL7_NOT_AVAILABLE`                   | `EnsLib.HL7.Schema` not installed on this instance                                                             |
+| `SQL_ERROR`                           | `iris_query` statement failed; IRIS's message is in `error`                                                    |
+| `IRIS_RUNTIME_ERROR`                  | `iris_execute` code raised an ObjectScript error; IRIS's text is in `output`                                   |
+
+`SQL_ERROR` and `IRIS_RUNTIME_ERROR` responses carry a `hint` when iad recognises the error: an
+ObjectScript function such as `$ZDATETIME` inside SQL, or a `Security.*`, `Config.*` or `SYS.*`
+class called outside `%SYS`. Each hint names the fix and the skill section it came from. Any other
+error comes back without one.

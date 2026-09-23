@@ -18276,3 +18276,85 @@ async fn test_policy_gate_blocks_iris_source_control_via_wiremock() {
         "iris_source_control should be POLICY_GATE: {v}"
     );
 }
+
+// ── spec 125: error hints ─────────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_dispatch_iris_execute_system_class_outside_sys_hints_at_sys() {
+    let tools = match make_iris_tools() {
+        Some(t) => t,
+        None => return,
+    };
+    let code = r#"Write ##class(Security.Applications).Exists("/csp/sys")"#;
+    let v = parse_result(
+        tools
+            .call_for_test(
+                "iris_execute",
+                serde_json::json!({"code": code, "namespace": "USER"}),
+            )
+            .await,
+    );
+    assert_eq!(v["error_code"], "IRIS_RUNTIME_ERROR", "{v}");
+    let hint = v["hint"].as_str().unwrap_or_else(|| panic!("no hint: {v}"));
+    assert!(hint.contains("\"%SYS\""), "{hint}");
+
+    // Following the hint works, and a success carries no hint.
+    let v = parse_result(
+        tools
+            .call_for_test(
+                "iris_execute",
+                serde_json::json!({"code": code, "namespace": "%SYS"}),
+            )
+            .await,
+    );
+    assert_eq!(v["success"], true, "{v}");
+    assert!(v.get("hint").is_none(), "{v}");
+}
+
+#[tokio::test]
+async fn test_dispatch_iris_execute_unknown_class_gets_no_hint() {
+    let tools = match make_iris_tools() {
+        Some(t) => t,
+        None => return,
+    };
+    let v = parse_result(
+        tools
+            .call_for_test(
+                "iris_execute",
+                serde_json::json!({"code": "Write ##class(Nope.Missing).Foo()", "namespace": "USER"}),
+            )
+            .await,
+    );
+    assert_eq!(v["error_code"], "IRIS_RUNTIME_ERROR", "{v}");
+    assert!(v.get("hint").is_none(), "{v}");
+}
+
+#[tokio::test]
+async fn test_dispatch_iris_query_objectscript_function_hints_at_current_timestamp() {
+    let tools = match make_iris_tools() {
+        Some(t) => t,
+        None => return,
+    };
+    let v = parse_result(
+        tools
+            .call_for_test(
+                "iris_query",
+                serde_json::json!({"query": "SELECT $ZDATETIME($HOROLOG,3) AS ts", "namespace": "USER"}),
+            )
+            .await,
+    );
+    assert_eq!(v["error_code"], "SQL_ERROR", "{v}");
+    let hint = v["hint"].as_str().unwrap_or_else(|| panic!("no hint: {v}"));
+    assert!(hint.contains("CURRENT_TIMESTAMP"), "{hint}");
+
+    let v = parse_result(
+        tools
+            .call_for_test(
+                "iris_query",
+                serde_json::json!({"query": "SELECT * FROM Nope.NoSuchTable", "namespace": "USER"}),
+            )
+            .await,
+    );
+    assert_eq!(v["error_code"], "SQL_ERROR", "{v}");
+    assert!(v.get("hint").is_none(), "{v}");
+}

@@ -99,6 +99,20 @@ A durable fix is pinning the port in compose/run config.
 
 After editing `.toml`, call any MCP tool — it reconnects immediately.
 
+## `<CLASS DOES NOT EXIST>` for a system class
+
+`Security.*`, `Config.*` and `SYS.*` classes exist only in `%SYS`. Web applications, users,
+roles, namespaces and databases all live there. Called from `USER`, they fail with an error that
+names the class and nothing else:
+
+```text
+ERROR: <CLASS DOES NOT EXIST> 150 Execute+7^IrisDevTmp.IrisDevRun...1 Security.Applications
+```
+
+Pass `namespace: "%SYS"` to `iris_execute`. `%SYS.*` and `%SYSTEM.*` are different: `%` packages
+resolve in every namespace, so `##class(%SYSTEM.Security)` works from `USER`. `iris_execute` adds
+a `hint` to the error when it sees this case.
+
 ## `.iris-agentic-dev.toml` key reference
 
 Generate a documented sample: `iris-agentic-dev init`
