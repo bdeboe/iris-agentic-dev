@@ -47,8 +47,8 @@
 
 ## Phase 5: Polish
 
-- [ ] T017 Run `cargo fmt --all`, `cargo clippy --all-targets --features testing -- -D warnings`
+- [x] T017 Run `cargo fmt --all`, `cargo clippy --all-targets --features testing -- -D warnings`
       and the full `unit` target.
 - [x] T018 Record the SC-006 `tools/list` byte count before and after in `quickstart.md`.
-- [ ] T019 Run markdownlint and prettier on every changed `.md`, then make local commits. No push
+- [x] T019 Run markdownlint and prettier on every changed `.md`, then make local commits. No push
       (FR-015).
