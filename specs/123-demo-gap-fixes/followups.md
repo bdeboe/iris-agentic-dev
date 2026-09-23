@@ -4,7 +4,10 @@ Nothing here is filed. Each draft waits for Tom's word before it becomes an issu
 
 ## (d) `iris_execute` does by ObjectScript what the destructive tier refuses by tool call
 
-**Status**: blocked until the destructive tier has a written purpose.
+**Status**: decided 2026-09-22. The tiers are an accident guard for tool calls, not a security
+boundary. `iris_execute` stays out of scope and the literal `Kill` check stays. Principle VI
+(1.6.0), `docs/connecting.md` and `iris_execute`'s description now say so and name the hard limit:
+an IRIS user without delete privileges (T022).
 
 With `IRIS_DESTRUCTIVE_TOOLS_ENABLED` unset, `iris_admin(action="delete_webapp")` is refused at
 the gate in `call_tool`. `iris_execute` is write tier (`write_gate.rs`), so with only the write tier
@@ -24,6 +27,8 @@ I can't choose between the fixes without knowing what the tier is for:
 
 ## (e) SQL errors come back without a hint that names the likely fix
 
+**Status**: its own spec, 125, after the freeze. Rows only for errors reproduced live.
+
 `iris_query` returns SQLCODE and the parser message. It does not say what to change. The demo hit
 SQLCODE -12 with the position marker at `$`. The fix, `CURRENT_TIMESTAMP` for `$ZDATETIME`, is now
 in `objectscript-sql-patterns` §7, but the agent only finds it if it goes looking.
@@ -42,8 +47,9 @@ write or destructive tier. An agent with both tiers on is still refused, and `do
 mentions the variable (only `docs/backlog-empty-success-audit.md`, which notes 11 tests gated on
 it that the suite never sets). The round-trip test sets it (research R4).
 
-**Draft**: name `IRIS_ADMIN_TOOLS=1` in `iris_admin`'s description next to the tier claim and in
-`docs/connecting.md`. Or fold it into the gate table so there is one gate, not two.
+**Status**: documented on this branch (T021). `iris_admin` lists the ten actions by name, and a
+test checks that list against the handlers that call `admin_write_allowed()`. Folding it into the
+gate table as a third `admin` class, enforced once in `call_tool`, is a later spec.
 
 ## (g) An agent on a NoPWS container reads iad as unusable
 
@@ -65,8 +71,24 @@ The two wrong claims are about instructions, not code. The two right ones leave 
 compile are what an agent needs most on a NoPWS build, and today it has to hand-roll this with
 `iris_execute`, where the code-edit gate refuses `$system.OBJ`.
 
-**Draft (g2)**: `NOPWS_ATELIER_REQUIRED` should say what does work under `docker_only`
-(`iris_execute`, `iris_compile`), not just what doesn't.
+**Draft (g1)** is spec 124, after the freeze: put (with compile), get and delete.
+
+**(g2)**: done (T023). `NOPWS_ATELIER_REQUIRED` now names `iris_execute` and `iris_compile`.
+
+Writing g2 turned up a wrinkle in the `.mac` escape hatch. `docs/tools.md` and `iris_execute` said
+to write the routine with `iris_doc`, but under `docker_only` `iris_doc` is the thing that fails.
+So on a NoPWS build the escape hatch works only for a routine already on the server, until g1
+lands. `iris_execute`'s description now says so.
+
+## (h) The code-edit gate misses the `%Routine` short form
+
+`OBJECTSCRIPT_API_TOKENS` in `src/policy/code_edit_gate.rs` lists `%LIBRARY.ROUTINE` and
+`%ROUTINEMGR`. ObjectScript resolves `##class(%Routine)` to `%Library.Routine`, and the normalized
+code reads `##CLASS(%ROUTINE)`, which matches neither. I have not run it live. If it holds,
+`iris_execute` can write and compile a routine the gate means to refuse.
+
+**Draft**: reproduce live on `iris-dev-iris`, then add the short forms (`%ROUTINE.`, `%ROUTINE)`)
+with a test for each. Check the other `%Library` classes in the list for the same gap.
 
 ### Changes outside this repo (drafts, not applied)
 

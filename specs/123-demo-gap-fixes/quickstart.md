@@ -47,8 +47,13 @@ Measured on 2026-09-22 against the debug binary with an empty `HOME`, as the com
 | ------ | ------- | ----- |
 | before | 107,760 | 81    |
 | after  | 108,505 | 81    |
+| gates  | 108,911 | 81    |
 
 The payload grew by 745 bytes (0.7%), and all of it is description text. Eleven descriptions
 changed: the nine tier corrections, plus `iris_add_server` and `iris_import_servers`, which now
 name `iris_reload_pool` instead of a restart. `iris_remove_server` is one of the nine and
 carries both changes.
+
+The "gates" row (T020–T023) adds 406 bytes more, 1,151 (1.1%) over `master` in all. `iris_execute`
+says what the destructive gate does not cover and names the hard limit. `iris_admin` lists the ten
+actions that need `IRIS_ADMIN_TOOLS=1` by name.

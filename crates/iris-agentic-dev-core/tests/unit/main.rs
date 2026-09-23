@@ -43,6 +43,7 @@ mod test_example_scrub;
 mod test_fresh_container_setup_unit;
 mod test_gate_check;
 mod test_gate_classification;
+mod test_gate_purpose_wording;
 mod test_gate_resolution;
 mod test_gate_uncovered_paths;
 mod test_generate_unit;

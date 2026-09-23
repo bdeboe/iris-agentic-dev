@@ -52,3 +52,21 @@
 - [x] T018 Record the SC-006 `tools/list` byte count before and after in `quickstart.md`.
 - [x] T019 Run markdownlint and prettier on every changed `.md`, then make local commits. No push
       (FR-015).
+
+## Phase 7: Gate purpose, from the follow-ups grilling (2026-09-22)
+
+Tom approved (d) as an accident guard, (f) as documentation only, and (g2) as text only. Each is on
+this branch. (e) and (g1) get their own specs after the freeze.
+
+- [x] T020 Write `tests/unit/test_gate_purpose_wording.rs` first: the `IRIS_ADMIN_TOOLS` sentence
+      in `iris_admin` names exactly the handlers that call `admin_write_allowed()`,
+      `docs/connecting.md` names the variable, `iris_execute` names the destructive gate and the
+      hard limit, and `NOPWS_ATELIER_REQUIRED` names `iris_execute`, `iris_compile` and `.mac`. All
+      four failed before the text changed. Principle VI is not checked: `.specify/` is untracked.
+- [x] T021 (f) List the ten `IRIS_ADMIN_TOOLS` actions in `iris_admin`'s description and add
+      "What the tiers guard, and what they don't" to `docs/connecting.md`.
+- [x] T022 (d) Amend Principle VI locally (1.5.3 → 1.6.0, MINOR; untracked) and add the matching sentence to
+      `iris_execute`. The same description now says the `.mac` escape hatch needs Atelier REST.
+- [x] T023 (g2) `NOPWS_ATELIER_REQUIRED` says `iris_execute` and `iris_compile` still work under
+      `docker_only`, and where `{}` blocks can go.
+- [x] T024 Rerun unit (2394), binary (70), clippy and fmt. Re-measure SC-006.
