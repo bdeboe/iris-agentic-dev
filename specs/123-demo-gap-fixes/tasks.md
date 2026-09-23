@@ -40,7 +40,8 @@
 
 ## Phase 4: US4 — follow-ups (P3)
 
-- [ ] T015 [US4] Write `followups.md` with drafts (d) and (e) (FR-014). File neither.
+- [x] T015 [US4] Write `followups.md` with drafts (d) and (e) (FR-014). File neither. Also holds
+      (f) the `IRIS_ADMIN_TOOLS` gate and (g) the ai-core NoPWS findings with cross-repo drafts.
 - [ ] T016 [US4] Once spec 121 merges, fold the drafted defects from specs 121, 122 and 123 into
       one list. This stays open until then.
 
@@ -48,6 +49,6 @@
 
 - [ ] T017 Run `cargo fmt --all`, `cargo clippy --all-targets --features testing -- -D warnings`
       and the full `unit` target.
-- [ ] T018 Record the SC-006 `tools/list` byte count before and after in `quickstart.md`.
+- [x] T018 Record the SC-006 `tools/list` byte count before and after in `quickstart.md`.
 - [ ] T019 Run markdownlint and prettier on every changed `.md`, then make local commits. No push
       (FR-015).
