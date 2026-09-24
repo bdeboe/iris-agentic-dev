@@ -17,7 +17,7 @@
   ],
   "mcpServers": {
     "iris-dev": {
-      "command": "iris-dev",
+      "command": "iris-agentic-dev",
       "args": ["mcp"],
       "env": {
         "IRIS_HOST": "${IRIS_HOST}",
