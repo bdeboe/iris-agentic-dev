@@ -15,18 +15,11 @@
     "skills",
     "interoperability"
   ],
+  "skills": ["./skills/skills", "./skills/skills/iris-agentic-dev/nopws-setup"],
   "mcpServers": {
     "iris-dev": {
-      "command": "iris-dev",
-      "args": ["mcp"],
-      "env": {
-        "IRIS_HOST": "${IRIS_HOST}",
-        "IRIS_WEB_PORT": "${IRIS_WEB_PORT}",
-        "IRIS_NAMESPACE": "${IRIS_NAMESPACE}",
-        "IRIS_USERNAME": "${IRIS_USERNAME}",
-        "IRIS_PASSWORD": "${IRIS_PASSWORD}",
-        "IRIS_WEB_PREFIX": "${IRIS_WEB_PREFIX}"
-      }
+      "command": "iris-agentic-dev",
+      "args": ["mcp"]
     }
   },
   "hooks": {

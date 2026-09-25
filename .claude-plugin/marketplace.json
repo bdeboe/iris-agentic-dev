@@ -1,0 +1,15 @@
+{
+  "name": "iris-agentic-dev",
+  "description": "IRIS development tools for coding agents: an MCP server that talks to a live InterSystems IRIS instance, plus the ObjectScript skills that keep generated code compiling.",
+  "owner": {
+    "name": "InterSystems Corporation",
+    "url": "https://github.com/intersystems-community/iris-agentic-dev"
+  },
+  "plugins": [
+    {
+      "name": "iris-dev",
+      "source": "./",
+      "description": "Execute ObjectScript, query globals and SQL, inspect productions, run unit tests and read class source on a live IRIS instance. Needs the iris-agentic-dev binary on PATH."
+    }
+  ]
+}
