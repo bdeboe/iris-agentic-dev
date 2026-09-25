@@ -157,6 +157,7 @@ def _tool_schema(binary: str, tool: str) -> dict:
     return payload.get("inputSchema") or payload.get("input_schema") or payload
 
 
+@pytest.mark.requires_binary
 def test_every_subcommand_the_skill_names_exists():
     # The skill is read before the binary is looked for, so a missing skill fails rather
     # than skipping on a checkout with nothing built.
@@ -170,6 +171,7 @@ def test_every_subcommand_the_skill_names_exists():
     )
 
 
+@pytest.mark.requires_binary
 def test_every_tool_the_skill_names_exists():
     named = {match[0] for match in _TOOL_CALL_RE.findall(_skill_text())}
     binary = _binary()
@@ -179,6 +181,7 @@ def test_every_tool_the_skill_names_exists():
     )
 
 
+@pytest.mark.requires_binary
 def test_every_args_payload_parses_and_uses_declared_fields():
     calls = _TOOL_CALL_RE.findall(_skill_text())
     binary = _binary()

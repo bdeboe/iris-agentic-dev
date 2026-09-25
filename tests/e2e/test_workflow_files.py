@@ -150,7 +150,7 @@ def test_ci_runs_the_harness_as_a_directory_not_a_file_list():
 
 
 def test_ci_still_covers_the_files_it_used_to_name():
-    """The two guards that were named steps before the directory sweep replaced them.
+    """The guards that were named steps before the directory sweep replaced them.
 
     A release workflow broken in ordering can only otherwise be found by cutting a tag, and an
     unparseable workflow shows up as a 0-second run with no jobs — ci.yml sat dead on master for two
@@ -159,6 +159,10 @@ def test_ci_still_covers_the_files_it_used_to_name():
     load_bearing = (
         "tests/e2e/test_release_workflow.py",
         "tests/e2e/test_workflow_files.py",
+        # 122 added these three as named steps; they merged after the sweep existed.
+        "tests/e2e/test_plugin_manifest.py",
+        "tests/e2e/test_plugin_skills.py",
+        "tests/e2e/test_setup_skill.py",
     )
     bodies = [run for _, _, run in _run_steps(_ci())]
     for path in load_bearing:
