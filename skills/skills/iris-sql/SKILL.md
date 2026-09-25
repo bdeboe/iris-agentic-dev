@@ -583,6 +583,9 @@ Do obj.%Save()
 - No `MERGE` statement (standard SQL, not supported in IRIS as of 2026.2)
 - Duplicate primary key → `SQLCODE -119` ("Unique constraint violation")
 - `iris.dbapi` `executemany()` is supported but each row is still individual — no batch optimization
+- A property's `InitialExpression` also fills the column when an SQL INSERT leaves it out, including
+  the braced form `[ InitialExpression = {$ZDateTime($Horolog,3)} ]`, so there is no need to
+  populate it by hand (verified on 2026.2: `INSERT INTO T (Title) VALUES ('c')` got both defaults)
 
 ---
 

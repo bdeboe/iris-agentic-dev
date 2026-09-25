@@ -103,3 +103,6 @@ __pycache__/
 # container this developer happens to run — see
 # tests/unit/test_no_tracked_local_config.rs.
 /.iris-agentic-dev.toml
+
+# Local-only files: the published-example name denylist (spec 123)
+/.iad-local/

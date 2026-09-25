@@ -4408,7 +4408,7 @@ impl IrisTools {
     }
 
     #[tool(
-        description = "Execute arbitrary ObjectScript code on IRIS and return stdout. Two execution paths: (1) HTTP primary — wraps code in a temporary class method body (CodeMode=objectgenerator), compiles it via Atelier REST, runs it, deletes the class. Block syntax (`{}`) works here because class method bodies support it. (2) docker exec fallback — used when IRIS_CONTAINER env var is set and HTTP fails, or when the connection sets `docker_only = true` in `.iris-agentic-dev.toml` (a config-file key, not a parameter of this tool — passing docker_only in the tool arguments does nothing). This path pipes code into `iris session` stdin, which is a line-by-line terminal interpreter. Block syntax (`{}`) is NOT supported in terminal mode — `If cond { ... }` causes a `<SYNTAX>` error. Use classic terminal-compatible form instead: `If cond Write x`. For complex multi-line scripts that require `{}` on a docker exec path, write a .mac routine with `iris_doc` (mode=put) and compile it with `iris_compile`, then call `iris_execute Do entry^RoutineName`. &sql(...) embedded SQL macros are automatically translated to %SQL.Statement calls (set translate_sql: false to disable). When translation fires, response includes sql_translated: true and translated_code. Example: code='write $ZVERSION,!' returns the IRIS version string. Skill: objectscript-tdd for the compile-execute-fix loop. Session state: set use_session: true to enable the %ctx carrier (%DynamicObject). Store values in %ctx.key between calls — scalars, %DynamicObject, and %Persistent objects (stored as OID stubs and re-opened on restore). The response includes session_state (opaque Base64 token); pass it back as session_state on the next call to restore %ctx. Nothing is written to IRIS — the token is held by the client. Error codes: SESSION_INVALID (bad token), SESSION_RESTORE_FAILED (missing class or bad OID), SESSION_SERIALIZE_FAILED (serialization error), TERMINAL_SYNTAX_UNSUPPORTED (block syntax on docker exec path). `server` (optional): name of a registered IRIS instance. If omitted, uses the default connection. Use `iris_servers` to list available instances.",
+        description = "Execute arbitrary ObjectScript code on IRIS and return stdout. Two execution paths: (1) HTTP primary — wraps code in a temporary class method body (CodeMode=objectgenerator), compiles it via Atelier REST, runs it, deletes the class. Block syntax (`{}`) works here because class method bodies support it. (2) docker exec fallback — used when IRIS_CONTAINER env var is set and HTTP fails, or when the connection sets `docker_only = true` in `.iris-agentic-dev.toml` (a config-file key, not a parameter of this tool — passing docker_only in the tool arguments does nothing). This path pipes code into `iris session` stdin, which is a line-by-line terminal interpreter. Block syntax (`{}`) is NOT supported in terminal mode — `If cond { ... }` causes a `<SYNTAX>` error. Use classic terminal-compatible form instead: `If cond Write x`. For complex multi-line scripts that require `{}` on a docker exec path, write a .mac routine with `iris_doc` (mode=put) and compile it with `iris_compile`, then call `iris_execute Do entry^RoutineName`. That needs Atelier REST for `iris_doc`; under `docker_only` the routine must already be on the server. The destructive gate covers tool calls, not the code this tool runs: only a literal `Kill ^global` is checked, so for a hard limit connect as an IRIS user without delete privileges. &sql(...) embedded SQL macros are automatically translated to %SQL.Statement calls (set translate_sql: false to disable). When translation fires, response includes sql_translated: true and translated_code. Example: code='write $ZVERSION,!' returns the IRIS version string. Skill: objectscript-tdd for the compile-execute-fix loop. Session state: set use_session: true to enable the %ctx carrier (%DynamicObject). Store values in %ctx.key between calls — scalars, %DynamicObject, and %Persistent objects (stored as OID stubs and re-opened on restore). The response includes session_state (opaque Base64 token); pass it back as session_state on the next call to restore %ctx. Nothing is written to IRIS — the token is held by the client. Error codes: SESSION_INVALID (bad token), SESSION_RESTORE_FAILED (missing class or bad OID), SESSION_SERIALIZE_FAILED (serialization error), TERMINAL_SYNTAX_UNSUPPORTED (block syntax on docker exec path). `server` (optional): name of a registered IRIS instance. If omitted, uses the default connection. Use `iris_servers` to list available instances.",
         output_schema = output_schemas::oneof_output_schema::<IrisExecuteResponse>()
     )]
     async fn iris_execute(
@@ -6150,7 +6150,7 @@ Methods:
     }
 
     #[tool(
-        description = "Remove a skill from the registry by name.",
+        description = "Remove a skill from the registry by name. Destructive tier: requires IRIS_DESTRUCTIVE_TOOLS_ENABLED=1.",
         annotations(destructive_hint = true),
         output_schema = output_schemas::oneof_output_schema::<SkillForgetResponse>()
     )]
@@ -6648,7 +6648,7 @@ Methods:
     }
 
     #[tool(
-        description = "Manage the learning agent skill registry. action=list returns all skills, action=describe returns one skill, action=search finds skills by keyword, action=forget removes a skill, action=propose mines recent tool calls and synthesizes a new skill (requires ≥5 calls).",
+        description = "Manage the learning agent skill registry. action=list returns all skills, action=describe returns one skill, action=search finds skills by keyword, action=forget removes a skill, action=propose mines recent tool calls and synthesizes a new skill (requires ≥5 calls). forget is a destructive action (requires IRIS_DESTRUCTIVE_TOOLS_ENABLED=1).",
         output_schema = output_schemas::oneof_output_schema::<SkillResponse>()
     )]
     async fn skill(
@@ -6812,7 +6812,7 @@ Methods:
     // ── 052: iris_global ───────────────────────────────────────────────────────
 
     #[tool(
-        description = "Read, write, kill, or list IRIS global nodes. action: get=read a node or subtree, set=write a node, kill=delete a node/subtree, list=enumerate subscripts. PHI and system-blocklist gates enforced before any IRIS call. Pass acknowledgePhi=true to bypass per-global PHI gate. Skill: iris-agentic-dev. `server` (optional): name of a registered IRIS instance. If omitted, uses the default connection. Use `iris_servers` to list available instances.",
+        description = "Read, write, kill, or list IRIS global nodes. action: get=read a node or subtree, set=write a node, kill=delete a node/subtree, list=enumerate subscripts. kill is a destructive action (requires IRIS_DESTRUCTIVE_TOOLS_ENABLED=1). PHI and system-blocklist gates enforced before any IRIS call. Pass acknowledgePhi=true to bypass per-global PHI gate. Skill: iris-agentic-dev. `server` (optional): name of a registered IRIS instance. If omitted, uses the default connection. Use `iris_servers` to list available instances.",
         output_schema = output_schemas::oneof_output_schema::<IrisGlobalResponse>()
     )]
     async fn iris_global(
@@ -7485,7 +7485,7 @@ Methods:
     }
 
     #[tool(
-        description = "Create, update, or delete an Ensemble credential. action: create|update|delete. id: credential ID (required). username/password: required for create, optional for update. namespace: optional. Write-gated: suppressed on Live instances unless IRIS_ALLOW_PROD=1.",
+        description = "Create, update, or delete an Ensemble credential. action: create|update|delete. id: credential ID (required). username/password: required for create, optional for update. namespace: optional. Destructive tier: create/update/delete require IRIS_DESTRUCTIVE_TOOLS_ENABLED=1, and are suppressed on Live instances unless IRIS_ALLOW_PROD=1.",
         annotations(destructive_hint = true),
         output_schema = output_schemas::oneof_output_schema::<IrisCredentialManageResponse>()
     )]
@@ -7532,7 +7532,7 @@ Methods:
     // ─── 024-interop-depth: Lookup tables (US3) ───
 
     #[tool(
-        description = "Read, write, delete, or list Ensemble lookup table entries. action: get|set|delete|list_keys|list_tables. table: table name (required except list_tables). key: required for get/set/delete. value: required for set. namespace: optional. get/list_keys/list_tables always available; set/delete write-gated. Skill: ensemble-production.",
+        description = "Read, write, delete, or list Ensemble lookup table entries. action: get|set|delete|list_keys|list_tables. table: table name (required except list_tables). key: required for get/set/delete. value: required for set. namespace: optional. get/list_keys/list_tables always available; set/delete are destructive actions (require IRIS_DESTRUCTIVE_TOOLS_ENABLED=1). Skill: ensemble-production.",
         annotations(destructive_hint = true),
         output_schema = output_schemas::oneof_output_schema::<IrisLookupManageResponse>()
     )]
@@ -7616,13 +7616,17 @@ Methods:
         Read actions (always available): list_namespaces, list_databases, list_users, list_roles, \
         list_user_roles, check_permission, list_webapps, get_webapp, \
         view_locks, view_processes, journal_search, namespace_mappings, database_status. \
-        Write actions (require IRIS_WRITE_TOOLS_ENABLED=1): create_user, update_user, delete_user, \
-        create_namespace, delete_namespace, create_webapp, delete_webapp, \
+        Write actions (require IRIS_WRITE_TOOLS_ENABLED=1): \
         clear_password_change_flag, unlock_user, fresh_container_setup, mirror_add_async. \
         mirror_add_async joins this IRIS instance to an existing mirror set as an async DR member. \
         Params: mirror_name (required), primary_host (required), primary_port (default 2188), \
         instance_name (default IRIS), async_member_type (0=DR, 1=ReadOnly, 2=ReadWrite; default 0). \
-        Destructive actions (require IRIS_DESTRUCTIVE_TOOLS_ENABLED=1): mirror_failover. \
+        Destructive actions (require IRIS_DESTRUCTIVE_TOOLS_ENABLED=1): create_user, update_user, \
+        delete_user, create_namespace, delete_namespace, create_webapp, delete_webapp, \
+        mirror_failover. \
+        create_user, update_user, delete_user, create_namespace, delete_namespace, create_webapp, \
+        delete_webapp, clear_password_change_flag, unlock_user and fresh_container_setup also \
+        require IRIS_ADMIN_TOOLS=1, a second switch the handler checks after the tier gate. \
         mirror_failover promotes this backup member to primary (irreversible without manual recovery). \
         Params: confirm (required, must be true). \
         fresh_container_setup runs the full first-boot sequence on a fresh IRIS container: \
@@ -8154,7 +8158,7 @@ Methods:
     }
 
     #[tool(
-        description = "Add a new IRIS server to the iad-native configuration. Pass `web_prefix` (e.g. \"/hs20261\") for an instance behind a shared web gateway — without it the entry resolves to the gateway root and every call goes to the wrong place; registering the same name again updates the entry. The credential is stored in the OS keychain when available. On headless hosts (MCP in Claude Desktop, Remote SSH, CI) where no keychain exists, the credential is stored in plaintext in servers.json as a fallback — the response includes stored_plaintext: true and a warning in that case. The running pool does not hot-reload; restart iad after adding a server to make it available via the `server` param. Returns {added: true, name, note}.",
+        description = "Add a new IRIS server to the iad-native configuration. Pass `web_prefix` (e.g. \"/hs20261\") for an instance behind a shared web gateway — without it the entry resolves to the gateway root and every call goes to the wrong place; registering the same name again updates the entry. The credential is stored in the OS keychain when available. On headless hosts (MCP in Claude Desktop, Remote SSH, CI) where no keychain exists, the credential is stored in plaintext in servers.json as a fallback — the response includes stored_plaintext: true and a warning in that case. Call `iris_reload_pool` afterwards to make it available via the `server` param in the running server; no restart needed. Returns {added: true, name, note}.",
         output_schema = output_schemas::oneof_output_schema::<IrisAddServerResponse>()
     )]
     async fn iris_add_server(
@@ -8232,7 +8236,7 @@ Methods:
                     "name": p.name,
                     "stored_plaintext": true,
                     "warning": "Credential stored in plaintext in servers.json — use VS Code Server Manager for production credentials.",
-                    "note": "Restart iad for the pool to include this server."
+                    "note": "Call iris_reload_pool to make this server routable via the `server` param."
                 }));
             }
             return err_result(serde_json::json!({
@@ -8245,12 +8249,12 @@ Methods:
         ok_json(serde_json::json!({
             "added": true,
             "name": p.name,
-            "note": "Restart iad for the pool to include this server."
+            "note": "Call iris_reload_pool to make this server routable via the `server` param."
         }))
     }
 
     #[tool(
-        description = "Remove a server from the iad-native configuration. Only servers with source=iad-native can be removed (vscode, fleet, and env sources are read-only). Also removes the OS keychain entry. Returns {removed: true, name, note}. Error codes: REMOVE_NOT_ALLOWED (source is not iad-native), SERVER_NOT_FOUND (not in pool).",
+        description = "Remove a server from the iad-native configuration. Destructive tier: requires IRIS_DESTRUCTIVE_TOOLS_ENABLED=1. Only servers with source=iad-native can be removed (vscode, fleet, and env sources are read-only). Also removes the OS keychain entry. Call `iris_reload_pool` afterwards to drop it from the running pool. Returns {removed: true, name, note}. Error codes: REMOVE_NOT_ALLOWED (source is not iad-native), SERVER_NOT_FOUND (not in pool).",
         annotations(destructive_hint = true),
         output_schema = output_schemas::oneof_output_schema::<IrisRemoveServerResponse>()
     )]
@@ -8309,7 +8313,7 @@ Methods:
         ok_json(serde_json::json!({
             "removed": true,
             "name": p.name,
-            "note": "Restart iad for the pool to reflect the removal."
+            "note": "Call iris_reload_pool to drop this server from the running pool."
         }))
     }
 
@@ -8541,7 +8545,7 @@ Methods:
     }
 
     #[tool(
-        description = "Import IRIS server definitions from VS Code / Cursor Server Manager into the iad-native config. Reads intersystems.servers from VS Code and Cursor settings.json. Servers already present in the iad-native config are skipped (no overwrite). Passwords are resolved from the OS keychain; servers where no keychain entry exists are imported without a password (listed in no_keychain). Returns {imported, skipped, no_keychain: [...]}. Restart iad after importing.",
+        description = "Import IRIS server definitions from VS Code / Cursor Server Manager into the iad-native config. Reads intersystems.servers from VS Code and Cursor settings.json. Servers already present in the iad-native config are skipped (no overwrite). Passwords are resolved from the OS keychain; servers where no keychain entry exists are imported without a password (listed in no_keychain). Returns {imported, skipped, no_keychain: [...]}. Call `iris_reload_pool` after importing to make them routable.",
         output_schema = output_schemas::oneof_output_schema::<IrisImportServersResponse>()
     )]
     async fn iris_import_servers(
@@ -8629,7 +8633,7 @@ Methods:
             "skipped": skipped,
             "no_keychain": no_keychain,
             "note": if imported > 0 {
-                "Restart iad for the pool to include imported servers."
+                "Call iris_reload_pool to make the imported servers routable."
             } else {
                 "No new servers to import."
             }
@@ -8866,7 +8870,7 @@ Methods:
     }
 
     #[tool(
-        description = "Kill (delete) an entire IRIS global. WRITE-GATED. Requires a confirm_token from global_preview (valid 5 minutes). global: global name. confirm_token: token from global_preview. server: optional registered instance name. Error codes: CONFIRM_REQUIRED (call global_preview first), CONFIRM_EXPIRED (token expired), CONFIRM_MISMATCH (token for different global/server). Skill: iris-agentic-dev.",
+        description = "Kill (delete) an entire IRIS global. Destructive tier: requires IRIS_DESTRUCTIVE_TOOLS_ENABLED=1. Requires a confirm_token from global_preview (valid 5 minutes). global: global name. confirm_token: token from global_preview. server: optional registered instance name. Error codes: CONFIRM_REQUIRED (call global_preview first), CONFIRM_EXPIRED (token expired), CONFIRM_MISMATCH (token for different global/server). Skill: iris-agentic-dev.",
         annotations(destructive_hint = true),
         output_schema = output_schemas::oneof_output_schema::<GlobalKillResponse>()
     )]
@@ -9020,7 +9024,7 @@ Methods:
     }
 
     #[tool(
-        description = "Create a new namespace on an IRIS instance. WRITE-GATED. name: namespace name. db_path: optional database directory (defaults to name). server: optional registered instance name. Skill: iris-agentic-dev.",
+        description = "Create a new namespace on an IRIS instance. Destructive tier: requires IRIS_DESTRUCTIVE_TOOLS_ENABLED=1. name: namespace name. db_path: optional database directory (defaults to name). server: optional registered instance name. Skill: iris-agentic-dev.",
         annotations(destructive_hint = true),
         output_schema = output_schemas::oneof_output_schema::<IrisNamespaceCreateResponse>()
     )]

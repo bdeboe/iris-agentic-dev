@@ -184,7 +184,7 @@ fallback. The response includes `stored_plaintext: true` and a warning:
   "added": true,
   "stored_plaintext": true,
   "warning": "Credential stored in plaintext in servers.json — use VS Code Server Manager for production credentials.",
-  "note": "Restart iad for the pool to include this server."
+  "note": "Call iris_reload_pool to make this server routable via the `server` param."
 }
 ```
 
@@ -414,6 +414,19 @@ write_tools_enabled = false
 
 This is the recommended default for any server that more than one person connects
 to, or any server that isn't purely local.
+
+### What the tiers guard, and what they don't
+
+`IRIS_WRITE_TOOLS_ENABLED=1` and `IRIS_DESTRUCTIVE_TOOLS_ENABLED=1` switch on the write and
+destructive tiers. `iris_admin`'s user, namespace and web application actions,
+`clear_password_change_flag`, `unlock_user` and `fresh_container_setup` also need
+`IRIS_ADMIN_TOOLS=1`, which the handler checks after the tier gate. With both tiers on and
+`IRIS_ADMIN_TOOLS` unset, those actions are still refused.
+
+The tiers are an accident guard for tool calls, not a security boundary. `iris_execute` is
+write tier, and the only thing it checks in the code it runs is a literal `Kill ^global`. With
+the destructive tier off, it can still run `##class(Security.Applications).Delete("/x")` in
+`%SYS`. For a hard limit, connect as an IRIS user without delete privileges.
 
 ## Tool subset (allowlist)
 

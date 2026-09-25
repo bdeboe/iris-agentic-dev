@@ -241,8 +241,8 @@ block copied out of VS Code settings loads without renaming the key.
 Re-registering an existing name updates that entry in place and keeps its stored password,
 so a forgotten prefix can be added without re-entering the credential.
 
-After adding a server, restart iad (or call `iris_reload_pool`) for the new connection to
-appear in the pool.
+After adding a server, call `iris_reload_pool` for the new connection to appear in the
+running pool. No restart is needed.
 
 ### `iris_remove_server` ☠
 
