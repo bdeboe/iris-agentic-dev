@@ -22,6 +22,29 @@ Rules for anything written here:
 
 ## What's new
 
+### Errors say where the fix is when iad knows it
+
+Two errors from the todo-app demo now carry a `hint` field. `<CLASS DOES NOT EXIST>` for a class in
+`Security.*`, `Config.*` or `SYS.*` says the class lives only in `%SYS` and to pass
+`namespace: "%SYS"`. SQLCODE -12 on a `$ZDATETIME` inside an `INSERT` points at `CURRENT_TIMESTAMP`.
+`iris_query`'s four `SQL_ERROR` sites and `iris_execute`'s three `IRIS_RUNTIME_ERROR` sites add the
+hint when a row in `tools/error_hints.rs` matches and leave it out otherwise. Each hint cites a skill
+section, and a test fails if that heading goes missing.
+
+### A setup skill an agent can follow from a bare machine
+
+The plugin ships `iris-agentic-dev-setup`: find or install the binary, find an IRIS before starting
+one, clear the expired default password, read the web port off the container, register the server,
+verify. I wrote it against a throwaway container, not the docs. It installs the right release asset
+for all five platforms a tag builds, and `tests/e2e/test_setup_skill.py` checks every subcommand,
+tool name and `--args` payload it names against the real CLI.
+
+### `docs/examples/todo-app/`
+
+The demo that exposed the fixes below, as two classes, `STEPS.md` and a transcript. A live test
+puts and compiles both classes, creates the web application, adds, toggles and deletes rows, and
+tears it all down.
+
 ### The skills are measured at nothing, and the README says so
 
 The front page advertised **+27%** for `objectscript-review`. That number was true when it was
@@ -54,6 +77,32 @@ commands need Docker and which need a model credential, because those are differ
 not follow, that test fails.
 
 ## Notable fixes
+
+### The Claude Code plugin could not be installed, and then arrived nearly empty
+
+The repo had no `.claude-plugin/marketplace.json`, so `plugin marketplace add` failed. With that
+fixed, the plugin launched `iris-dev`, a binary no release has installed; on a machine with an old
+`~/.local/bin/iris-dev` it started 0.9.10 silently. It launches `iris-agentic-dev` now, and a test
+checks the command against both the Cargo binary name and the name the Homebrew formula installs.
+The `env` block that set six connection variables to empty strings is gone, so the server resolves
+its connection from `.iris-agentic-dev.toml` like every other client.
+
+An install also delivered 3 skills instead of 38: the loader reads `skills/<name>/SKILL.md` and the
+bundled ones sit one level deeper. `plugin.json` declares that directory now, plus the nested
+`nopws-setup` skill two tools point at when a NoPWS build refuses a connection.
+
+### Tool descriptions name the tier the gate enforces
+
+Eighteen tool/action descriptions disagreed with the gate table. `iris_admin` listed seven
+destructive actions as write, `global_kill` and `iris_namespace_create` said WRITE-GATED, and four
+destructive actions said nothing. A unit test reads every description against the table. No gate
+behaviour changed. `iris_admin` also says which actions need `IRIS_ADMIN_TOOLS=1`.
+
+### Adding a server no longer tells the agent to restart
+
+`iris_add_server`, `iris_remove_server` and `iris_import_servers` said to restart iad. An agent in
+another repo took that at face value and stopped using iad. They point at `iris_reload_pool` now,
+which rebuilds the pool in the running server.
 
 ### The CLI handed out WebSocket tokens nothing could use
 
