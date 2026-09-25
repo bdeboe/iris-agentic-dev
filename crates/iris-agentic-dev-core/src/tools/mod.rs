@@ -76,6 +76,7 @@ pub mod coverage;
 pub mod dict;
 pub mod doc;
 pub mod doc_search;
+pub mod error_hints;
 pub mod execute_session;
 pub mod gate_macro;
 pub mod global;
@@ -1500,6 +1501,15 @@ fn err_json(code: &str, msg: &str) -> Result<CallToolResult, McpError> {
     err_result(serde_json::json!({"success": false, "error_code": code, "error": msg}))
 }
 
+/// `SQL_ERROR` with a `hint` when the message matches a row in `error_hints` (spec 125).
+fn sql_err(msg: &str) -> Result<CallToolResult, McpError> {
+    let mut v = serde_json::json!({"success": false, "error_code": "SQL_ERROR", "error": msg});
+    if let Some(hint) = error_hints::sql_error_hint(msg) {
+        v["hint"] = serde_json::Value::String(hint);
+    }
+    err_result(v)
+}
+
 /// Parse `"http://host:port"` into `(host, port)`.
 ///
 /// Returns `("unknown", 0)` on failure. Used by `iris_servers` for clean output.
@@ -1879,7 +1889,7 @@ async fn iris_query_explain(
     if let Some(errors) = body["status"]["errors"].as_array() {
         if !errors.is_empty() {
             let msg = errors[0]["error"].as_str().unwrap_or("SQL error");
-            return err_json("SQL_ERROR", msg);
+            return sql_err(msg);
         }
     }
 
@@ -1944,7 +1954,7 @@ async fn iris_query_count(
     if let Some(errors) = body["status"]["errors"].as_array() {
         if !errors.is_empty() {
             let msg = errors[0]["error"].as_str().unwrap_or("SQL error");
-            return err_json("SQL_ERROR", msg);
+            return sql_err(msg);
         }
     }
 
@@ -2060,7 +2070,7 @@ Write "OK:"_rs.%ROWCOUNT"#,
         Ok(out) => {
             let out = out.trim();
             if let Some(msg) = out.strip_prefix("ERROR:SQL_ERROR:") {
-                return err_json("SQL_ERROR", msg);
+                return sql_err(msg);
             }
             let rows_affected: i64 = out
                 .strip_prefix("OK:")
@@ -4408,7 +4418,7 @@ impl IrisTools {
     }
 
     #[tool(
-        description = "Execute arbitrary ObjectScript code on IRIS and return stdout. Two execution paths: (1) HTTP primary — wraps code in a temporary class method body (CodeMode=objectgenerator), compiles it via Atelier REST, runs it, deletes the class. Block syntax (`{}`) works here because class method bodies support it. (2) docker exec fallback — used when IRIS_CONTAINER env var is set and HTTP fails, or when the connection sets `docker_only = true` in `.iris-agentic-dev.toml` (a config-file key, not a parameter of this tool — passing docker_only in the tool arguments does nothing). This path pipes code into `iris session` stdin, which is a line-by-line terminal interpreter. Block syntax (`{}`) is NOT supported in terminal mode — `If cond { ... }` causes a `<SYNTAX>` error. Use classic terminal-compatible form instead: `If cond Write x`. For complex multi-line scripts that require `{}` on a docker exec path, write a .mac routine with `iris_doc` (mode=put) and compile it with `iris_compile`, then call `iris_execute Do entry^RoutineName`. That needs Atelier REST for `iris_doc`; under `docker_only` the routine must already be on the server. The destructive gate covers tool calls, not the code this tool runs: only a literal `Kill ^global` is checked, so for a hard limit connect as an IRIS user without delete privileges. &sql(...) embedded SQL macros are automatically translated to %SQL.Statement calls (set translate_sql: false to disable). When translation fires, response includes sql_translated: true and translated_code. Example: code='write $ZVERSION,!' returns the IRIS version string. Skill: objectscript-tdd for the compile-execute-fix loop. Session state: set use_session: true to enable the %ctx carrier (%DynamicObject). Store values in %ctx.key between calls — scalars, %DynamicObject, and %Persistent objects (stored as OID stubs and re-opened on restore). The response includes session_state (opaque Base64 token); pass it back as session_state on the next call to restore %ctx. Nothing is written to IRIS — the token is held by the client. Error codes: SESSION_INVALID (bad token), SESSION_RESTORE_FAILED (missing class or bad OID), SESSION_SERIALIZE_FAILED (serialization error), TERMINAL_SYNTAX_UNSUPPORTED (block syntax on docker exec path). `server` (optional): name of a registered IRIS instance. If omitted, uses the default connection. Use `iris_servers` to list available instances.",
+        description = "Execute arbitrary ObjectScript code on IRIS and return stdout. Two execution paths: (1) HTTP primary — wraps code in a temporary class method body (CodeMode=objectgenerator), compiles it via Atelier REST, runs it, deletes the class. Block syntax (`{}`) works here because class method bodies support it. (2) docker exec fallback — used when IRIS_CONTAINER env var is set and HTTP fails, or when the connection sets `docker_only = true` in `.iris-agentic-dev.toml` (a config-file key, not a parameter of this tool — passing docker_only in the tool arguments does nothing). This path pipes code into `iris session` stdin, which is a line-by-line terminal interpreter. Block syntax (`{}`) is NOT supported in terminal mode — `If cond { ... }` causes a `<SYNTAX>` error. Use classic terminal-compatible form instead: `If cond Write x`. For complex multi-line scripts that require `{}` on a docker exec path, write a .mac routine with `iris_doc` (mode=put) and compile it with `iris_compile`, then call `iris_execute Do entry^RoutineName`. That needs Atelier REST for `iris_doc`; under `docker_only` the routine must already be on the server. The destructive gate covers tool calls, not the code this tool runs: only a literal `Kill ^global` is checked, so for a hard limit connect as an IRIS user without delete privileges. &sql(...) embedded SQL macros are automatically translated to %SQL.Statement calls (set translate_sql: false to disable). When translation fires, response includes sql_translated: true and translated_code. Example: code='write $ZVERSION,!' returns the IRIS version string. Classes in Security.*, Config.* and SYS.* (web applications, users, roles, namespaces, databases) exist only in %SYS: pass namespace: \"%SYS\" for them. Skill: objectscript-tdd for the compile-execute-fix loop. Session state: set use_session: true to enable the %ctx carrier (%DynamicObject). Store values in %ctx.key between calls — scalars, %DynamicObject, and %Persistent objects (stored as OID stubs and re-opened on restore). The response includes session_state (opaque Base64 token); pass it back as session_state on the next call to restore %ctx. Nothing is written to IRIS — the token is held by the client. Error codes: SESSION_INVALID (bad token), SESSION_RESTORE_FAILED (missing class or bad OID), SESSION_SERIALIZE_FAILED (serialization error), TERMINAL_SYNTAX_UNSUPPORTED (block syntax on docker exec path). `server` (optional): name of a registered IRIS instance. If omitted, uses the default connection. Use `iris_servers` to list available instances.",
         output_schema = output_schemas::oneof_output_schema::<IrisExecuteResponse>()
     )]
     async fn iris_execute(
@@ -4570,6 +4580,10 @@ impl IrisTools {
                         if is_runtime_error {
                             resp["error_code"] =
                                 serde_json::Value::String("IRIS_RUNTIME_ERROR".into());
+                            if let Some(hint) = error_hints::runtime_error_hint(trimmed, &namespace)
+                            {
+                                resp["hint"] = serde_json::Value::String(hint);
+                            }
                         }
                         if let Some(ref tr) = translation {
                             if tr.found {
@@ -4642,6 +4656,9 @@ impl IrisTools {
                 });
                 if is_runtime_error {
                     resp["error_code"] = serde_json::Value::String("IRIS_RUNTIME_ERROR".into());
+                    if let Some(hint) = error_hints::runtime_error_hint(trimmed, &namespace) {
+                        resp["hint"] = serde_json::Value::String(hint);
+                    }
                 }
                 if let Some(tok) = session_token {
                     resp["session_state"] = serde_json::Value::String(tok);
@@ -4746,6 +4763,9 @@ impl IrisTools {
                 });
                 if is_runtime_error {
                     resp["error_code"] = serde_json::Value::String("IRIS_RUNTIME_ERROR".into());
+                    if let Some(hint) = error_hints::runtime_error_hint(trimmed, &namespace) {
+                        resp["hint"] = serde_json::Value::String(hint);
+                    }
                 }
                 if let Some(ref tr) = translation {
                     if tr.found {
@@ -4996,7 +5016,7 @@ impl IrisTools {
             if !errors.is_empty() {
                 let msg = errors[0]["error"].as_str().unwrap_or("SQL error");
                 self.record_call("iris_query", false);
-                return err_json("SQL_ERROR", msg);
+                return sql_err(msg);
             }
         }
 
