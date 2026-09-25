@@ -1,0 +1,83 @@
+id: CORPUS-17
+prompt: |
+  Bench.Row in the BENCHMARK namespace is a persistent class with a Value
+  property. Seed() clears the extent and inserts 5, 15 and 25. CountOver(pMin) should return how many
+  rows hold a value greater than pMin, using %SQL.Statement, and it stops after the first row it
+  finds. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Row
+    content: |
+      Class Bench.Row Extends %Persistent
+      {
+
+      Property Value As %Integer;
+
+      ClassMethod Seed() As %Status
+      {
+          Set tSC = $$$OK
+          Do ..%DeleteExtent()
+          For tValue = 5, 15, 25 {
+              Set tRow = ..%New()
+              Set tRow.Value = tValue
+              Set tSC = tRow.%Save()
+              If $$$ISERR(tSC) { Quit }
+          }
+          Quit tSC
+      }
+
+      ClassMethod CountOver(pMin As %Integer) As %Integer
+      {
+          Set tStatement = ##class(%SQL.Statement).%New()
+          Set tSC = tStatement.%Prepare("SELECT Value FROM Bench.Row WHERE Value > ?")
+          If $$$ISERR(tSC) { Quit -1 }
+          Set tResult = tStatement.%Execute(pMin)
+          Set tCount = 0
+          While tResult.%Next() {
+              Set tCount = tCount + 1
+              Quit
+          }
+          Quit tCount
+      }
+
+      }
+check: |
+  try { do ##class(Bench.Row).Seed() set ok=((##class(Bench.Row).CountOver(10)=2)&&(##class(Bench.Row).CountOver(30)=0)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Row
+    content: |
+      Class Bench.Row Extends %Persistent
+      {
+
+      Property Value As %Integer;
+
+      ClassMethod Seed() As %Status
+      {
+          Set tSC = $$$OK
+          Do ..%DeleteExtent()
+          For tValue = 5, 15, 25 {
+              Set tRow = ..%New()
+              Set tRow.Value = tValue
+              Set tSC = tRow.%Save()
+              If $$$ISERR(tSC) { Quit }
+          }
+          Quit tSC
+      }
+
+      ClassMethod CountOver(pMin As %Integer) As %Integer
+      {
+          Set tStatement = ##class(%SQL.Statement).%New()
+          Set tSC = tStatement.%Prepare("SELECT Value FROM Bench.Row WHERE Value > ?")
+          If $$$ISERR(tSC) { Quit -1 }
+          Set tResult = tStatement.%Execute(pMin)
+          Set tCount = 0
+          While tResult.%Next() {
+              Set tCount = tCount + 1
+          }
+          Quit tCount
+      }
+
+      }
+tags: [sql, result-sets]

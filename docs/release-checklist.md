@@ -57,7 +57,9 @@ re-measured against the tree you are tagging, not copied forward from the spec t
 
 ## 5. Skill regression baseline
 
-- [ ] Run the eval — either the GitHub Actions skill-regression workflow, or locally:
+- [ ] Check the last scheduled `skill-regression` run — it is the nightly canary, and its verdict is
+      `healthy` or it names what broke. It reports no lift, by design (spec 121 FR-016)
+- [ ] Run the eval for the numbers, by hand, because nothing runs it on a schedule any more:
 
 ```bash
 PYTHONPATH=. python -m tests.e2e.skill_eval --skill <name> --runs 5 \
@@ -70,8 +72,10 @@ PYTHONPATH=. python -m tests.e2e.skill_eval --skill <name> --runs 5 \
 There is no `run_skill_eval.sh`; this item named one for months and nobody noticed, which says
 something about how often the gate was actually run. The full sweep is nine skills, about 105
 minutes of sequential opencode sessions and roughly $5 of `OPENAI_API_KEY`, so it is the one gate
-here that costs real money. The nightly workflow is the cheap path — check the last scheduled run
-before deciding to run it by hand.
+here that costs real money. That cost is why the nightly stopped running it: three nights in a row
+it failed on Δs smaller than eight task-pairs can resolve. The nightly now answers only whether the
+harness runs, whether the binary still advertises its tools, and whether `MCP-01`, `SKILL-01` and
+`FULL-01` still pass.
 
 ## 6. CI pre-flight (before tagging)
 

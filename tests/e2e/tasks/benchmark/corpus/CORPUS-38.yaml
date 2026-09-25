@@ -1,0 +1,30 @@
+id: CORPUS-38
+prompt: |
+  Bench.Short in the BENCHMARK namespace has a Code property that accepts strings
+  of any length. It must accept at most five characters — %ValidateObject has to fail for a longer one
+  and pass for a shorter one. Change the property definition and leave the class compiled on the
+  server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Short
+    content: |
+      Class Bench.Short Extends %RegisteredObject
+      {
+
+      Property Code As %String(MAXLEN = 50);
+
+      }
+check: |
+  try { set a=##class(Bench.Short).%New() set a.Code="abc" set sc1=a.%ValidateObject() set b=##class(Bench.Short).%New() set b.Code="abcdefgh" set sc2=b.%ValidateObject() set ok=('$system.Status.IsError(sc1)&&$system.Status.IsError(sc2)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Short
+    content: |
+      Class Bench.Short Extends %RegisteredObject
+      {
+
+      Property Code As %String(MAXLEN = 5);
+
+      }
+tags: [class-definition, maxlen]

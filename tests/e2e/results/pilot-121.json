@@ -1,0 +1,340 @@
+{
+  "purpose": "design_decision",
+  "publishable": false,
+  "note": "FR-024: a design decision about whether to build the corpus, not a measurement of the tools. The counts and the one-sided exact p-value are the whole of the claim.",
+  "model": "openai/gpt-4.1",
+  "timeout_seconds": 300,
+  "arms": [
+    "bare",
+    "tools",
+    "tools+skills"
+  ],
+  "skills_installed": [
+    "aihub-eap",
+    "ensemble-production",
+    "iris-agentic-dev",
+    "iris-ai-hub",
+    "iris-connectivity",
+    "iris-container-graceful-shutdown",
+    "iris-cpf-merge",
+    "iris-devtester",
+    "iris-docs",
+    "iris-embedded-python",
+    "iris-linux-docker",
+    "iris-objectscript-eval",
+    "iris-pgwire",
+    "iris-product-features",
+    "iris-sql",
+    "iris-vector-ai",
+    "iris-vscode-objectscript",
+    "iris-windows-iis-setup",
+    "irishealth-container",
+    "irispython-connector",
+    "objectscript-coverage",
+    "objectscript-debugging",
+    "objectscript-fewshot-fixes",
+    "objectscript-guardrails",
+    "objectscript-list-patterns",
+    "objectscript-loop-patterns",
+    "objectscript-mac-routines",
+    "objectscript-navigation",
+    "objectscript-repair",
+    "objectscript-review",
+    "objectscript-sql-patterns",
+    "objectscript-tdd",
+    "objectscript-unit-test",
+    "opencode-introspect"
+  ],
+  "runs": [
+    {
+      "task_id": "PILOT-01",
+      "arm": "bare",
+      "passed": false,
+      "reason": null,
+      "timed_out": true,
+      "tool_calls": 2,
+      "seconds": 305.3993104160036,
+      "session_seconds": 300.026590709007
+    },
+    {
+      "task_id": "PILOT-01",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 18,
+      "seconds": 99.3386732910003,
+      "session_seconds": 94.34379320801236
+    },
+    {
+      "task_id": "PILOT-01",
+      "arm": "tools+skills",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 3,
+      "seconds": 28.75493799999822,
+      "session_seconds": 23.73138412499975
+    },
+    {
+      "task_id": "PILOT-02",
+      "arm": "bare",
+      "passed": false,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 0,
+      "seconds": 17.416902041004505,
+      "session_seconds": 12.42518762499094
+    },
+    {
+      "task_id": "PILOT-02",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 4,
+      "seconds": 31.979995166009758,
+      "session_seconds": 27.004615750003722
+    },
+    {
+      "task_id": "PILOT-02",
+      "arm": "tools+skills",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 4,
+      "seconds": 34.15554795799835,
+      "session_seconds": 29.055217666988028
+    },
+    {
+      "task_id": "PILOT-03",
+      "arm": "bare",
+      "passed": false,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 12,
+      "seconds": 122.83810708300734,
+      "session_seconds": 114.94894312499673
+    },
+    {
+      "task_id": "PILOT-03",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 3,
+      "seconds": 24.498419709008886,
+      "session_seconds": 19.552031667000847
+    },
+    {
+      "task_id": "PILOT-03",
+      "arm": "tools+skills",
+      "passed": false,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 41,
+      "seconds": 210.8179168330098,
+      "session_seconds": 205.84346487499715
+    },
+    {
+      "task_id": "PILOT-04",
+      "arm": "bare",
+      "passed": false,
+      "reason": null,
+      "timed_out": true,
+      "tool_calls": 0,
+      "seconds": 305.20684891699057,
+      "session_seconds": 300.02291816700017
+    },
+    {
+      "task_id": "PILOT-04",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 5,
+      "seconds": 36.892857999991975,
+      "session_seconds": 31.71543224999914
+    },
+    {
+      "task_id": "PILOT-04",
+      "arm": "tools+skills",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 12,
+      "seconds": 56.841344250002294,
+      "session_seconds": 51.9814322500024
+    },
+    {
+      "task_id": "PILOT-05",
+      "arm": "bare",
+      "passed": false,
+      "reason": null,
+      "timed_out": true,
+      "tool_calls": 3,
+      "seconds": 304.73641425000096,
+      "session_seconds": 300.02226083300775
+    },
+    {
+      "task_id": "PILOT-05",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 10,
+      "seconds": 59.4402014590014,
+      "session_seconds": 54.486349541999516
+    },
+    {
+      "task_id": "PILOT-05",
+      "arm": "tools+skills",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 7,
+      "seconds": 51.266815917013446,
+      "session_seconds": 45.85149312499561
+    },
+    {
+      "task_id": "PILOT-06",
+      "arm": "bare",
+      "passed": false,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 18,
+      "seconds": 84.32157174999884,
+      "session_seconds": 78.93633995900746
+    },
+    {
+      "task_id": "PILOT-06",
+      "arm": "tools",
+      "passed": false,
+      "reason": null,
+      "timed_out": true,
+      "tool_calls": 7,
+      "seconds": 305.19743495900184,
+      "session_seconds": 300.02934662500047
+    },
+    {
+      "task_id": "PILOT-06",
+      "arm": "tools+skills",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 4,
+      "seconds": 47.921936459009885,
+      "session_seconds": 42.92120379200787
+    },
+    {
+      "task_id": "PILOT-07",
+      "arm": "bare",
+      "passed": false,
+      "reason": null,
+      "timed_out": true,
+      "tool_calls": 1,
+      "seconds": 307.6573260830046,
+      "session_seconds": 300.0185370830004
+    },
+    {
+      "task_id": "PILOT-07",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 4,
+      "seconds": 38.23122687501018,
+      "session_seconds": 30.81210637500044
+    },
+    {
+      "task_id": "PILOT-07",
+      "arm": "tools+skills",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 5,
+      "seconds": 38.08341833399027,
+      "session_seconds": 30.593063000007533
+    },
+    {
+      "task_id": "PILOT-08",
+      "arm": "bare",
+      "passed": false,
+      "reason": null,
+      "timed_out": true,
+      "tool_calls": 0,
+      "seconds": 305.1979212499864,
+      "session_seconds": 300.0174665000086
+    },
+    {
+      "task_id": "PILOT-08",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 25,
+      "seconds": 129.92130062500655,
+      "session_seconds": 124.76153412499116
+    },
+    {
+      "task_id": "PILOT-08",
+      "arm": "tools+skills",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 4,
+      "seconds": 42.339319999999134,
+      "session_seconds": 36.68508208300045
+    }
+  ],
+  "comparisons": [
+    {
+      "arm_a": "bare",
+      "arm_b": "tools",
+      "n_pairs": 8,
+      "b": 7,
+      "c": 0,
+      "discordance": 0.875,
+      "lift": 0.875,
+      "interval": [
+        0.6458,
+        1.1042
+      ],
+      "p_value_one_sided": 0.0078,
+      "mde": 0.7949,
+      "floor": 170,
+      "threshold_applied": 0.7949,
+      "verdict": "passed",
+      "underpowered": false,
+      "publishable": false,
+      "purpose": "design_decision",
+      "holes": [],
+      "summary": "bare -> tools  lift +0.875 [+0.646, +1.104]  n=8 pairs  floor=170  discordance=0.88 (b=7, c=0)  mde=0.795  threshold=0.795  passed  p=0.0078 one-sided  design decision, not a result (FR-024)",
+      "pilot_verdict": "go"
+    },
+    {
+      "arm_a": "tools",
+      "arm_b": "tools+skills",
+      "n_pairs": 8,
+      "b": 1,
+      "c": 1,
+      "discordance": 0.25,
+      "lift": 0.0,
+      "interval": [
+        -0.3465,
+        0.3465
+      ],
+      "p_value_one_sided": 0.75,
+      "mde": 0.4249,
+      "floor": 47,
+      "threshold_applied": 0.4249,
+      "verdict": "below_threshold",
+      "underpowered": false,
+      "publishable": false,
+      "purpose": "design_decision",
+      "holes": [],
+      "summary": "tools -> tools+skills  lift +0.000 [-0.346, +0.346]  n=8 pairs  floor=47  discordance=0.25 (b=1, c=1)  mde=0.425  threshold=0.425  below_threshold  p=0.7500 one-sided  design decision, not a result (FR-024)",
+      "pilot_verdict": "stop"
+    }
+  ]
+}

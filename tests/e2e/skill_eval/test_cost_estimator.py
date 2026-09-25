@@ -4,10 +4,17 @@ import pytest
 
 from tests.e2e.skill_eval import cost_estimator
 from tests.e2e.skill_eval.cost_estimator import (
+    BENCHMARK_BUDGET_USD,
+    COST_PER_SESSION_USD,
+    SECONDS_PER_SESSION,
+    BudgetExceeded,
     _SECONDS_PER_TASK,
+    assert_within_budget,
     estimate,
+    estimate_ladder,
     estimate_skill,
     format_dry_run,
+    format_ladder_estimate,
 )
 from tests.e2e.skill_eval.evaluator import SkillEvalConfig
 
@@ -237,7 +244,7 @@ def test_the_shipped_rate_table_prices_the_model_the_scorer_asks_for():
     Dict membership passed on my laptop and failed on the runner for exactly that reason.
     """
     import tests.e2e.skill_eval  # noqa: F401  — sys.path shim for `runner`
-    from runner._client import haiku_model
+    from tests.e2e.skill_eval.scorer_client import haiku_model
 
     assert cost_estimator._rate_for(haiku_model()) is not None, (
         f"{haiku_model()} has no declared rate, so the run's cost cannot be derived"
@@ -294,3 +301,95 @@ def test_every_declared_rate_carries_a_citation():
     table_start = source.index("SCORER_RATES")
     preamble = source[max(0, table_start - 1200) : table_start]
     assert "https://" in preamble, "the rate table needs a source URL above it"
+
+
+# ---------------------------------------------------------------------------
+# T034 — the benchmark ladder's own estimate, and the $80 refusal
+# ---------------------------------------------------------------------------
+
+
+def test_the_ladder_estimate_counts_one_session_per_task_arm_and_run():
+    est = estimate_ladder(n_tasks=50, arms=("bare", "tools", "tools+skills"), runs=2)
+    assert est["sessions"] == 300
+
+
+def test_the_ladder_estimate_prices_the_full_tools_run_under_its_40_dollar_share():
+    """50 × 3 × 2 at the pilot's own measured per-session price. If this ever climbs past $40 the
+    stage does not start, and the number here is what says so before any session is billed."""
+    est = estimate_ladder(n_tasks=50, arms=("bare", "tools", "tools+skills"), runs=2)
+    assert est["cost_usd"] == pytest.approx(300 * COST_PER_SESSION_USD, abs=0.01)
+    assert est["cost_usd"] < 40.0
+
+
+def test_the_ladder_estimate_reports_serial_wall_clock_from_measured_arm_means():
+    """The bare arm costs the same as the others and takes three times as long, so a total that
+    averages every arm together understates the clock for a bare-heavy ladder."""
+    est = estimate_ladder(n_tasks=50, arms=("bare", "tools", "tools+skills"), runs=2)
+    bare_only = estimate_ladder(n_tasks=50, arms=("bare",), runs=2)
+    assert bare_only["hours_serial"] > est["hours_serial"] / 3
+    assert est["hours_serial"] > 0
+
+
+def test_an_arm_with_no_measured_mean_falls_back_to_the_overall_mean():
+    est = estimate_ladder(n_tasks=4, arms=("tools+one-skill",), runs=1)
+    assert est["sessions"] == 4
+    assert est["hours_serial"] == pytest.approx(
+        4 * SECONDS_PER_SESSION / 3600, abs=0.005
+    )
+
+
+def test_the_estimate_names_the_arms_so_the_log_says_what_was_priced():
+    est = estimate_ladder(n_tasks=12, arms=("tools", "tools+skills"), runs=2)
+    assert est["arms"] == ["tools", "tools+skills"]
+    assert est["n_tasks"] == 12 and est["runs"] == 2
+
+
+def test_a_run_inside_the_budget_is_allowed():
+    est = estimate_ladder(n_tasks=50, arms=("bare", "tools", "tools+skills"), runs=2)
+    assert assert_within_budget(est) is est
+
+
+def test_a_run_over_the_budget_refuses_before_any_session_starts():
+    est = estimate_ladder(n_tasks=5000, arms=("bare", "tools", "tools+skills"), runs=2)
+    with pytest.raises(BudgetExceeded) as caught:
+        assert_within_budget(est)
+    assert "80" in str(caught.value)
+
+
+def test_the_budget_counts_what_earlier_stages_already_spent():
+    """The cap is $80 for the whole goal, not $80 per stage. An estimate that fits on its own and
+    does not fit on top of the ledger has to refuse, or the cap is three caps."""
+    est = estimate_ladder(n_tasks=50, arms=("bare", "tools", "tools+skills"), runs=2)
+    assert assert_within_budget(est, already_spent=40.0) is est
+    with pytest.raises(BudgetExceeded) as caught:
+        assert_within_budget(est, already_spent=70.0)
+    assert "70" in str(caught.value)
+
+
+def test_the_refusal_names_the_estimate_the_spend_and_the_cap():
+    est = estimate_ladder(n_tasks=5000, arms=("bare",), runs=2)
+    with pytest.raises(BudgetExceeded) as caught:
+        assert_within_budget(est, already_spent=12.5)
+    message = str(caught.value)
+    assert f"{est['cost_usd']:.2f}" in message
+    assert "12.50" in message
+    assert "10000 sessions" in message
+
+
+def test_the_declared_budget_is_80_dollars():
+    assert BENCHMARK_BUDGET_USD == 80.0
+
+
+def test_the_per_session_price_is_the_pilots_own_bill_not_a_guess():
+    """24 sessions for about $2. The constant carries that derivation in its comment, and this test
+    is what fails if someone rounds it to a friendlier number."""
+    assert 0.07 <= COST_PER_SESSION_USD <= 0.10
+
+
+def test_the_formatted_estimate_states_sessions_cost_and_clock():
+    est = estimate_ladder(n_tasks=50, arms=("bare", "tools", "tools+skills"), runs=2)
+    text = format_ladder_estimate(est, already_spent=4.08)
+    assert "300 sessions" in text
+    assert "$4.08" in text
+    assert "80.00" in text
+    assert "h serial" in text

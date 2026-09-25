@@ -1542,6 +1542,257 @@ def scored_exception_findings(files: dict[str, str]) -> list[Finding]:
     return found
 
 
+# ---------------------------------------------------------------------------
+# unpowered-result — a lift emitted with nothing that says how well it was measured
+# ---------------------------------------------------------------------------
+
+#: What names a lift. Anything whose identifier, attribute or dict key says `lift`.
+_LIFT_TOKENS = ("lift",)
+
+#: What makes a lift readable: how many items it was measured over, how far apart the arms
+#: actually were, and what the smallest difference the corpus could resolve was. Any one of
+#: these in the same statement clears it — the detector's job is to catch a number travelling
+#: with nothing at all, not to police which of the three a given call site chose.
+_EVIDENCE_TOKENS = (
+    "mde",
+    "n_pairs",
+    "pairs",
+    "interval",
+    "floor",
+    "comparison",
+    "underpowered",
+    "verdict",
+    "discordance",
+    "summary",
+    "threshold",
+)
+
+#: The rates a lift is the difference of. Subtracting two of them is the shipped instance.
+_RATE_TOKENS = ("pass_rate",)
+
+
+def _dotted(node: ast.AST) -> str:
+    """`skill.pass_rate` from the attribute node, `""` from anything else."""
+    if isinstance(node, ast.Attribute):
+        return f"{_dotted(node.value)}.{node.attr}".lstrip(".")
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Subscript):
+        key = node.slice
+        inner = key.value if isinstance(key, ast.Constant) else ""
+        return f"{_dotted(node.value)}.{inner}"
+    if isinstance(node, ast.Call):
+        return _dotted(node.func)
+    return ""
+
+
+def _statement_tokens(stmt: ast.stmt) -> set[str]:
+    """Every identifier, attribute and string constant in one statement, lowercased."""
+    tokens: set[str] = set()
+    for node in ast.walk(stmt):
+        if isinstance(node, ast.Name):
+            tokens.add(node.id.lower())
+        elif isinstance(node, ast.Attribute):
+            tokens.add(node.attr.lower())
+        elif isinstance(node, ast.arg):
+            tokens.add(node.arg.lower())
+        elif isinstance(node, ast.keyword) and node.arg:
+            tokens.add(node.arg.lower())
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            tokens.add(node.value.lower())
+    return tokens
+
+
+def _naming_tokens(stmt: ast.stmt) -> set[str]:
+    """The tokens in one statement that *name* something, case intact.
+
+    Identifiers, attributes, arguments and string constants that could be a key. Prose is left
+    out on purpose: a sentence mentioning a lift is not a lift, and reading it as one flagged
+    `nightly_canary.lift_mentions` — the one function in the tree whose whole job is keeping
+    lift out of the nightly.
+    """
+    tokens: set[str] = set()
+    for node in ast.walk(stmt):
+        if isinstance(node, ast.Name):
+            tokens.add(node.id)
+        elif isinstance(node, ast.Attribute):
+            tokens.add(node.attr)
+        elif isinstance(node, ast.arg):
+            tokens.add(node.arg)
+        elif isinstance(node, ast.keyword) and node.arg:
+            tokens.add(node.arg)
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if node.value and not any(c.isspace() for c in node.value):
+                tokens.add(node.value)
+    return tokens
+
+
+def _names_a_lift(token: str) -> bool:
+    """True when the token is a lift — `lift`, `lift_delta`, `r.lift`, `d["lift"]`.
+
+    An ALL-CAPS name is excluded: it declares a word list or a threshold, not a measurement.
+    `_LIFT_WORDS` is the nightly guard's own scan list.
+    """
+    bare = token.lstrip("_")
+    if bare.isupper():
+        return False
+    return any(word in bare.lower().split("_") for word in _LIFT_TOKENS)
+
+
+def _is_emission(stmt: ast.stmt) -> bool:
+    """True when this statement puts a number in front of a reader or into a file.
+
+    Three shapes: an f-string, a `print`/`format`/`write` call, and a dict literal with a
+    `lift` key — a serialized figure is published as surely as a printed one.
+    """
+    for node in ast.walk(stmt):
+        if isinstance(node, ast.JoinedStr):
+            return True
+        if isinstance(node, ast.Call):
+            name = _dotted(node.func).rsplit(".", 1)[-1]
+            if name in ("print", "format", "write", "writelines", "dumps", "dump"):
+                return True
+        if isinstance(node, ast.Dict):
+            for key in node.keys:
+                if (
+                    isinstance(key, ast.Constant)
+                    and isinstance(key.value, str)
+                    and any(t in key.value.lower() for t in _LIFT_TOKENS)
+                ):
+                    return True
+    return False
+
+
+def _is_docstring_only(stmt: ast.stmt) -> bool:
+    return isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant)
+
+
+@dataclass(frozen=True)
+class _LiftScope:
+    """One function (or the module body) that emits a lift, and where it first does so."""
+
+    body: tuple
+    emission_line: int
+
+
+def _own_statements(body) -> list[ast.stmt]:
+    """Every statement in this body, nested blocks included, nested `def`s excluded.
+
+    A nested function is its own scope and is answered on its own terms; folding its
+    statements into the enclosing one would let a helper's MDE clear its caller.
+    """
+    out: list[ast.stmt] = []
+    for stmt in body or []:
+        if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        out.append(stmt)
+        for field in ("body", "orelse", "finalbody"):
+            out.extend(_own_statements(getattr(stmt, field, None)))
+        for handler in getattr(stmt, "handlers", None) or []:
+            out.extend(_own_statements(handler.body))
+    return out
+
+
+def _lift_emission_scopes(tree: ast.Module) -> list[_LiftScope]:
+    """The scopes that put a lift in front of a reader, one entry each."""
+    scopes: list[_LiftScope] = []
+    holders = [tree] + [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+    for holder in holders:
+        body = _own_statements(holder.body)
+        lines = [
+            stmt.lineno
+            for stmt in body
+            if not _is_docstring_only(stmt)
+            and _is_emission(stmt)
+            and any(_names_a_lift(token) for token in _naming_tokens(stmt))
+        ]
+        if lines:
+            scopes.append(_LiftScope(tuple(body), min(lines)))
+    return scopes
+
+
+def unpowered_result_findings(files: dict[str, str]) -> list[Finding]:
+    """A lift emitted with no item count, no interval and no MDE beside it.
+
+    First shipped instance: `lift.py:76`, `skill.pass_rate - baseline.pass_rate`. Two point
+    estimates subtracted and printed as a finding, with nothing saying how many items either
+    rate was measured over. Three consecutive nightly runs then failed on differences smaller
+    than the harness could resolve, and four skills reported 0.00 against 0.00 as though that
+    were a measurement.
+
+    Two rules, because the class has two halves. A lift computed as the difference of two
+    aggregate rates cannot carry an item count — there is no paired count to carry. And a call
+    site that prints or serializes a lift without one has published an unreadable number even
+    when the arithmetic underneath it was sound.
+
+    Takes a `{path: text}` mapping so a canary can pass a sample.
+    """
+    found: list[Finding] = []
+    for path, raw in sorted(files.items()):
+        try:
+            tree = ast.parse(raw)
+        except SyntaxError as e:
+            found.append(
+                Finding(
+                    "unpowered-result",
+                    f"{path}:{e.lineno or 0}",
+                    f"does not parse ({e.msg}), so this detector cannot clear it. "
+                    "A file the scanner skips is not a file the scanner passed.",
+                )
+            )
+            continue
+        name_at = _function_name_at(tree)
+
+        # Rule A: a lift subtracted out of two rates.
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.BinOp) or not isinstance(node.op, ast.Sub):
+                continue
+            left, right = _dotted(node.left).lower(), _dotted(node.right).lower()
+            if any(t in left for t in _RATE_TOKENS) and any(
+                t in right for t in _RATE_TOKENS
+            ):
+                found.append(
+                    Finding(
+                        "unpowered-result",
+                        f"{path}:{node.lineno}",
+                        f"`{name_at(node.lineno)}` computes a lift as the difference of two "
+                        "point estimates. Two aggregate rates carry no paired item count, so "
+                        "nothing downstream can say what the number could resolve — pair the "
+                        "arms on task ID and read the lift off a `Comparison`.",
+                    )
+                )
+
+        # Rule B: a lift emitted with nothing beside it.
+        #
+        # Scoped to the enclosing function rather than the single statement. A formatter builds
+        # its line over several statements — `comparison.py`'s `summary()` formats the lift on
+        # one line and the MDE three lines later — and a per-statement rule reads that as a
+        # violation. What the class is actually about is a function that puts a lift in front of
+        # a reader while knowing nothing about how well it was measured.
+        for scope in _lift_emission_scopes(tree):
+            tokens = set()
+            for stmt in scope.body:
+                tokens |= _statement_tokens(stmt)
+            if any(t in token for token in tokens for t in _EVIDENCE_TOKENS):
+                continue
+            line = scope.emission_line
+            found.append(
+                Finding(
+                    "unpowered-result",
+                    f"{path}:{line}",
+                    f"`{name_at(line)}` emits a lift with no item count, no interval and no "
+                    "mde anywhere in it. A lift alone cannot be read: +0.12 over 8 pairs and "
+                    "+0.12 over 100 are different facts. Print or serialize the `Comparison` "
+                    "fields with it.",
+                )
+            )
+    return found
+
+
 def _src_texts() -> dict[str, str]:
     return {rel(p): p.read_text(errors="replace") for p in src_files()}
 
@@ -1562,6 +1813,21 @@ def check_scored_exception() -> list[Finding]:
     return scored_exception_findings(_py_texts())
 
 
+def check_unpowered_result() -> list[Finding]:
+    """The harness's own Python, minus its tests.
+
+    A test constructs lifts deliberately — that is what a fixture is — and scanning them would
+    bury the call sites that matter under the cases that prove they work.
+    """
+    return unpowered_result_findings(
+        {
+            path: text
+            for path, text in _py_texts().items()
+            if not pathlib.Path(path).name.startswith("test_")
+        }
+    )
+
+
 CHECKS = {
     "vacuous-tests": check_vacuous_tests,
     "empty-tests": check_empty_tests,
@@ -1578,6 +1844,7 @@ CHECKS = {
     "undeclared-params": check_undeclared_params,
     "prose-only-enum": check_prose_only_enum,
     "scored-exception": check_scored_exception,
+    "unpowered-result": check_unpowered_result,
 }
 
 # Findings in these classes always fail the gate, baseline or not: the class is fully
@@ -1592,6 +1859,7 @@ NO_BASELINE = {
     "undeclared-params",
     "prose-only-enum",
     "scored-exception",
+    "unpowered-result",
 }
 
 

@@ -1,0 +1,35 @@
+id: CORPUS-30
+prompt: |
+  Bench.Dates.Ymd(pHorolog) in the BENCHMARK namespace should format a $HOROLOG
+  day number as YYYY-MM-DD. It returns the American MM/DD/YYYY form. Fix it and leave the class
+  compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Dates
+    content: |
+      Class Bench.Dates Extends %RegisteredObject
+      {
+
+      ClassMethod Ymd(pHorolog As %Integer) As %String
+      {
+          Quit $ZDate(pHorolog, 1)
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Dates).Ymd(64000)="2016-03-23")&&(##class(Bench.Dates).Ymd(50000)="1977-11-23")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Dates
+    content: |
+      Class Bench.Dates Extends %RegisteredObject
+      {
+
+      ClassMethod Ymd(pHorolog As %Integer) As %String
+      {
+          Quit $ZDate(pHorolog, 3)
+      }
+
+      }
+tags: [dates, formatting]

@@ -58,6 +58,20 @@ jobs:
         env:
           RUST_LOG: warn
           RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+      # The python tests that need a real build. They skip themselves without one, and
+      # `benchmark-lint` has no cargo, so the getting-started guard and the T007 tools/list
+      # check ran nowhere: the #118 pattern, where provenance falls back to a Homebrew path
+      # that does not exist on a runner. This job already built the binary, so it is the only
+      # job that can name it. Selected by marker, not by file, so a new marked test is covered
+      # by existing.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml pytest requests
+      - name: Python tests that need the built binary
+        run: |
+          IAD_BINARY="$PWD/target/debug/iris-agentic-dev" \
+            python -m pytest tests/e2e -m requires_binary -q
 
   benchmark-lint:
     runs-on: ubuntu-latest
@@ -66,30 +80,46 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
-      - run: pip install pyyaml pytest
-      - name: Verify benchmark task YAML parses clean
+      - run: pip install pyyaml pytest requests
+      - name: Verify the graded corpus loads and the split covers it
+        # Loaded the retired 021 harness's task_loader until spec 121 T043 made
+        # `tests/e2e/skill_eval/` the one harness. The split load is the interesting half: it
+        # refuses unless every task ID in the corpus sits on exactly one side, so a task added
+        # without a side fails here rather than at publish time.
         run: |
           python -c "
-          import sys, os
-          sys.path.insert(0, 'benchmark/021/runner')
-          from task_loader import load_tasks
-          tasks = load_tasks()
-          print(f'OK: {len(tasks)} tasks loaded and validated')
+          from tests.e2e.skill_eval.graded_task import all_tasks
+          from tests.e2e.skill_eval.split import default_split
+          tasks = all_tasks()
+          split = default_split()
+          print(f'OK: {len(tasks)} tasks, {len(split.train)} train, {len(split.holdout)} holdout')
           "
-      - name: Verify release workflow ordering
-        # A broken release.yml is otherwise only discoverable by cutting a tag,
-        # and a Marketplace publish cannot be undone.
-        run: python -m pytest tests/e2e/test_release_workflow.py -q
-
-      - name: Verify every workflow file parses and declares jobs
-        # An unparseable workflow shows up as a 0-second run with no jobs, which
-        # is why ci.yml sat dead on master for two days after 4dec14f.
-        run: python -m pytest tests/e2e/test_workflow_files.py -q
-
-      - name: Verify the task corpus is self-consistent and committed
-        # An eval.yaml referencing a task file that exists on disk but is not
-        # tracked by git is green locally and red in CI, every time.
-        run: python -m pytest tests/e2e/skill_eval/test_task_corpus.py -q
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+      - name: Run the Python suite
+        # Named by directory, not by file. This step used to be three named files
+        # (test_release_workflow.py, test_workflow_files.py, and one corpus check) against a
+        # tests/e2e tree of ~1000 tests, so everything else — the ladder, the split, the gates,
+        # the reporter, the resume path, the published-figure guards — ran nowhere and a new
+        # file was covered only if someone remembered to add a step.
+        #
+        # What the marker filter drops, and why each is not a gap:
+        #   requires_iris  — no container in this job. Covered by the Rust integration jobs and
+        #                    by the nightly, which does have one. Those 70 tests also carry a
+        #                    module-level skipif on `docker ps`, so they would survive without the
+        #                    filter; the marker is what lets anyone select them deliberately, and
+        #                    test_iris_markers.py fails if it ever stops matching them.
+        #   network_curl   — reaches raw.githubusercontent.com; a GitHub outage is not a defect
+        #                    in this repo.
+        #   billable       — spawns a real agent session. skill-regression.yml is the only
+        #                    workflow allowed to, and test_workflow_files.py asserts that.
+        #
+        # Locally: 1023 passed, 71 skipped, 16 deselected in 50 s.
+        run: |
+          python -m pytest tests/e2e benchmark/harbor \
+            -m "not requires_iris and not network_curl and not billable" -q
+        env:
+          PYTHONPATH: ${{ github.workspace }}
 
   windows-handshake:
     runs-on: windows-latest

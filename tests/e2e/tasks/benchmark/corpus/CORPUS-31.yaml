@@ -1,0 +1,35 @@
+id: CORPUS-31
+prompt: |
+  Bench.Meta.HasMethod(pClass, pMethod) in the BENCHMARK namespace should answer 1
+  when that compiled class really defines that method and 0 when it does not. It answers 1 for
+  anything. Fix it by asking the dictionary, and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Meta
+    content: |
+      Class Bench.Meta Extends %RegisteredObject
+      {
+
+      ClassMethod HasMethod(pClass As %String, pMethod As %String) As %Boolean
+      {
+          Quit 1
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Meta).HasMethod("Bench.Meta","HasMethod")=1)&&(##class(Bench.Meta).HasMethod("Bench.Meta","NoSuchMethod")=0)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Meta
+    content: |
+      Class Bench.Meta Extends %RegisteredObject
+      {
+
+      ClassMethod HasMethod(pClass As %String, pMethod As %String) As %Boolean
+      {
+          Quit ##class(%Dictionary.CompiledMethod).%ExistsId(pClass_"||"_pMethod)
+      }
+
+      }
+tags: [introspection, dictionary]

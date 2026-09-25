@@ -1,0 +1,3201 @@
+{
+  "purpose": "result",
+  "scoring_mode": "machine",
+  "note": "Every task is graded by an ObjectScript check printing PASS or FAIL against live IRIS. No model scores anything, and a check whose output is neither leaves the task unscored rather than failed.",
+  "caveats": [
+    "The 42 corpus tasks were written by the author of the tools they measure. No description, prompt or skill was changed while looking at a result from a holdout task \u2014 that is what the split is for \u2014 but a corpus written by the tool's author is weaker evidence than a corpus written by someone else, and this figure should be read that way.",
+    "A killed session counts as a task not solved. The timeout is part of the measurement, not a nuisance around it, so every arm's solve-time block states how many of its sessions hit it."
+  ],
+  "timeout_seconds": 300,
+  "arms": [
+    "tools",
+    "tools+its-own-skill"
+  ],
+  "skills_installed": {
+    "tools+its-own-skill": []
+  },
+  "provenance": {
+    "run_id": "ladder-20260919T023537",
+    "task_ids": [
+      "SKILL-01",
+      "SKILL-02",
+      "SKILL-03",
+      "SKILL-04",
+      "SKILL-05",
+      "SKILL-06",
+      "SKILL-07",
+      "SKILL-08",
+      "SKILL-09",
+      "SKILL-10",
+      "SKILL-11",
+      "SKILL-12"
+    ],
+    "scoring_mode": "machine",
+    "scorer_model": null,
+    "scorer_model_requested": null,
+    "tool_surface": "1.4.2+fa0b694f8725",
+    "runs": 1,
+    "measured_at": "2026-09-19T07:08:50Z",
+    "harness_commit": "8d0314b",
+    "driver": "opencode",
+    "harness_version": "1.14.17",
+    "agent_model": "openai/gpt-4.1",
+    "container": "iris-dev-iris",
+    "image": "intersystemsdc/iris-community:2026.2",
+    "image_digest": "intersystemsdc/iris-community@sha256:5ffbd9af5a3ab685e65496d45c32ed6db455882f9f1d32864d4e4032f395bf42",
+    "image_id": "sha256:f360aa53f1f2c5219d20137bd9a0057cd1e82ec6052d5a0c92b5df9aef309492",
+    "corpus_commit": "8d0314b8745c34d84c8a6cdbc6cd1ba621bc81f3",
+    "corpus_dirty": false,
+    "corpus_task_count": 62,
+    "item_counts": {
+      "tasks": 12,
+      "arms": 2,
+      "repeats": 1,
+      "sessions": 24
+    }
+  },
+  "arm_rates": {
+    "tools": {
+      "sessions": 12,
+      "scored": 12,
+      "unscored": 0,
+      "passed": 10,
+      "rate": 0.8333333333333334,
+      "interval": [
+        0.552,
+        0.953
+      ],
+      "interval_method": "Wilson score, 95%"
+    },
+    "tools+iris-sql": {
+      "sessions": 1,
+      "scored": 1,
+      "unscored": 0,
+      "passed": 0,
+      "rate": 0.0,
+      "interval": [
+        0.0,
+        0.7935
+      ],
+      "interval_method": "Wilson score, 95%"
+    },
+    "tools+objectscript-guardrails": {
+      "sessions": 5,
+      "scored": 5,
+      "unscored": 0,
+      "passed": 4,
+      "rate": 0.8,
+      "interval": [
+        0.3755,
+        0.9638
+      ],
+      "interval_method": "Wilson score, 95%"
+    },
+    "tools+objectscript-list-patterns": {
+      "sessions": 3,
+      "scored": 3,
+      "unscored": 0,
+      "passed": 2,
+      "rate": 0.6666666666666666,
+      "interval": [
+        0.2077,
+        0.9385
+      ],
+      "interval_method": "Wilson score, 95%"
+    },
+    "tools+objectscript-sql-patterns": {
+      "sessions": 3,
+      "scored": 3,
+      "unscored": 0,
+      "passed": 1,
+      "rate": 0.3333333333333333,
+      "interval": [
+        0.0615,
+        0.7923
+      ],
+      "interval_method": "Wilson score, 95%"
+    }
+  },
+  "solve_time": {
+    "tools": {
+      "sessions": 12,
+      "solved": 10,
+      "median_solve_seconds": 38.6,
+      "mean_solve_seconds": 60.5,
+      "fastest_solve_seconds": 28.4,
+      "slowest_solve_seconds": 165.6,
+      "timed_out": 0,
+      "censored_note": "0 of 12 sessions hit the 300s clock and count as tasks not solved; their true solve time is unknown and is not averaged in"
+    },
+    "tools+iris-sql": {
+      "sessions": 1,
+      "solved": 0,
+      "median_solve_seconds": null,
+      "mean_solve_seconds": null,
+      "fastest_solve_seconds": null,
+      "slowest_solve_seconds": null,
+      "timed_out": 0,
+      "censored_note": "0 of 1 sessions hit the 300s clock and count as tasks not solved; their true solve time is unknown and is not averaged in"
+    },
+    "tools+objectscript-guardrails": {
+      "sessions": 5,
+      "solved": 4,
+      "median_solve_seconds": 25.8,
+      "mean_solve_seconds": 25.1,
+      "fastest_solve_seconds": 19.1,
+      "slowest_solve_seconds": 29.5,
+      "timed_out": 0,
+      "censored_note": "0 of 5 sessions hit the 300s clock and count as tasks not solved; their true solve time is unknown and is not averaged in"
+    },
+    "tools+objectscript-list-patterns": {
+      "sessions": 3,
+      "solved": 2,
+      "median_solve_seconds": 58.8,
+      "mean_solve_seconds": 58.8,
+      "fastest_solve_seconds": 32.6,
+      "slowest_solve_seconds": 85.0,
+      "timed_out": 0,
+      "censored_note": "0 of 3 sessions hit the 300s clock and count as tasks not solved; their true solve time is unknown and is not averaged in"
+    },
+    "tools+objectscript-sql-patterns": {
+      "sessions": 3,
+      "solved": 1,
+      "median_solve_seconds": 54.6,
+      "mean_solve_seconds": 54.6,
+      "fastest_solve_seconds": 54.6,
+      "slowest_solve_seconds": 54.6,
+      "timed_out": 0,
+      "censored_note": "0 of 3 sessions hit the 300s clock and count as tasks not solved; their true solve time is unknown and is not averaged in"
+    }
+  },
+  "failure_modes": {
+    "tools": {
+      "sessions": 12,
+      "failed": 2,
+      "unscored": 0,
+      "killed_on_the_clock": 0,
+      "made_no_attempt": 0,
+      "tried_and_failed": 2,
+      "note": "0 of 2 failures hit the 300s clock and 0 ended with no tool call at all; only 2 were an attempt that came back wrong"
+    },
+    "tools+iris-sql": {
+      "sessions": 1,
+      "failed": 1,
+      "unscored": 0,
+      "killed_on_the_clock": 0,
+      "made_no_attempt": 0,
+      "tried_and_failed": 1,
+      "note": "0 of 1 failures hit the 300s clock and 0 ended with no tool call at all; only 1 were an attempt that came back wrong"
+    },
+    "tools+objectscript-guardrails": {
+      "sessions": 5,
+      "failed": 1,
+      "unscored": 0,
+      "killed_on_the_clock": 0,
+      "made_no_attempt": 0,
+      "tried_and_failed": 1,
+      "note": "0 of 1 failures hit the 300s clock and 0 ended with no tool call at all; only 1 were an attempt that came back wrong"
+    },
+    "tools+objectscript-list-patterns": {
+      "sessions": 3,
+      "failed": 1,
+      "unscored": 0,
+      "killed_on_the_clock": 0,
+      "made_no_attempt": 0,
+      "tried_and_failed": 1,
+      "note": "0 of 1 failures hit the 300s clock and 0 ended with no tool call at all; only 1 were an attempt that came back wrong"
+    },
+    "tools+objectscript-sql-patterns": {
+      "sessions": 3,
+      "failed": 2,
+      "unscored": 0,
+      "killed_on_the_clock": 0,
+      "made_no_attempt": 1,
+      "tried_and_failed": 1,
+      "note": "0 of 2 failures hit the 300s clock and 1 ended with no tool call at all; only 1 were an attempt that came back wrong"
+    }
+  },
+  "comparisons": [
+    {
+      "arm_a": "tools",
+      "arm_b": "tools+its-own-skill",
+      "n_pairs": 12,
+      "b": 1,
+      "c": 4,
+      "discordance": 0.4167,
+      "lift": -0.25,
+      "interval": [
+        -0.5867,
+        0.0867
+      ],
+      "p_value_one_sided": 0.9688,
+      "mde": 0.4722,
+      "floor": 80,
+      "threshold_applied": 0.4722,
+      "verdict": "underpowered",
+      "underpowered": true,
+      "publishable": false,
+      "purpose": "result",
+      "holes": [],
+      "summary": "tools -> tools+its-own-skill  lift -0.250 [-0.587, +0.087]  n=12 pairs  floor=80  discordance=0.42 (b=1, c=4)  mde=0.472  threshold=0.472  underpowered  p=0.9688 one-sided"
+    }
+  ],
+  "published": [],
+  "runs": [
+    {
+      "task_id": "SKILL-01",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 4,
+      "seconds": 33.24176662500395,
+      "session_seconds": 28.431073750005453,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_add_server",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-01",
+      "arm": "tools+objectscript-guardrails",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 4,
+      "seconds": 23.97084516599716,
+      "session_seconds": 19.138632000001962,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-02",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 5,
+      "seconds": 37.71045858300204,
+      "session_seconds": 32.094946917000925,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "edit",
+          "server": null,
+          "completed": false,
+          "status": "error",
+          "error": "File /Bench.Chain.cls not found"
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-02",
+      "arm": "tools+objectscript-guardrails",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 7,
+      "seconds": 34.947580082996865,
+      "session_seconds": 27.10002841700043,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-03",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 10,
+      "seconds": 40.69995183300489,
+      "session_seconds": 35.6415382500054,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "docs_introspect",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "docs_introspect",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-03",
+      "arm": "tools+objectscript-guardrails",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 6,
+      "seconds": 29.910896125002182,
+      "session_seconds": 24.573929666003096,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "docs_introspect",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-04",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 7,
+      "seconds": 37.112032290999196,
+      "session_seconds": 29.488040500000352,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-04",
+      "arm": "tools+objectscript-guardrails",
+      "passed": false,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 15,
+      "seconds": 85.14082187500026,
+      "session_seconds": 78.57176854099816,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "grep",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "grep",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_table_info",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "docs_introspect",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_global",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-05",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 9,
+      "seconds": 47.38605304099474,
+      "session_seconds": 39.36816004200227,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols_local",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_info",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-05",
+      "arm": "tools+objectscript-guardrails",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 8,
+      "seconds": 34.31556249999994,
+      "session_seconds": 29.510891958001594,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols_local",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_info",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-06",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 12,
+      "seconds": 49.38331758300046,
+      "session_seconds": 44.14206416699744,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": false,
+          "status": "error",
+          "error": "StatusCode: non 2xx status code (404 GET https://community.intersystems.com/post/how-use-list-data-type-objectscript)"
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-06",
+      "arm": "tools+objectscript-list-patterns",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 8,
+      "seconds": 40.94624499999918,
+      "session_seconds": 32.63316954200127,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": false,
+          "status": "error",
+          "error": "StatusCode: non 2xx status code (404 GET https://community.intersystems.com/search/all/objectscript%20percentlist%20contains)"
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-07",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 15,
+      "seconds": 43.3310736659987,
+      "session_seconds": 37.7496014999997,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-07",
+      "arm": "tools+objectscript-list-patterns",
+      "passed": false,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 54,
+      "seconds": 153.754600459004,
+      "session_seconds": 145.46012762500322,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "edit",
+          "server": null,
+          "completed": false,
+          "status": "error",
+          "error": "File /Bench.Ls2.cls not found"
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-08",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 35,
+      "seconds": 150.68268337500194,
+      "session_seconds": 136.25055695899937,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols_local",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_table_info",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-08",
+      "arm": "tools+objectscript-sql-patterns",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 17,
+      "seconds": 67.69824541600246,
+      "session_seconds": 54.603654334001476,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_servers",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "docs_introspect",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_table_info",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "docs_introspect",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-09",
+      "arm": "tools",
+      "passed": false,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 18,
+      "seconds": 86.34536441700038,
+      "session_seconds": 72.1421609579993,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "docs_introspect",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_table_info",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "grep",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "grep",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "read",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "read",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_info",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "grep",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "grep",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-09",
+      "arm": "tools+objectscript-sql-patterns",
+      "passed": false,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 0,
+      "seconds": 22.461259333998896,
+      "session_seconds": 8.761950959000387,
+      "run_index": 0,
+      "calls": []
+    },
+    {
+      "task_id": "SKILL-10",
+      "arm": "tools",
+      "passed": false,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 20,
+      "seconds": 98.02747308300604,
+      "session_seconds": 90.32005583400314,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": false,
+          "status": "error",
+          "error": "StatusCode: non 2xx status code (404 GET https://community.intersystems.com/post/how-avoid-error-null-value-when-using-listget)"
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": false,
+          "status": "error",
+          "error": "StatusCode: non 2xx status code (404 GET https://community.intersystems.com/tags/listget)"
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": false,
+          "status": "error",
+          "error": "StatusCode: non 2xx status code (404 GET https://community.intersystems.com/post/how-safely-iterate-list-objectscript)"
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-10",
+      "arm": "tools+objectscript-list-patterns",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 20,
+      "seconds": 92.36017412499496,
+      "session_seconds": 84.95741233399895,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-11",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 16,
+      "seconds": 64.92939124999975,
+      "session_seconds": 56.37024379200011,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "webfetch",
+          "server": null,
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "edit",
+          "server": null,
+          "completed": false,
+          "status": "error",
+          "error": "File /private/var/folders/sh/xd6ss5td5jvfcqcns6wptq5j63nmv7/T/pilot-SKILL-11-zcnclagm/Bench.Ddl.cls not found"
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-11",
+      "arm": "tools+iris-sql",
+      "passed": false,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 2,
+      "seconds": 19.403217083003256,
+      "session_seconds": 11.741129166002793,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-12",
+      "arm": "tools",
+      "passed": true,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 41,
+      "seconds": 176.52757362499688,
+      "session_seconds": 165.56344037499366,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_admin",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_table_info",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols_local",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_info",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols_local",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_info",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": false,
+          "status": "error",
+          "error": "MCP error -32001: Request timed out"
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    },
+    {
+      "task_id": "SKILL-12",
+      "arm": "tools+objectscript-sql-patterns",
+      "passed": false,
+      "reason": null,
+      "timed_out": false,
+      "tool_calls": 30,
+      "seconds": 115.73602400000527,
+      "session_seconds": 102.15793787500297,
+      "run_index": 0,
+      "calls": [
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_symbols",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc_search",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_compile",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_execute_method",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "docs_introspect",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_info",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_info",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_doc",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        },
+        {
+          "name": "iris_query",
+          "server": "iris_agentic_dev",
+          "completed": true,
+          "status": "completed",
+          "error": null
+        }
+      ]
+    }
+  ],
+  "skill_verdict": "harmful",
+  "skill_verdict_rule": "Discordant counts, not an interval: twelve items cannot reach the publication floor of 37 and an interval over twelve contains zero whatever happens. `helps` needs b >= 4 and c <= 1; b <= c is a real negative about the documents. Fixed in plan.md and in `skill_verdict` before the first skill session ran.",
+  "per_skill": [
+    {
+      "skill": "iris-sql",
+      "pairs": 1,
+      "b": 0,
+      "c": 1,
+      "verdict": "harmful",
+      "helps_reachable": false
+    },
+    {
+      "skill": "objectscript-guardrails",
+      "pairs": 5,
+      "b": 0,
+      "c": 1,
+      "verdict": "harmful",
+      "helps_reachable": true
+    },
+    {
+      "skill": "objectscript-list-patterns",
+      "pairs": 3,
+      "b": 1,
+      "c": 1,
+      "verdict": "no effect",
+      "helps_reachable": false
+    },
+    {
+      "skill": "objectscript-sql-patterns",
+      "pairs": 3,
+      "b": 0,
+      "c": 1,
+      "verdict": "harmful",
+      "helps_reachable": false
+    }
+  ],
+  "merged_from": [
+    "ladder-20260919T023537.runs.jsonl"
+  ],
+  "unscored_sessions": []
+}

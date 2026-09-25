@@ -1,0 +1,56 @@
+id: SKILL-02
+prompt: |
+  Bench.Chain.Run() in the BENCHMARK namespace must call ..Inner() and report what
+  Inner reported: Inner's own %Status when Inner fails, and success when it does not. Inner() is already
+  written and you should not change it. Leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: objectscript-guardrails
+fixtures:
+  - name: Bench.Chain
+    content: |
+      Class Bench.Chain Extends %RegisteredObject
+      {
+
+      ClassMethod Inner() As %Status
+      {
+          If $Get(^Bench.Chain("fail")) = 1 {
+              Quit $$$ERROR($$$GeneralError, "inner failed")
+          }
+          Quit $$$OK
+      }
+
+      ClassMethod Run() As %Status
+      {
+          Quit $$$OK
+      }
+
+      }
+check: |
+  try { set ^Bench.Chain("fail")=1 set sc1=##class(Bench.Chain).Run() set ^Bench.Chain("fail")=0 set sc2=##class(Bench.Chain).Run() set ok=($system.Status.IsError(sc1)&&'$system.Status.IsError(sc2)&&($system.Status.GetErrorText(sc1)["inner failed")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Chain
+    content: |
+      Class Bench.Chain Extends %RegisteredObject
+      {
+
+      ClassMethod Inner() As %Status
+      {
+          If $Get(^Bench.Chain("fail")) = 1 {
+              Quit $$$ERROR($$$GeneralError, "inner failed")
+          }
+          Quit $$$OK
+      }
+
+      ClassMethod Run() As %Status
+      {
+          Set tSC = ..Inner()
+          If $$$ISERR(tSC) {
+              Quit tSC
+          }
+          Quit $$$OK
+      }
+
+      }
+tags: [status-propagation, error-handling]

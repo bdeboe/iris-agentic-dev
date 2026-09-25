@@ -1,0 +1,56 @@
+id: SKILL-03
+prompt: |
+  Bench.Tx.Safe() in the BENCHMARK namespace is the cleanup helper a catch block
+  calls. It must abandon the current transaction if one is open, return 1 either way, and never raise —
+  catch blocks call it whether or not a transaction was ever started. Harness() is the test hook and
+  you should not change it. Leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: objectscript-guardrails
+fixtures:
+  - name: Bench.Tx
+    content: |
+      Class Bench.Tx Extends %RegisteredObject
+      {
+
+      ClassMethod Safe() As %Integer
+      {
+          Quit 1
+      }
+
+      ClassMethod Harness() As %Integer
+      {
+          TSTART
+          Set ^Bench.Tx("x") = 1
+          Do ..Safe()
+          Quit $TLevel
+      }
+
+      }
+check: |
+  try { set ok1=0 try { set ok1=(##class(Bench.Tx).Safe()=1) } catch { set ok1=0 } set ok2=(##class(Bench.Tx).Harness()=0) set ok=(ok1&&ok2) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Tx
+    content: |
+      Class Bench.Tx Extends %RegisteredObject
+      {
+
+      ClassMethod Safe() As %Integer
+      {
+          If $TLevel > 0 {
+              TROLLBACK
+          }
+          Quit 1
+      }
+
+      ClassMethod Harness() As %Integer
+      {
+          TSTART
+          Set ^Bench.Tx("x") = 1
+          Do ..Safe()
+          Quit $TLevel
+      }
+
+      }
+tags: [transactions, error-handling]

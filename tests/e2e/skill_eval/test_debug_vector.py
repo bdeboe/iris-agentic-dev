@@ -1,18 +1,28 @@
 """Debug iris-vector-ai cold-start scoring."""
+
 import os, sys, shutil, tempfile
 import pytest
 
+# Every test in this file spawns a real agent session. See `tests/e2e/billing.py`.
+pytestmark = pytest.mark.billable
+
+
 @pytest.mark.skipif(not os.environ.get("OPENAI_API_KEY"), reason="needs key")
 def test_debug_vector_cold():
-    sys.path.insert(0, 'benchmark/021')
     from tests.e2e.isolated_env import IsolatedEnv
     from tests.e2e.opencode_runner import collect_events
-    from tests.e2e.skill_eval.lift import _read_cls_files_from_workdir, _extract_written_content, _check_expected_patterns
+    from tests.e2e.skill_eval.lift import (
+        _read_cls_files_from_workdir,
+        _extract_written_content,
+        _check_expected_patterns,
+    )
     import yaml
 
     key = os.environ["OPENAI_API_KEY"]
     model = "openai/gpt-4.1"
-    task = yaml.safe_load(open("tests/e2e/tasks/skills/targeted/VECTOR-SYNTAX-COLD.yaml"))
+    task = yaml.safe_load(
+        open("tests/e2e/tasks/skills/targeted/VECTOR-SYNTAX-COLD.yaml")
+    )
     expected = task["expected_behavior"]
 
     for label, install_skill in [("BASELINE", False), ("WITH_SKILL", True)]:
@@ -22,10 +32,20 @@ def test_debug_vector_cold():
                 if install_skill:
                     dest = os.path.join(env.skills_dir, "iris-vector-ai")
                     os.makedirs(dest, exist_ok=True)
-                    shutil.copy2("skills/skills/iris-vector-ai/SKILL.md", os.path.join(dest, "SKILL.md"))
-                events = collect_events(task["description"], env.env_vars(), model=model, working_dir=workdir)
+                    shutil.copy2(
+                        "skills/skills/iris-vector-ai/SKILL.md",
+                        os.path.join(dest, "SKILL.md"),
+                    )
+                events = collect_events(
+                    task["description"],
+                    env.env_vars(),
+                    model=model,
+                    working_dir=workdir,
+                )
 
-            content = _read_cls_files_from_workdir(workdir) or _extract_written_content(events)
+            content = _read_cls_files_from_workdir(workdir) or _extract_written_content(
+                events
+            )
             patterns_met = _check_expected_patterns(content, expected)
             print(f"\n=== {label} ===")
             print(f"Content length: {len(content)}")

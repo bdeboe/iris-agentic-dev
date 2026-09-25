@@ -1,0 +1,62 @@
+id: CORPUS-32
+prompt: |
+  Bench.Last.LastKey() in the BENCHMARK namespace should return the last
+  first-level subscript of ^Bench.Last in collating order, or an empty string when the global is
+  empty. It returns the first one. Seed() is already there. Fix LastKey() and leave the class compiled
+  on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Last
+    content: |
+      Class Bench.Last Extends %RegisteredObject
+      {
+
+      ClassMethod Seed()
+      {
+          Kill ^Bench.Last
+          Set ^Bench.Last("alpha") = 1
+          Set ^Bench.Last("beta") = 2
+          Set ^Bench.Last("gamma") = 3
+      }
+
+      ClassMethod Clear()
+      {
+          Kill ^Bench.Last
+      }
+
+      ClassMethod LastKey() As %String
+      {
+          Quit $Order(^Bench.Last(""))
+      }
+
+      }
+check: |
+  try { do ##class(Bench.Last).Seed() set a=##class(Bench.Last).LastKey() do ##class(Bench.Last).Clear() set b=##class(Bench.Last).LastKey() set ok=((a="gamma")&&(b="")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Last
+    content: |
+      Class Bench.Last Extends %RegisteredObject
+      {
+
+      ClassMethod Seed()
+      {
+          Kill ^Bench.Last
+          Set ^Bench.Last("alpha") = 1
+          Set ^Bench.Last("beta") = 2
+          Set ^Bench.Last("gamma") = 3
+      }
+
+      ClassMethod Clear()
+      {
+          Kill ^Bench.Last
+      }
+
+      ClassMethod LastKey() As %String
+      {
+          Quit $Order(^Bench.Last(""), -1)
+      }
+
+      }
+tags: [globals, order-traversal]

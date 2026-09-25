@@ -1,0 +1,51 @@
+schema_version = "1.3"
+
+[task]
+name = "intersystems/golden-01-tools"
+authors = ["Thomas Dyar <thomas.dyar@intersystems.com>"]
+description = "GOLDEN-01 (tools): The class Golden.Buggy in the BENCHMARK namespace does not compile."
+keywords = ["iris", "objectscript", "iris-agentic-dev", "tools"]
+
+[metadata]
+source_task = "GOLDEN-01"
+arm = "tools"
+tools = true
+skills = false
+
+[agent]
+timeout_sec = 600.0
+
+[verifier]
+timeout_sec = 120.0
+
+[environment]
+# A shared reachable IRIS, allowlisted — decision 1's answer, and what Harbor documents for a
+# task container that has to reach a service outside it. Every arm needs this route equally: a
+# task with no route to IRIS fails all three for the same reason and reads as a broken tool.
+network_mode = "allowlist"
+allowed_hosts = ["${IRIS_HOST}"]
+workdir = "/workspace"
+
+[environment.env]
+IRIS_HOST = "${IRIS_HOST}"
+IRIS_WEB_PORT = "${IRIS_WEB_PORT}"
+IRIS_USERNAME = "${IRIS_USERNAME}"
+IRIS_PASSWORD = "${IRIS_PASSWORD}"
+IRIS_NAMESPACE = "BENCHMARK"
+IRIS_TOOLSET = "merged"
+
+# Harbor's single-step task has no setup hook, so the fixture is applied by the healthcheck.
+# `seed.sh` holds a marker file: this command runs again during the session, and a second
+# seed would overwrite the agent's answer with the fixture it was asked to fix.
+[environment.healthcheck]
+command = "/usr/local/bin/seed.sh"
+interval_sec = 30
+timeout_sec = 120
+start_period_sec = 5
+retries = 3
+
+[[environment.mcp_servers]]
+name = "iris-agentic-dev"
+transport = "stdio"
+command = "/usr/local/bin/iris-agentic-dev"
+args = ["mcp"]

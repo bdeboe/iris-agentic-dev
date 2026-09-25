@@ -1,0 +1,50 @@
+id: CORPUS-08
+prompt: |
+  Bench.Txn.Apply() in the BENCHMARK namespace starts a transaction, writes
+  ^Bench.Txn("a"), then hits a failure and returns the error %Status. It returns without
+  rolling back, so the write survives and the transaction level is left above zero. Fix it
+  so a failure leaves no transaction open and no data behind, and still returns the error
+  %Status. Leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Txn
+    content: |
+      Class Bench.Txn Extends %RegisteredObject
+      {
+
+      ClassMethod Apply() As %Status
+      {
+          Kill ^Bench.Txn
+          TSTART
+          Set ^Bench.Txn("a") = 1
+          Quit $$$ERROR($$$GeneralError, "the write failed")
+      }
+
+      }
+check: |
+  try { set sc=##class(Bench.Txn).Apply() set ok=($system.Status.IsError(sc)&&'$data(^Bench.Txn("a"))&&($tlevel=0)) if $tlevel>0 { trollback } } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Txn
+    content: |
+      Class Bench.Txn Extends %RegisteredObject
+      {
+
+      ClassMethod Apply() As %Status
+      {
+          Set tSC = $$$OK
+          Kill ^Bench.Txn
+          TSTART
+          Set ^Bench.Txn("a") = 1
+          Set tSC = $$$ERROR($$$GeneralError, "the write failed")
+          If $$$ISERR(tSC) {
+              If $TLevel > 0 { TROLLBACK }
+              Quit tSC
+          }
+          TCOMMIT
+          Quit tSC
+      }
+
+      }
+tags: [transactions, status-handling]

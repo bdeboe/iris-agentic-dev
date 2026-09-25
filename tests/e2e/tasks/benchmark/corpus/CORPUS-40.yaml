@@ -1,0 +1,49 @@
+id: CORPUS-40
+prompt: |
+  Bench.Tracked in the BENCHMARK namespace is a persistent class. Its %OnAfterSave
+  callback sets ^Bench.Tracked("live", id). Deleting a row must clear that subscript again; nothing
+  does today, so the marker outlives the row. Add the callback that clears it and leave the class
+  compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Tracked
+    content: |
+      Class Bench.Tracked Extends %Persistent
+      {
+
+      Property Name As %String;
+
+      Method %OnAfterSave(pInsert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
+      {
+          Set ^Bench.Tracked("live", ..%Id()) = 1
+          Quit $$$OK
+      }
+
+      }
+check: |
+  try { do ##class(Bench.Tracked).%DeleteExtent() set o=##class(Bench.Tracked).%New() set o.Name="Ann" set sc=o.%Save() set id=o.%Id() set marked=$data(^Bench.Tracked("live",id)) set sc2=##class(Bench.Tracked).%DeleteId(id) set ok=('$system.Status.IsError(sc)&&marked&&'$system.Status.IsError(sc2)&&'$data(^Bench.Tracked("live",id))) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Tracked
+    content: |
+      Class Bench.Tracked Extends %Persistent
+      {
+
+      Property Name As %String;
+
+      Method %OnAfterSave(pInsert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
+      {
+          Set ^Bench.Tracked("live", ..%Id()) = 1
+          Quit $$$OK
+      }
+
+      ClassMethod %OnDelete(oid As %ObjectIdentity) As %Status [ Private, ServerOnly = 1 ]
+      {
+          Set tId = $ListGet(oid, 1)
+          Kill ^Bench.Tracked("live", tId)
+          Quit $$$OK
+      }
+
+      }
+tags: [persistence, callbacks]

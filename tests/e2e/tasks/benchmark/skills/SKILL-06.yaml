@@ -1,0 +1,36 @@
+id: SKILL-06
+prompt: |
+  Bench.Ls.Has(pList, pItem) in the BENCHMARK namespace is a stub. Make it answer
+  1 when pItem is one of the elements of the %List pList, and 0 when it is not. Leave the class compiled
+  on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: objectscript-list-patterns
+fixtures:
+  - name: Bench.Ls
+    content: |
+      Class Bench.Ls Extends %RegisteredObject
+      {
+
+      ClassMethod Has(pList As %List, pItem As %String) As %Boolean
+      {
+          Quit 0
+      }
+
+      }
+check: |
+  try { set l=$listbuild("abc","de") set ok=((##class(Bench.Ls).Has(l,"abc")=1)&&(##class(Bench.Ls).Has(l,"de")=1)&&(##class(Bench.Ls).Has(l,"b")=0)&&(##class(Bench.Ls).Has(l,"abcde")=0)&&(##class(Bench.Ls).Has(l,"xyz")=0)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Ls
+    content: |
+      Class Bench.Ls Extends %RegisteredObject
+      {
+
+      ClassMethod Has(pList As %List, pItem As %String) As %Boolean
+      {
+          Quit $ListFind(pList, pItem) > 0
+      }
+
+      }
+tags: [lists, membership]

@@ -9,28 +9,35 @@ import sys
 
 # Ensure benchmark/021 is on path
 import tests.e2e.skill_eval  # noqa: F401 (triggers sys.path shim)
-
-from tests.e2e.skill_eval.evaluator import (
-    discover_skills,
-    load_eval_config,
-    compare_to_baseline,
-    SkillResult,
-)
+from tests.e2e import billing
+from tests.e2e.skill_eval import provenance as provenance_mod
 from tests.e2e.skill_eval.baseline import (
     compute_diff,
     format_diff_line,
     load_baseline,
     save_baseline,
 )
+from tests.e2e.skill_eval.comparison import GATE_THRESHOLD
 from tests.e2e.skill_eval.cost_estimator import (
     estimate,
     format_dry_run,
     format_scorer_cost,
     merge_scorer_costs,
 )
+from tests.e2e.skill_eval.evaluator import (
+    SkillResult,
+    compare_to_baseline,
+    discover_skills,
+    load_eval_config,
+)
 from tests.e2e.skill_eval.preflight import preflight
 from tests.e2e.skill_eval.provenance import Provenance
-from tests.e2e.skill_eval.reporter import EvalRun, print_summary, write_result
+from tests.e2e.skill_eval.reporter import (
+    EvalRun,
+    print_summary,
+    progress_line,
+    write_result,
+)
 from tests.e2e.skill_eval.scoring import (
     EXIT_INTEGRITY,
     EXIT_MEASURED,
@@ -83,8 +90,8 @@ def _run_skill(
     baseline. `SkillResult` grows those fields in Phase 4.
     """
     from tests.e2e.skill_eval.fire_rate import measure_fire_rate
-    from tests.e2e.skill_eval.lift import measure_lift
     from tests.e2e.skill_eval.isolation import check_isolation
+    from tests.e2e.skill_eval.lift import measure_lift
 
     print(f"  [{config.skill}] measuring fire-rate ({n_runs} runs)...", flush=True)
     fire_rate = measure_fire_rate(
@@ -149,13 +156,7 @@ def _run_skill(
             iris_web_port=iris_web_port,
             iris_container=iris_container,
         )
-        scored = lift_data.get("items_scored", 0)
-        unscored = lift_data.get("items_unscored", 0)
-        print(
-            f"  [{config.skill}] lift={lift_data.get('lift')} "
-            f"({scored}/{scored + unscored} scored)",
-            flush=True,
-        )
+        print(progress_line(config.skill, lift_data), flush=True)
 
     result = SkillResult(
         skill=config.skill,
@@ -171,6 +172,9 @@ def _run_skill(
         no_task_coverage=False,
         task_ids_used=lift_data.get("task_ids_used", []),
         arms=lift_data.get("arms"),
+        # G1: the item count, the floor, the MDE and the verdict travel with the lift into the
+        # result file and into the table. Without it the reporter withholds the number.
+        comparison=lift_data.get("comparison"),
     )
     return result, lift_data
 
@@ -180,9 +184,16 @@ def _provenance(run_id: str, lift_data: dict, probe, runs: int) -> dict:
 
     Recorded per skill rather than per run because a sharded night measures each skill in its
     own job, on its own runner, against its own container.
-    """
-    from runner._client import haiku_model
 
+    120 FR-012 adds the driver. `opencode_runner` is what spawns these sessions, so the identity
+    comes off `OpencodeDriver` rather than a string here — the day `prime-agent` takes over,
+    swapping the driver is what changes this line, and nothing above it.
+    """
+    from tests.e2e.skill_eval.scorer_client import haiku_model
+
+    from tests.e2e.skill_eval.opencode_driver import OpencodeDriver
+
+    driver = OpencodeDriver(harness_version=provenance_mod.harness_version("opencode"))
     return dataclasses.asdict(
         Provenance(
             run_id=run_id,
@@ -192,6 +203,7 @@ def _provenance(run_id: str, lift_data: dict, probe, runs: int) -> dict:
             scorer_model_requested=haiku_model(),
             tool_surface=probe.tool_surface or "none",
             runs=runs,
+            **provenance_mod.driver_identity(driver),
         )
     )
 
@@ -295,7 +307,7 @@ def _merge_and_report(args) -> int:
     return 1 if regressions else 0
 
 
-def main():
+def _main():
     parser = argparse.ArgumentParser(
         description="Skill regression and lift measurement suite"
     )
@@ -315,7 +327,9 @@ def main():
         action="store_true",
         help="Update skill-baseline.json after run",
     )
-    parser.add_argument("--regression-threshold", type=float, default=0.05)
+    # FR-009's declared threshold. The old default sat below the harness's own resolution, which
+    # is how three consecutive nightly runs failed on differences smaller than they could see.
+    parser.add_argument("--regression-threshold", type=float, default=GATE_THRESHOLD)
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--output", default=_DEFAULT_RESULTS_DIR)
     parser.add_argument("--model", default=_DEFAULT_MODEL)
@@ -534,6 +548,12 @@ def main():
     if not run_valid:
         sys.exit(EXIT_INTEGRITY)
     sys.exit(EXIT_INTEGRITY if regressions else EXIT_MEASURED)
+
+
+def main():
+    """The skill-eval suite, with billable sessions permitted — see `tests/e2e/billing.py`."""
+    with billing.allow():
+        return _main()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,63 @@
+id: SKILL-09
+prompt: |
+  Bench.Q2.CountOther(pCode) in the BENCHMARK namespace must return how many rows
+  of Bench.Sub.Item have a Code that is not pCode, asked through SQL with pCode passed as a parameter.
+  Return -1 if the query does not run. Leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: objectscript-sql-patterns
+fixtures:
+  - name: Bench.Sub.Item
+    content: |
+      Class Bench.Sub.Item Extends %Persistent
+      {
+
+      Property Code As %String;
+
+      Property Score As %Integer;
+
+      }
+  - name: Bench.Q2
+    content: |
+      Class Bench.Q2 Extends %RegisteredObject
+      {
+
+      ClassMethod CountOther(pCode As %String) As %Integer
+      {
+          Quit -1
+      }
+
+      }
+check: |
+  try { do ##class(Bench.Sub.Item).%DeleteExtent() for i=1:1:3 { set o=##class(Bench.Sub.Item).%New() set o.Code="c"_i,o.Score=i*10 do o.%Save() } set ok=((##class(Bench.Q2).CountOther("c1")=2)&&(##class(Bench.Q2).CountOther("zzz")=3)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Sub.Item
+    content: |
+      Class Bench.Sub.Item Extends %Persistent
+      {
+
+      Property Code As %String;
+
+      Property Score As %Integer;
+
+      }
+  - name: Bench.Q2
+    content: |
+      Class Bench.Q2 Extends %RegisteredObject
+      {
+
+      ClassMethod CountOther(pCode As %String) As %Integer
+      {
+          Set tRs = ##class(%SQL.Statement).%ExecDirect(, "SELECT COUNT(*) FROM Bench_Sub.Item WHERE Code <> ?", pCode)
+          If 'tRs.%Next() {
+              Quit -1
+          }
+          If tRs.%SQLCODE '= 0 {
+              Quit -1
+          }
+          Quit tRs.%GetData(1)
+      }
+
+      }
+tags: [sql, operators]

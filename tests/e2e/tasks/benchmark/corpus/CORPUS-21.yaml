@@ -1,0 +1,72 @@
+id: CORPUS-21
+prompt: |
+  Bench.Queue in the BENCHMARK namespace wraps a %ListOfDataTypes. Push() adds to
+  the end and Pop() should remove and return the oldest entry, first in first out. It returns the
+  newest instead. Fix Pop() and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Queue
+    content: |
+      Class Bench.Queue Extends %RegisteredObject
+      {
+
+      Property Items As %ListOfDataTypes;
+
+      Method %OnNew() As %Status
+      {
+          Set ..Items = ##class(%ListOfDataTypes).%New()
+          Quit $$$OK
+      }
+
+      Method Push(pItem As %String)
+      {
+          Do ..Items.Insert(pItem)
+      }
+
+      Method Pop() As %String
+      {
+          Set tCount = ..Items.Count()
+          If tCount = 0 {
+              Quit ""
+          }
+          Set tItem = ..Items.GetAt(tCount)
+          Do ..Items.RemoveAt(tCount)
+          Quit tItem
+      }
+
+      }
+check: |
+  try { set q=##class(Bench.Queue).%New() do q.Push("a") do q.Push("b") do q.Push("c") set ok=((q.Pop()="a")&&(q.Pop()="b")&&(q.Pop()="c")&&(q.Pop()="")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Queue
+    content: |
+      Class Bench.Queue Extends %RegisteredObject
+      {
+
+      Property Items As %ListOfDataTypes;
+
+      Method %OnNew() As %Status
+      {
+          Set ..Items = ##class(%ListOfDataTypes).%New()
+          Quit $$$OK
+      }
+
+      Method Push(pItem As %String)
+      {
+          Do ..Items.Insert(pItem)
+      }
+
+      Method Pop() As %String
+      {
+          If ..Items.Count() = 0 {
+              Quit ""
+          }
+          Set tItem = ..Items.GetAt(1)
+          Do ..Items.RemoveAt(1)
+          Quit tItem
+      }
+
+      }
+tags: [collections, fifo]

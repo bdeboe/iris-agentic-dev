@@ -35,6 +35,11 @@
           "ENSEMBLE-PYPROD"
         ],
         "tool_surface": "1.4.1+fa0b694f8725"
+      },
+      "withdrawn": {
+        "reason": "-0.10 off one discordant pair in ten, inside mde_paired(10, 0.10) = 0.2482; not a regression",
+        "recorded_by": "121 T021/T022/T023 — see specs/121-benchmark-program/research.md § triage",
+        "verdict": "not_helped"
       }
     },
     "iris-ai-hub": {
@@ -75,6 +80,11 @@
           "AI-HUB-WORKFLOW-SUSPEND"
         ],
         "tool_surface": "1.4.1+fa0b694f8725"
+      },
+      "withdrawn": {
+        "reason": "-0.10 off three discordant pairs in thirty, inside the gate threshold; all 30 items graded through the 500-character cap",
+        "recorded_by": "121 T021/T022/T023 — see specs/121-benchmark-program/research.md § triage",
+        "verdict": "not_helped"
       }
     },
     "iris-connectivity": {
@@ -110,6 +120,11 @@
           "IRIS-PYTHON-CONNECT"
         ],
         "tool_surface": "1.4.1+fa0b694f8725"
+      },
+      "withdrawn": {
+        "reason": "graded through lift.format_transcript's 500-character cap; the judge scored a fragment and said so ('cutting off'). Reference solution scores 3/3/3 on the same check",
+        "recorded_by": "121 T021/T022/T023 — see specs/121-benchmark-program/research.md § triage",
+        "verdict": "broken_check"
       }
     },
     "iris-vector-ai": {
@@ -181,6 +196,11 @@
           "TIMESTAMP-FORMAT"
         ],
         "tool_surface": "1.4.1+fa0b694f8725"
+      },
+      "withdrawn": {
+        "reason": "the skill arm is at the ceiling, so the set cannot resolve its own maximum possible effect (0.20 against an MDE of 0.4334)",
+        "recorded_by": "121 T021/T022/T023 — see specs/121-benchmark-program/research.md § triage",
+        "verdict": "too_easy"
       }
     },
     "objectscript-list-patterns": {
@@ -216,6 +236,11 @@
           "LIST-ITERATE"
         ],
         "tool_surface": "1.4.1+fa0b694f8725"
+      },
+      "withdrawn": {
+        "reason": "graded through the 500-character cap; the recorded 0.00 did not reproduce — one live baseline session scored a pass",
+        "recorded_by": "121 T021/T022/T023 — see specs/121-benchmark-program/research.md § triage",
+        "verdict": "broken_check"
       }
     },
     "objectscript-review": {
@@ -286,6 +311,11 @@
           "SQLCODE-SILENT"
         ],
         "tool_surface": "1.4.1+fa0b694f8725"
+      },
+      "withdrawn": {
+        "reason": "the live session was killed at opencode_runner's 300 s timeout with 0 completed tool calls and scored 0 rather than unscored",
+        "recorded_by": "121 T021/T022/T023 — see specs/121-benchmark-program/research.md § triage",
+        "verdict": "broken_check"
       }
     },
     "objectscript-unit-test": {
@@ -322,6 +352,11 @@
           "GEN-02"
         ],
         "tool_surface": "1.4.1+fa0b694f8725"
+      },
+      "withdrawn": {
+        "reason": "GEN-01/GEN-02 do not exercise a %UnitTest-generating skill; task set retired",
+        "recorded_by": "121 T021/T022/T023 — see specs/121-benchmark-program/research.md § triage",
+        "verdict": "broken_check"
       }
     }
   },

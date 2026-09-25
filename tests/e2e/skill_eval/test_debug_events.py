@@ -1,6 +1,11 @@
 """Debug: dump raw event stream to see content truncation."""
+
 import os, json
 import pytest
+
+# Every test in this file spawns a real agent session. See `tests/e2e/billing.py`.
+pytestmark = pytest.mark.billable
+
 
 @pytest.mark.skipif(not os.environ.get("OPENAI_API_KEY"), reason="needs key")
 def test_debug_raw_events():

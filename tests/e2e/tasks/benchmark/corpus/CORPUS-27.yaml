@@ -1,0 +1,35 @@
+id: CORPUS-27
+prompt: |
+  Bench.Csv.FromList(pList) in the BENCHMARK namespace takes a %List and should
+  return its elements joined by commas. It returns only the first element. Fix it and leave the class
+  compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Csv
+    content: |
+      Class Bench.Csv Extends %RegisteredObject
+      {
+
+      ClassMethod FromList(pList As %List) As %String
+      {
+          Quit $List(pList, 1)
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Csv).FromList($listbuild("a","b","c"))="a,b,c")&&(##class(Bench.Csv).FromList($listbuild("solo"))="solo")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Csv
+    content: |
+      Class Bench.Csv Extends %RegisteredObject
+      {
+
+      ClassMethod FromList(pList As %List) As %String
+      {
+          Quit $ListToString(pList, ",")
+      }
+
+      }
+tags: [list-patterns]

@@ -1,0 +1,129 @@
+# Which of the 81 tools a corpus task could plausibly have used — 121 FR-012.
+#
+# A reach rate needs a denominator, and "all 41 tasks" is the wrong one: `iris_mirror_status` reaching
+# none of them says nothing about the tool when none of them is about mirroring. So each tool declares
+# one domain, each task declares the domains it touches, and reach is counted over the tasks whose
+# domains include the tool's.
+#
+# This file is committed before the join runs, for the same reason `split.toml` is committed before
+# the figure: a denominator chosen after seeing the numerator is not a denominator. It is also my own
+# judgement about my own tools, which is the same authorship caveat the corpus carries — the honest
+# use of this table is to find the tools nobody reaches for, not to grade the ones that get reached.
+#
+# One domain per tool, chosen as the problem the tool serves rather than the mechanism it uses.
+# `iris_table_info` is `sql` and not `introspection` because a task reaches for it when the question is
+# about a table.
+#
+# `baseline` is every corpus task's floor: each one edits or writes an ObjectScript class, runs code to
+# see what it did, and needs to read a class it did not write. That is the widest honest floor — it
+# means an unreached `iris_symbols` is reported as a tool the agent passed over rather than a tool no
+# task needed, which is the harder answer and the one worth having.
+#
+# A task naming a skill also touches `skills`: the point of the per-skill rung is that the document is
+# reachable, and the skill tools are how an agent finds it.
+
+baseline = ["objectscript-code", "execution", "introspection"]
+
+[tools]
+agent_history = "agent-audit"
+agent_stats = "agent-audit"
+capability_matrix = "access"
+check_config = "configuration"
+compare_document = "objectscript-code"
+compare_namespace = "namespace-admin"
+docs_introspect = "introspection"
+extract_message_map_routing = "interop"
+find_subclass_implementations = "introspection"
+global_kill = "globals"
+global_preview = "globals"
+hl7_schema_inspect = "interop"
+hl7_schema_list = "interop"
+iris_add_server = "configuration"
+iris_admin = "instance-admin"
+iris_business_rule_info = "interop"
+iris_compile = "objectscript-code"
+iris_containers = "configuration"
+iris_coverage = "testing"
+iris_credential_list = "configuration"
+iris_credential_manage = "configuration"
+iris_database_list = "instance-admin"
+iris_database_stats = "instance-admin"
+iris_debug = "debugging"
+iris_doc = "objectscript-code"
+iris_doc_search = "objectscript-code"
+iris_execute = "execution"
+iris_execute_method = "execution"
+iris_generate = "objectscript-code"
+iris_generate_class = "objectscript-code"
+iris_generate_test = "testing"
+iris_get_log = "instance-admin"
+iris_global = "globals"
+iris_import_servers = "configuration"
+iris_info = "instance-admin"
+iris_interop_query = "interop"
+iris_lookup_manage = "interop"
+iris_lookup_transfer = "interop"
+iris_macro = "objectscript-code"
+iris_message_body = "interop"
+iris_mirror_status = "mirroring"
+iris_namespace_create = "namespace-admin"
+iris_namespace_list = "namespace-admin"
+iris_production = "interop"
+iris_production_diff = "interop"
+iris_production_item = "interop"
+iris_query = "sql"
+iris_reload_pool = "configuration"
+iris_remove_server = "configuration"
+iris_search = "objectscript-code"
+iris_servers = "configuration"
+iris_source_control = "source-control"
+iris_symbols = "introspection"
+iris_symbols_local = "introspection"
+iris_system_performance = "instance-admin"
+iris_table_info = "sql"
+iris_test = "testing"
+iris_test_server = "configuration"
+iris_ws_close = "interactive-session"
+iris_ws_exec = "interactive-session"
+iris_ws_open = "interactive-session"
+journal_search = "journalling"
+kb = "knowledge-base"
+kb_index = "knowledge-base"
+kb_recall = "knowledge-base"
+mermaid_class = "diagram"
+mermaid_production = "diagram"
+my_access = "access"
+query_audit_log = "auditing"
+resolve_dynamic_dispatch = "introspection"
+resolve_storage = "storage"
+skill = "skills"
+skill_community = "skills"
+skill_community_list = "skills"
+skill_describe = "skills"
+skill_forget = "skills"
+skill_list = "skills"
+skill_search = "skills"
+stream_inspect = "streams"
+telemetry_export_trace = "telemetry"
+telemetry_query = "telemetry"
+
+# Task tags that add a domain beyond the baseline. Most corpus tags are topical — `loops`,
+# `precedence`, `case-folding` — and add nothing: they describe what the ObjectScript does, not which
+# tool could serve it. Only the tags that change the answer appear here.
+[tags]
+chunked-reads = "streams"
+ddl = "sql"
+debug = "debugging"
+globals = "globals"
+indices = "sql"
+nested-subscripts = "globals"
+order-traversal = "globals"
+persistence = "sql"
+result-sets = "sql"
+schema-names = "sql"
+sql = "sql"
+sql-patterns = "sql"
+sql-projection = "sql"
+sqlcode = "sql"
+storage = "storage"
+streams = "streams"

@@ -1,0 +1,98 @@
+# The committed train/holdout split for the whole graded corpus — spec 120 FR-011, spec 121 T032.
+#
+# This is the file the publish path reads. `pilot/split.toml` beside it is the record of what the
+# go/no-go was measured under, and `test_split.py` compares the two, so a pilot task cannot change
+# sides here without a visible failure.
+#
+# Every task ID in `pilot/`, `corpus/` and `skills/` appears in exactly one side, and
+# `tests/e2e/skill_eval/split.py` refuses to load this file otherwise.
+#
+# How the line is drawn:
+#
+# - **Three pilot IDs are train because I have read them.** Every spec 120 phase gate ran PILOT-01 and
+#   I read its transcripts; PILOT-02 and PILOT-03 join it so the optimizer has more than one task to
+#   fit against. That is tuning, whatever it was called at the time.
+# - **Six corpus IDs are train by a stated rule, not by taste: every seventh in authoring order.**
+#   CORPUS-07, -14, -21, -28, -35, -42. GEPA needs somewhere to go that is not the holdout, and a
+#   train side of three tasks is not somewhere. Fixing the rule before the first figure is taken is
+#   the only moment it costs nothing; picking six favourable IDs after a run would be worthless. The
+#   six land on try/catch, $Increment, %ListOfDataTypes, the %OpenId guard, VALUELIST and $ZStrip, so
+#   the train side is not all one kind of task.
+# - **Everything else is holdout — 41 tasks against FR-008's floor of 37.** New tasks default to this
+#   side. A task moves to train the moment anyone tunes anything while looking at it, and that move is
+#   a commit with a reason.
+# - **The skills tasks are all holdout.** They were written for one question and nothing is fitted to
+#   them; `test_every_skill_ladder_task_is_on_the_holdout_side` keeps it that way.
+#
+# One caveat that the split cannot fix and the report has to carry instead: I wrote the 42 corpus
+# tasks knowing what iad's 81 tools can do. Authoring is not tuning — no description, prompt or skill
+# was changed while looking at a result from these tasks — but a corpus written by the tool author is
+# not the same evidence as a corpus written by someone else, and the published number says so.
+
+train = [
+  "PILOT-01",
+  "PILOT-02",
+  "PILOT-03",
+  "CORPUS-07",
+  "CORPUS-14",
+  "CORPUS-21",
+  "CORPUS-28",
+  "CORPUS-35",
+  "CORPUS-42",
+]
+
+holdout = [
+  "PILOT-04",
+  "PILOT-05",
+  "PILOT-06",
+  "PILOT-07",
+  "PILOT-08",
+  "CORPUS-01",
+  "CORPUS-02",
+  "CORPUS-03",
+  "CORPUS-04",
+  "CORPUS-05",
+  "CORPUS-06",
+  "CORPUS-08",
+  "CORPUS-09",
+  "CORPUS-10",
+  "CORPUS-11",
+  "CORPUS-12",
+  "CORPUS-13",
+  "CORPUS-15",
+  "CORPUS-16",
+  "CORPUS-17",
+  "CORPUS-18",
+  "CORPUS-19",
+  "CORPUS-20",
+  "CORPUS-22",
+  "CORPUS-23",
+  "CORPUS-24",
+  "CORPUS-25",
+  "CORPUS-26",
+  "CORPUS-27",
+  "CORPUS-29",
+  "CORPUS-30",
+  "CORPUS-31",
+  "CORPUS-32",
+  "CORPUS-33",
+  "CORPUS-34",
+  "CORPUS-36",
+  "CORPUS-37",
+  "CORPUS-38",
+  "CORPUS-39",
+  "CORPUS-40",
+  "CORPUS-41",
+  "SKILL-01",
+  "SKILL-02",
+  "SKILL-03",
+  "SKILL-04",
+  "SKILL-05",
+  "SKILL-06",
+  "SKILL-07",
+  "SKILL-08",
+  "SKILL-09",
+  "SKILL-10",
+  "SKILL-11",
+  "SKILL-12",
+]

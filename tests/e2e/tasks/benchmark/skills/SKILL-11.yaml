@@ -1,0 +1,38 @@
+id: SKILL-11
+prompt: |
+  Bench.Ddl.Build() in the BENCHMARK namespace must create the table Bench.Notes by
+  executing DDL: an integer Id that is the primary key, and a Body column holding up to 4000 characters.
+  Return 1 when the DDL ran and 0 when it did not. Assume the table does not exist. Leave the class
+  compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: iris-sql
+fixtures:
+  - name: Bench.Ddl
+    content: |
+      Class Bench.Ddl Extends %RegisteredObject
+      {
+
+      ClassMethod Build() As %Boolean
+      {
+          Quit 0
+      }
+
+      }
+check: |
+  try { do ##class(%SQL.Statement).%ExecDirect(,"DROP TABLE Bench.Notes") set ok=0 if ##class(Bench.Ddl).Build()=1 { set body="" for i=1:1:400 { set body=body_"0123456789" } set ins=##class(%SQL.Statement).%ExecDirect(,"INSERT INTO Bench.Notes (Id, Body) VALUES (?, ?)",1,body) if ins.%SQLCODE=0 { set sel=##class(%SQL.Statement).%ExecDirect(,"SELECT Body FROM Bench.Notes WHERE Id = 1") if sel.%Next(), sel.%SQLCODE=0 { set ok=($length(sel.%GetData(1))=4000) } } } } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Ddl
+    content: |
+      Class Bench.Ddl Extends %RegisteredObject
+      {
+
+      ClassMethod Build() As %Boolean
+      {
+          Set tRs = ##class(%SQL.Statement).%ExecDirect(, "CREATE TABLE Bench.Notes (Id INTEGER NOT NULL PRIMARY KEY, Body VARCHAR(4000))")
+          Quit tRs.%SQLCODE = 0
+      }
+
+      }
+tags: [sql, ddl]

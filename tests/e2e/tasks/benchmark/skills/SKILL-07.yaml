@@ -1,0 +1,40 @@
+id: SKILL-07
+prompt: |
+  Bench.Ls2.At(pList, pIndex) in the BENCHMARK namespace is a stub. Make it return
+  the element of the %List pList at position pIndex, counting from 1, and an empty string for any
+  position the list does not have. It must never raise, whatever pIndex is. Leave the class compiled on
+  the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: objectscript-list-patterns
+fixtures:
+  - name: Bench.Ls2
+    content: |
+      Class Bench.Ls2 Extends %RegisteredObject
+      {
+
+      ClassMethod At(pList As %List, pIndex As %Integer) As %String
+      {
+          Quit ""
+      }
+
+      }
+check: |
+  try { set l=$listbuild("a","b") set ok=((##class(Bench.Ls2).At(l,1)="a")&&(##class(Bench.Ls2).At(l,2)="b")&&(##class(Bench.Ls2).At(l,5)="")&&(##class(Bench.Ls2).At(l,0)="")&&(##class(Bench.Ls2).At(l,-1)="")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Ls2
+    content: |
+      Class Bench.Ls2 Extends %RegisteredObject
+      {
+
+      ClassMethod At(pList As %List, pIndex As %Integer) As %String
+      {
+          If (pIndex < 1) || (pIndex > $ListLength(pList)) {
+              Quit ""
+          }
+          Quit $ListGet(pList, pIndex)
+      }
+
+      }
+tags: [lists, bounds]

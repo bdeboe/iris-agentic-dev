@@ -1,6 +1,11 @@
 """Probe: does Sonnet use TO_VECTOR(?,DOUBLE,384) or TO_VECTOR(?) for Python code?"""
+
 import os, shutil, tempfile
 import pytest
+
+# Every test in this file spawns a real agent session. See `tests/e2e/billing.py`.
+pytestmark = pytest.mark.billable
+
 
 @pytest.mark.skipif(not os.environ.get("OPENAI_API_KEY"), reason="needs key")
 def test_tovector_arg_count():
@@ -27,7 +32,9 @@ def test_tovector_arg_count():
                         "skills/skills/iris-vector-ai/SKILL.md",
                         os.path.join(dest, "SKILL.md"),
                     )
-                events = collect_events(prompt, env.env_vars(), model=model, working_dir=workdir)
+                events = collect_events(
+                    prompt, env.env_vars(), model=model, working_dir=workdir
+                )
 
             texts = [
                 e["part"]["text"]
@@ -38,18 +45,24 @@ def test_tovector_arg_count():
             print(f"\n=== {label} ===")
             found = {}
             for kw in [
-                "TO_VECTOR(?,DOUBLE", "TO_VECTOR(?, DOUBLE",   # 3-arg correct
-                "TO_VECTOR(?)",                                  # 1-arg wrong
-                "::vector", "<=>",                              # pgvector wrong
-                "LIMIT", "TOP ",                                # LIMIT=pgvector, TOP=IRIS
-                "VECTOR_COSINE",                                # correct
+                "TO_VECTOR(?,DOUBLE",
+                "TO_VECTOR(?, DOUBLE",  # 3-arg correct
+                "TO_VECTOR(?)",  # 1-arg wrong
+                "::vector",
+                "<=>",  # pgvector wrong
+                "LIMIT",
+                "TOP ",  # LIMIT=pgvector, TOP=IRIS
+                "VECTOR_COSINE",  # correct
             ]:
                 found[kw] = kw.lower() in full.lower()
                 if found[kw]:
                     print(f"  FOUND: {repr(kw)}")
             # Print SQL lines
             for line in full.splitlines():
-                if any(x in line for x in ["TO_VECTOR", "<=>", "VECTOR_COSINE", "LIMIT", "TOP "]):
+                if any(
+                    x in line
+                    for x in ["TO_VECTOR", "<=>", "VECTOR_COSINE", "LIMIT", "TOP "]
+                ):
                     print(f"  > {line.strip()[:120]}")
         finally:
             shutil.rmtree(workdir, ignore_errors=True)

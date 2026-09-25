@@ -1,15 +1,20 @@
-"""The nightly Skill Regression job has to fit inside its own timeout.
+"""The nightly has to be a breakage guard, and has to stay cheap enough to run nightly.
 
-It did not. From 2026-08-29 to 2026-09-07 every scheduled run finished as `cancelled` at
-exactly 1h15m — the `timeout-minutes: 75` on a single sequential job. Run 34093536537 shows
-where it got to: five of nine skills plus part of the sixth in 68 minutes, still printing
-progress when the runner killed it. No hang, no stuck subprocess (`collect_events` caps a
-session at 300 s); the work is simply about 100 minutes long.
+Two histories are in this file.
 
-The 75 came from the dry-run estimate, which said 67.2 min. That estimate was wrong twice
-over: it never counted the implicit fire-rate pass, and it priced a session at 15 s when the
-measured cost is 22 s. So these tests check the two things that let the mistake happen —
-budget honesty and job shape — rather than just asserting a bigger number.
+From 2026-08-29 to 2026-09-07 every scheduled run finished as `cancelled` at exactly 1h15m — the
+`timeout-minutes: 75` on a single sequential job. Run 34093536537 got through five of nine skills
+in 68 minutes. Sharding fixed the clock. It did not fix what the job was measuring: six of nine
+skills printed 0.00 against 0.00 and the job reported success, and then runs 34744344877,
+34817991701 and 34939912456 failed three nights running on Δs smaller than the corpus could
+resolve.
+
+121 FR-016 settles it by changing the question. The nightly asks whether the harness runs, whether
+the binary still advertises its tools, and whether a named canary set still passes — three
+assertion-scored tasks, no grading call, no lift. Lift is reported by the full benchmark, at a
+release and before a conference, over a corpus large enough to support it. So these tests assert
+the nightly's shape and its silence about lift, and the old sharding assertions are gone with the
+job they described.
 """
 
 import os
@@ -18,8 +23,9 @@ import pytest
 
 yaml = pytest.importorskip("yaml")
 
-from tests.e2e.skill_eval.cost_estimator import estimate, estimate_skill  # noqa: E402
+from tests.e2e.skill_eval.cost_estimator import estimate  # noqa: E402
 from tests.e2e.skill_eval.evaluator import load_eval_config  # noqa: E402
+from tests.e2e.skill_eval.nightly_canary import CANARY_TASKS  # noqa: E402
 from tests.e2e.skill_eval.shard import covered_skills  # noqa: E402
 
 _REPO_ROOT = os.path.dirname(
@@ -33,15 +39,115 @@ _TASKS_SKILLS_DIR = os.path.join(_REPO_ROOT, "tests", "e2e", "tasks", "skills")
 _NIGHTLY_RUNS = 5
 
 # Checkout, pip install, npm install -g opencode, IRIS container start + Atelier wait, and the
-# harness unit tests all run before the eval step. Measured at 3m18s in run 34093536537
-# (07:02:32 job start → 07:05:14 "Running skill evaluation"), rounded up hard because a slow
-# GHA runner or a cold npm cache is the normal case, not the exception.
+# harness unit tests all run before the canary. Measured at 3m18s in run 34093536537, rounded up
+# hard because a slow runner or a cold npm cache is the normal case, not the exception.
 _SETUP_ALLOWANCE_MIN = 15
 
 
 def _workflow() -> dict:
     with open(_WORKFLOW) as f:
         return yaml.safe_load(f)
+
+
+def _steps(workflow: dict) -> str:
+    return " ".join(
+        step.get("run") or ""
+        for job in (workflow.get("jobs") or {}).values()
+        for step in (job.get("steps") or [])
+    )
+
+
+def _canary_job(workflow: dict) -> tuple:
+    """The job that runs the canary — the one invoking `nightly_canary`."""
+    for name, job in (workflow.get("jobs") or {}).items():
+        for step in job.get("steps") or []:
+            if "nightly_canary" in (step.get("run") or ""):
+                return name, job
+    pytest.fail(
+        "no job in skill-regression.yml runs tests.e2e.skill_eval.nightly_canary — "
+        "FR-016 makes the nightly a breakage guard, and a guard nothing invokes is not one"
+    )
+
+
+# ── the nightly is the canary, not the lift run ──────────────────────────────
+
+
+def test_the_nightly_runs_the_canary_guard():
+    name, job = _canary_job(_workflow())
+    assert job.get("timeout-minutes"), (
+        f"job `{name}` has no timeout-minutes — a wedged session would hold a runner for 6 h"
+    )
+
+
+def test_the_nightly_measures_no_lift_at_all():
+    """FR-016 in the workflow: no per-skill leg, no merge, no baseline write.
+
+    Every one of these flags starts an opencode session per benchmark task and ends in a printed
+    lift. The nightly ran them for a month and published numbers its corpus could not support.
+    """
+    runs = _steps(_workflow())
+    for forbidden in ("--skill ", "--merge-results", "--update-baseline"):
+        assert forbidden not in runs, (
+            f"the nightly still invokes `{forbidden.strip()}`, which measures and prints a "
+            f"lift. The full benchmark owns lift now (FR-016)"
+        )
+
+
+def test_the_nightly_has_no_per_skill_matrix():
+    """One job, three tasks. The nine-shard matrix belonged to the lift run."""
+    for name, job in (_workflow().get("jobs") or {}).items():
+        matrix = (job.get("strategy") or {}).get("matrix") or {}
+        assert "skill" not in matrix, (
+            f"job `{name}` still shards on skill — that is the lift run's shape, and it cost "
+            f"~$3.70 and two hours of runner time a night"
+        )
+
+
+def test_the_nightly_pushes_nothing():
+    """A baseline commit is a claim about measured lift. The nightly no longer makes one."""
+    pushers = [
+        name
+        for name, job in (_workflow().get("jobs") or {}).items()
+        if any(
+            "git push" in (step.get("run") or "") for step in (job.get("steps") or [])
+        )
+    ]
+    assert pushers == [], f"the nightly still pushes from {pushers}"
+
+
+def test_the_canary_set_is_named_in_the_workflow_or_read_from_the_module():
+    """The set is declared once, in `nightly_canary.CANARY_TASKS`.
+
+    A second hand-written list in YAML is a list that rots — the workflow invokes the module and
+    the module names the tasks.
+    """
+    runs = _steps(_workflow())
+    hardcoded = [task for task in CANARY_TASKS if task in runs]
+    assert not hardcoded, (
+        f"the workflow names canary tasks itself ({hardcoded}); let CANARY_TASKS be the one "
+        f"source, so adding a canary does not need a YAML edit"
+    )
+
+
+def test_the_nightly_still_installs_the_binary_it_checks():
+    """The tool-surface probe reads `IAD_BINARY`, and without it the check is unanswerable.
+
+    The nightly ran for weeks with no iad tools in any session: `isolated_env.py` held a literal
+    Homebrew path that no runner has. Every transcript was a bare model and the judge scored it
+    as the skill failing.
+    """
+    runs = _steps(_workflow())
+    assert "IAD_BINARY" in runs, (
+        "nothing exports IAD_BINARY, so the tool surface reads as None"
+    )
+
+
+def test_the_nightly_runs_the_harness_unit_tests():
+    """The cheapest breakage signal there is, and it costs no session at all."""
+    assert "pytest" in _steps(_workflow())
+
+
+# ── the budget ───────────────────────────────────────────────────────────────
 
 
 def _configs():
@@ -51,167 +157,39 @@ def _configs():
     ]
 
 
-def _eval_job(workflow: dict) -> tuple[str, dict]:
-    """The job that actually runs the eval — the one whose steps invoke the harness.
-
-    Every mode of the CLI that starts no session has to be excluded by name, because they all
-    invoke the same module. `--preflight-only` is the one that caught this out: it lives in
-    `discover`, which runs first, so six tests here started describing the wrong job and
-    failing about its missing matrix.
-    """
-    not_an_eval = ("--list-skills", "--merge-results", "--preflight-only", "--dry-run")
-    for name, job in (workflow.get("jobs") or {}).items():
-        for step in job.get("steps") or []:
-            run = step.get("run") or ""
-            if "tests.e2e.skill_eval" in run and not any(
-                flag in run for flag in not_an_eval
-            ):
-                return name, job
-    pytest.fail("no job in skill-regression.yml runs the skill_eval harness")
-
-
-def test_the_whole_suite_no_longer_fits_in_one_job():
-    """This is the measurement that the 75-minute timeout was missing.
-
-    If the corrected estimate ever drops back under an hour the sharding is no longer earning
-    its complexity — but until then, one job cannot do this.
-    """
-    est = estimate(_configs(), runs=_NIGHTLY_RUNS)
-    assert est["time_minutes"] + _SETUP_ALLOWANCE_MIN > 75, (
-        f"the suite now estimates {est['time_minutes']} min; if that is real, a single "
-        f"75-minute job would work again and this file is describing a fixed problem"
+def test_the_canary_is_a_fraction_of_the_suite_it_replaces():
+    """Three sessions against ~450. If that ratio ever closes, the nightly is a benchmark again."""
+    suite = estimate(_configs(), runs=_NIGHTLY_RUNS)
+    # 22 s a session measured, 3 canary tasks, no repeats — the canary is a yes/no, not a rate.
+    canary_minutes = len(CANARY_TASKS) * 22 / 60
+    assert canary_minutes * 10 < suite["time_minutes"], (
+        f"the canary estimates {canary_minutes:.1f} min against the suite's "
+        f"{suite['time_minutes']} min; it is meant to be an order of magnitude cheaper"
     )
 
 
-def test_the_eval_job_is_sharded_one_skill_at_a_time():
-    name, job = _eval_job(_workflow())
-    matrix = (job.get("strategy") or {}).get("matrix")
-    assert matrix, (
-        f"job `{name}` has no matrix — it would run all skills sequentially again"
-    )
-    assert "skill" in matrix, f"job `{name}` shards on {list(matrix)}, not on `skill`"
-    step_runs = " ".join(step.get("run") or "" for step in job["steps"])
-    assert "--skill" in step_runs, (
-        f"job `{name}` shards on skill but never passes `--skill`, so every shard would "
-        f"run the whole suite"
-    )
-
-
-def test_the_matrix_is_derived_from_the_harness_not_hardcoded():
-    """A hand-written skill list rots the moment someone adds an eval.yaml.
-
-    `--list-skills` reads the same directories the eval reads, so the matrix cannot drift
-    out of sync with what is actually covered.
-    """
-    workflow = _workflow()
-    _, job = _eval_job(workflow)
-    matrix_skill = str((job.get("strategy") or {}).get("matrix", {}).get("skill", ""))
-    assert "fromJSON" in matrix_skill, (
-        f"the matrix skill list is a literal ({matrix_skill!r}); derive it from "
-        f"`--list-skills` instead"
-    )
-    generator = " ".join(
-        step.get("run") or ""
-        for j in workflow["jobs"].values()
-        for step in (j.get("steps") or [])
-    )
-    assert "--list-skills" in generator, (
-        "nothing in the workflow calls `--list-skills`, so `fromJSON` has no source"
-    )
-
-
-def test_the_shard_timeout_covers_the_slowest_skill():
-    """iris-ai-hub is 6 benchmark tasks × 2 conditions × 5 runs = 60 sessions on its own."""
-    name, job = _eval_job(_workflow())
+def test_the_nightly_timeout_covers_the_canary_with_room_for_setup():
+    name, job = _canary_job(_workflow())
     timeout = job.get("timeout-minutes")
-    assert timeout, (
-        f"job `{name}` has no timeout-minutes — a wedged shard would run for 6 h"
+    canary_minutes = len(CANARY_TASKS) * 22 / 60
+    assert timeout >= canary_minutes + _SETUP_ALLOWANCE_MIN, (
+        f"job `{name}` allows {timeout} min; the canary needs ~{canary_minutes:.1f} min of "
+        f"sessions plus ~{_SETUP_ALLOWANCE_MIN} min of setup"
     )
-    worst = max(
-        estimate_skill(c, runs=_NIGHTLY_RUNS)["time_minutes"] for c in _configs()
+    assert timeout <= 45, (
+        f"job `{name}` allows {timeout} min for three assertion-scored tasks. A generous "
+        f"timeout on a cheap job is how a two-hour lift run gets added back without anyone "
+        f"noticing the clock"
     )
-    assert timeout >= worst + _SETUP_ALLOWANCE_MIN, (
-        f"job `{name}` allows {timeout} min per shard; the slowest skill needs "
-        f"{worst} min of eval plus ~{_SETUP_ALLOWANCE_MIN} min of setup"
-    )
-
-
-def test_a_failing_shard_does_not_cancel_the_others():
-    """`fail-fast` defaults to true, which would throw away eight good results for one bad."""
-    name, job = _eval_job(_workflow())
-    strategy = job.get("strategy") or {}
-    assert strategy.get("fail-fast") is False, (
-        f"job `{name}` leaves fail-fast at its default, so the first regression cancels "
-        f"every other skill and the nightly report comes back mostly empty"
-    )
-
-
-def test_the_baseline_is_written_by_exactly_one_job():
-    """Nine shards racing `git push` on one file is nine conflicts, not one baseline."""
-    workflow = _workflow()
-    pushers = [
-        name
-        for name, job in workflow["jobs"].items()
-        if any(
-            "git push" in (step.get("run") or "") for step in (job.get("steps") or [])
-        )
-    ]
-    assert len(pushers) <= 1, f"more than one job pushes the baseline: {pushers}"
-    for name in pushers:
-        assert not (workflow["jobs"][name].get("strategy") or {}).get("matrix"), (
-            f"job `{name}` pushes the baseline from inside a matrix — every shard would "
-            f"commit over the others"
-        )
-
-
-def test_every_shard_uploads_its_own_result():
-    """Aggregation reads artifacts, so a shard whose name collides overwrites its neighbour."""
-    _, job = _eval_job(_workflow())
-    uploads = [
-        step
-        for step in job["steps"]
-        if str(step.get("uses", "")).startswith("actions/upload-artifact")
-    ]
-    assert uploads, "the sharded job uploads nothing — there is nothing to aggregate"
-    for step in uploads:
-        artifact = str((step.get("with") or {}).get("name", ""))
-        assert "matrix.skill" in artifact, (
-            f"artifact name {artifact!r} is the same for every shard; the last upload wins"
-        )
-
-
-def test_an_aggregate_job_merges_the_shards_and_gates_on_them():
-    workflow = _workflow()
-    eval_name, _ = _eval_job(workflow)
-    merging = [
-        (name, job)
-        for name, job in workflow["jobs"].items()
-        if any(
-            "--merge-results" in (step.get("run") or "")
-            for step in (job.get("steps") or [])
-        )
-    ]
-    assert merging, (
-        "no job merges the shard results, so a regression in one skill never fails the run"
-    )
-    for name, job in merging:
-        needs = job.get("needs")
-        needs = [needs] if isinstance(needs, str) else (needs or [])
-        assert eval_name in needs, (
-            f"job `{name}` merges shard results but does not need `{eval_name}` — it would "
-            f"run before the shards finish"
-        )
 
 
 def test_no_eval_result_file_is_tracked_in_git():
-    """A tracked `skill-eval-*.json` rides along in every shard's artifact.
+    """A tracked `skill-eval-*.json` rides along in every artifact upload.
 
-    Each shard uploads `tests/e2e/results/skill-eval-*.json`, which is a glob over the whole
-    directory — so 35 result files from May and June, force-added past the `*.json` in that
-    directory's own `.gitignore`, arrived in all nine artifacts. Run 34707534110's merge read
-    324 files to find nine, and its footer reported seven skills as re-runs that discarded a
-    2026-05-31 result. The newest `run_id` still won, so the numbers were right; a stale file
-    with a later id would have been published instead.
+    Each shard used to upload `tests/e2e/results/skill-eval-*.json`, which is a glob over the
+    whole directory — so 35 result files from May and June, force-added past that directory's own
+    `.gitignore`, arrived in all nine artifacts. Run 34707534110's merge read 324 files to find
+    nine, and its footer reported seven skills as re-runs that discarded a 2026-05-31 result.
     """
     import subprocess
 
@@ -225,6 +203,6 @@ def test_no_eval_result_file_is_tracked_in_git():
     stale = [p for p in tracked if os.path.basename(p).startswith("skill-eval-")]
     assert not stale, (
         f"{len(stale)} eval result file(s) are tracked: {stale[:3]}. They are ignored by "
-        f"tests/e2e/results/.gitignore for a reason — every shard artifact carries all of "
+        f"tests/e2e/results/.gitignore for a reason — every artifact carries all of "
         f"them. `git rm` them; only skill-baseline.json belongs in the repo."
     )

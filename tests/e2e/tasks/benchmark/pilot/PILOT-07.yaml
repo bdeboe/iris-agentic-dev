@@ -1,0 +1,42 @@
+id: PILOT-07
+# Two classes, one of which has to be read to answer the other. An agent that cannot introspect the
+# superclass has to guess what Area() is supposed to override.
+prompt: |
+  Pilot.Circle in the BENCHMARK namespace extends Pilot.Shape and inherits an Area() method that
+  returns 0. Override Area() in Pilot.Circle so it returns the area of a circle with the instance's
+  Radius property, using $ZPI for pi. Leave the class compiled on the server.
+
+  A Pilot.Circle with Radius 2 must report an area of 12.57 to two decimal places.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Pilot.Shape
+    content: |
+      Class Pilot.Shape Extends %RegisteredObject
+      {
+      Property Radius As %Numeric;
+
+      Method Area() As %Numeric
+      {
+          Quit 0
+      }
+      }
+  - name: Pilot.Circle
+    content: |
+      Class Pilot.Circle Extends Pilot.Shape
+      {
+      }
+check: |
+  try { set c=##class(Pilot.Circle).%New() set c.Radius=2 set ok=($fnumber(c.Area(),"",2)="12.57") } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Pilot.Circle
+    content: |
+      Class Pilot.Circle Extends Pilot.Shape
+      {
+      Method Area() As %Numeric
+      {
+          Quit $ZPI * ..Radius * ..Radius
+      }
+      }
+tags: [inheritance, introspection]

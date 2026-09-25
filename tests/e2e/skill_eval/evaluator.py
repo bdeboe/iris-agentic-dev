@@ -1,9 +1,12 @@
 """SkillEvalConfig loader and skill discovery — T004."""
 
-import os
 import dataclasses
+import os
 from typing import Optional
+
 import yaml
+
+from tests.e2e.skill_eval.comparison import GATE_THRESHOLD
 
 
 @dataclasses.dataclass
@@ -42,9 +45,15 @@ class SkillResult:
     outcome_reason: Optional[str] = None
     arms: Optional[dict] = None  # {"baseline": ArmResult.to_dict(), "skill": ...}
     provenance: Optional[dict] = None
+    # 121: `Comparison.to_dict()` for this skill's two arms — item count, floor, MDE, verdict.
+    # `None` on a result the harness could not pair at all, and on result files written before
+    # this field existed. Both the gate and the report read it and neither invents it.
+    comparison: Optional[dict] = None
     threshold_applied: Optional[float] = None
     # Printed beside the Δ when the binary changed, never suppressing it.
     surface_note: Optional[str] = None
+    # The same, for the agent harness that drove the sessions (120 FR-012).
+    driver_note: Optional[str] = None
 
 
 def discover_skills(skills_pack_dir: str) -> list[str]:
@@ -95,19 +104,29 @@ def _an_arm_scored_nothing(result: SkillResult) -> bool:
 def compare_to_baseline(
     result: SkillResult,
     baseline: dict,
-    threshold: float = 0.05,
+    threshold: float = GATE_THRESHOLD,
 ) -> SkillResult:
     """Derive the outcome for one skill against its stored entry.
 
     The order is data-model.md § 5 and the first match wins: no entry → `new_skill`;
     incomparable provenance → `not_comparable` naming the field; an arm with no scored items →
-    `not_comparable`; a drop past the threshold → `regressed`; otherwise `held`.
+    `not_comparable`; a comparison below FR-008's item floor → `underpowered`; a drop past the
+    threshold → `regressed`; otherwise `held`.
 
     `regression_flag` is set from `outcome` at the bottom and computed nowhere else. The rule it
     replaces was a 5-point floor with an escape hatch at 20 points, and nobody could derive
     either constant — a skill going from +0.40 to +0.10 was reported as holding.
+
+    121: the default threshold is `GATE_THRESHOLD`, not the 0.05 that failed three consecutive
+    nightly runs on differences smaller than the harness could see. A drop measured over fewer
+    pairs than the floor is `underpowered` whatever its size, because the Δ between two lifts
+    neither of which could be resolved is not evidence of anything.
     """
-    from tests.e2e.skill_eval.baseline import comparability, surface_change
+    from tests.e2e.skill_eval.baseline import (
+        comparability,
+        driver_change,
+        surface_change,
+    )
 
     result.threshold_applied = threshold
     entry = baseline.get(result.skill)
@@ -122,6 +141,7 @@ def compare_to_baseline(
 
     result.new_skill = False
     result.surface_note = surface_change(entry, result.provenance)
+    result.driver_note = driver_change(entry, result.provenance)
 
     reason = comparability(entry, result.provenance)
     if reason is None and _an_arm_scored_nothing(result):
@@ -138,6 +158,19 @@ def compare_to_baseline(
 
     delta = result.lift - entry["lift"]
     result.lift_delta = round(delta, 4)
+
+    # FR-008 at the gate. The Δ stays on the result — it is the number a reader wants — but it
+    # decides nothing, because neither lift it was computed from cleared the floor.
+    comparison = result.comparison or {}
+    if comparison.get("underpowered"):
+        result.outcome = "underpowered"
+        result.outcome_reason = (
+            f"{comparison.get('n_pairs')} task-pairs against a floor of "
+            f"{comparison.get('floor')} (FR-008); the Δ is inside the harness's own resolution"
+        )
+        result.regression_flag = False
+        return result
+
     result.outcome = "regressed" if delta < -threshold else "held"
     result.outcome_reason = None
     result.regression_flag = result.outcome == "regressed"

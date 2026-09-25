@@ -72,14 +72,16 @@ computed. `tool_surface` difference is annotated, never suppressing. `run_id`, `
 
 One skill's stored reference measurement. Extends today's four-float entry.
 
-| Field                | Type          | Notes                                  |
-| -------------------- | ------------- | -------------------------------------- |
-| `pass_rate_baseline` | float \| None | Existing field, now nullable           |
-| `pass_rate_skill`    | float \| None | Existing field, now nullable           |
-| `lift`               | float \| None | Existing                               |
-| `fire_rate`          | float         | Existing                               |
-| `items`              | object        | The two Arm results, keyed by arm name |
-| `provenance`         | Provenance    | New; required in v2                    |
+| Field                | Type           | Notes                                                                   |
+| -------------------- | -------------- | ----------------------------------------------------------------------- |
+| `pass_rate_baseline` | float \| None  | Existing field, now nullable                                            |
+| `pass_rate_skill`    | float \| None  | Existing field, now nullable                                            |
+| `lift`               | float \| None  | Existing                                                                |
+| `fire_rate`          | float          | Existing                                                                |
+| `items`              | object         | The two Arm results, keyed by arm name                                  |
+| `provenance`         | Provenance     | New; required in v2                                                     |
+| `comparison`         | object \| None | 121: `Comparison.to_dict()` for the run that wrote the entry            |
+| `withdrawn`          | object \| None | 121: `{reason, verdict, withdrawn_at}` when the numbers no longer stand |
 
 The file that holds them:
 
@@ -97,22 +99,30 @@ Writes are merge-by-skill: read, replace the skills in this run, write back (R7)
 migrated in memory on read; its entries get `provenance: None`, which makes every one of them
 `not_comparable` with reason `no provenance recorded` — not "unknown, try anyway".
 
+`comparison` and `withdrawn` both arrived with spec 121 and are optional, so a v2 entry written
+before it still loads. `comparison` is here because the stored lift is what next month's Δ is
+subtracted from, and 0.25 over 12 pairs subtracts exactly like 0.25 over 100. `withdrawn` marks an
+entry nobody stands behind — six of the nine committed entries were graded through the
+500-character transcript cap and cannot be re-graded — and a withdrawn entry is not a comparison
+basis, so the skill reads `new_skill` rather than `held`. Details in contracts/baseline-v2.md.
+
 ## 5. Skill result
 
 One skill's outcome for this run. Existing `SkillResult`, extended.
 
-| Field               | Type          | Notes                                                                  |
-| ------------------- | ------------- | ---------------------------------------------------------------------- |
-| `skill_name`        | str           | Existing                                                               |
-| `lift`              | float \| None | Existing, now nullable                                                 |
-| `fire_rate`         | float         | Existing                                                               |
-| `baseline_delta`    | float \| None | Existing; None when not comparable                                     |
-| `regression_flag`   | bool          | Existing. **Derived**: `outcome == "regressed"`, computed nowhere else |
-| `outcome`           | enum          | New: `regressed` \| `held` \| `new_skill` \| `not_comparable`          |
-| `outcome_reason`    | str \| None   | New; why, when `not_comparable`                                        |
-| `arms`              | object        | New: the two Arm results                                               |
-| `provenance`        | Provenance    | New                                                                    |
-| `threshold_applied` | float         | New; the threshold the outcome was computed under (FR-010)             |
+| Field               | Type           | Notes                                                                                        |
+| ------------------- | -------------- | -------------------------------------------------------------------------------------------- |
+| `skill_name`        | str            | Existing                                                                                     |
+| `lift`              | float \| None  | Existing, now nullable                                                                       |
+| `fire_rate`         | float          | Existing                                                                                     |
+| `baseline_delta`    | float \| None  | Existing; None when not comparable                                                           |
+| `regression_flag`   | bool           | Existing. **Derived**: `outcome == "regressed"`, computed nowhere else                       |
+| `outcome`           | enum           | New: `regressed` \| `held` \| `new_skill` \| `not_comparable` \| `underpowered`              |
+| `outcome_reason`    | str \| None    | New; why, when `not_comparable` or `underpowered`                                            |
+| `arms`              | object         | New: the two Arm results                                                                     |
+| `provenance`        | Provenance     | New                                                                                          |
+| `threshold_applied` | float          | New; the threshold the outcome was computed under (FR-010)                                   |
+| `comparison`        | object \| None | 121: `Comparison.to_dict()` — the item count, MDE and interval the outcome was decided under |
 
 State transitions — the outcome is derived, in this order, and the first match wins:
 
@@ -120,8 +130,13 @@ State transitions — the outcome is derived, in this order, and the first match
 2. Baseline entry has no provenance, or provenance differs on task set / scoring mode / scorer
    model → `not_comparable`, with `outcome_reason` naming the field
 3. Either arm's `pass_rate` is None → `not_comparable`, reason `no scored items`
-4. `baseline_delta < -threshold_applied` → `regressed`
-5. Otherwise → `held`
+4. Either side has no recorded lift → `not_comparable`, reason `no lift recorded`
+5. `comparison.underpowered` → `underpowered`, with `outcome_reason` naming the pair count and the
+   floor. Spec 121 added this step, and it sits above the threshold test on purpose: the Δ between
+   two lifts neither of which cleared FR-008's floor is not evidence of a regression, and reporting
+   it as one is what failed three consecutive nightly runs.
+6. `baseline_delta < -threshold_applied` → `regressed`
+7. Otherwise → `held`
 
 `regression_flag` is then `outcome == "regressed"` and is computed in that one place. It survives
 only because `shard.py` merges shard files by key and a mid-transition merge would drop a renamed

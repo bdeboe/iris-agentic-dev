@@ -1,0 +1,64 @@
+id: CORPUS-28
+prompt: |
+  Bench.Lookup.NameOf(pId) in the BENCHMARK namespace opens a Bench.Lookup row by
+  ID and returns its Name. An ID that does not exist raises an error instead of returning an empty
+  string. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Lookup
+    content: |
+      Class Bench.Lookup Extends %Persistent
+      {
+
+      Property Name As %String;
+
+      ClassMethod Seed() As %String
+      {
+          Do ..%DeleteExtent()
+          Set tRow = ..%New()
+          Set tRow.Name = "Ann"
+          Set tSC = tRow.%Save()
+          If $$$ISERR(tSC) { Quit "" }
+          Quit tRow.%Id()
+      }
+
+      ClassMethod NameOf(pId As %String) As %String
+      {
+          Set tRow = ..%OpenId(pId)
+          Quit tRow.Name
+      }
+
+      }
+check: |
+  try { set id=##class(Bench.Lookup).Seed() set ok=((##class(Bench.Lookup).NameOf(id)="Ann")&&(##class(Bench.Lookup).NameOf(987654)="")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Lookup
+    content: |
+      Class Bench.Lookup Extends %Persistent
+      {
+
+      Property Name As %String;
+
+      ClassMethod Seed() As %String
+      {
+          Do ..%DeleteExtent()
+          Set tRow = ..%New()
+          Set tRow.Name = "Ann"
+          Set tSC = tRow.%Save()
+          If $$$ISERR(tSC) { Quit "" }
+          Quit tRow.%Id()
+      }
+
+      ClassMethod NameOf(pId As %String) As %String
+      {
+          Set tRow = ..%OpenId(pId)
+          If '$IsObject(tRow) {
+              Quit ""
+          }
+          Quit tRow.Name
+      }
+
+      }
+tags: [persistence, null-object]

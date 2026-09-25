@@ -13,10 +13,12 @@ import pytest
 
 from tests.e2e.skill_eval import baseline as baseline_mod
 from tests.e2e.skill_eval.baseline import (
+    COMPARABILITY_FIELDS,
     SCHEMA_VERSION,
     comparability,
     compute_diff,
     coverage_census,
+    driver_change,
     format_diff_line,
     load_baseline,
     load_ungated,
@@ -45,6 +47,8 @@ def provenance(task_ids=("DBG-01",), scorer_model="claude-sonnet-4-6", **over):
         "runs": 3,
         "measured_at": "2026-09-12T04:11:07Z",
         "harness_commit": "7d82f7d",
+        "driver": "opencode",
+        "harness_version": "0.14.3",
     }
     prov.update(over)
     return prov
@@ -64,8 +68,33 @@ def arms(baseline_rate=0.33, skill_rate=0.58, total=12, unscored=0):
     return {"baseline": arm(baseline_rate), "skill": arm(skill_rate)}
 
 
-def make_result(skill, lift, fire_rate=1.0, prov=None, arm_data=None):
+def comparison_over(b, c, both_pass=0, both_fail=0) -> dict:
+    """A real `Comparison`, serialized the way `lift.py` writes it into the result JSON."""
+    from tests.e2e.skill_eval.comparison import Comparison, TaskPair
+
+    pairs = []
+    for cell, (passed_a, passed_b) in (
+        (b, (False, True)),
+        (c, (True, False)),
+        (both_pass, (True, True)),
+        (both_fail, (False, False)),
+    ):
+        for _ in range(cell):
+            pairs.append(
+                TaskPair(
+                    f"t{len(pairs)}",
+                    "baseline",
+                    "skill",
+                    passed_a=passed_a,
+                    passed_b=passed_b,
+                )
+            )
+    return Comparison.from_pairs("baseline", "skill", pairs).to_dict()
+
+
+def make_result(skill, lift, fire_rate=1.0, prov=None, arm_data=None, comparison=None):
     return SkillResult(
+        comparison=comparison,
         skill=skill,
         fire_rate=fire_rate,
         implicit_fire_rate=None,
@@ -167,7 +196,7 @@ def test_a_new_skill_diff_line_prints_without_a_delta():
         }
     )
     assert "iris-connectivity" in line
-    assert "(new)" in line
+    assert "(new" in line, "121 puts the resolution in the same parenthesis"
     assert "0.00" in line
 
 
@@ -196,6 +225,118 @@ def test_an_improvement_diff_line_is_signed_positive():
         }
     )
     assert "+0.19" in line
+
+
+# ── 121 T015: a stored lift and a printed Δ carry what measured them ─────────
+
+#: 40 pairs, 8 discordant. Powered, and above the gate threshold.
+POWERED = comparison_over(b=6, c=2, both_pass=20, both_fail=12)
+#: 8 pairs. The Δ against this is inside the harness's own resolution.
+UNDERPOWERED = comparison_over(b=5, c=1, both_fail=2)
+
+
+def test_a_stored_entry_carries_the_comparison_its_lift_came_from():
+    """The entry is what next month's Δ is computed against, so it has to say what it can resolve.
+
+    A stored `lift: 0.29` with no item count beside it cannot support a comparison: the run
+    that reads it has no way to know whether 0.29 came off 8 task-pairs or 100, and it
+    subtracts either one the same way.
+    """
+    entry = baseline_mod.entry_from_result(
+        make_result("objectscript-review", 0.29, comparison=POWERED)
+    )
+    assert entry["comparison"]["n_pairs"] == 40
+    assert entry["comparison"]["mde"] == pytest.approx(POWERED["mde"])
+    assert entry["comparison"]["floor"] == POWERED["floor"]
+
+
+def test_a_stored_entry_with_no_comparison_records_none_rather_than_omitting_it():
+    """`None` is a fact — the harness could not pair the arms. A missing key is an accident."""
+    entry = baseline_mod.entry_from_result(make_result("objectscript-review", 0.29))
+    assert "comparison" in entry
+    assert entry["comparison"] is None
+
+
+def test_the_written_entry_keeps_its_comparison_through_a_roundtrip(
+    tmp_path, tasks_dir
+):
+    path = str(tmp_path / "baseline.json")
+    save_baseline([make_result("objectscript-review", 0.29, comparison=POWERED)], path)
+    stored = load_baseline(path)["objectscript-review"]
+    assert stored["comparison"]["n_pairs"] == 40
+    assert stored["comparison"]["verdict"] == POWERED["verdict"]
+
+
+def test_a_diff_carries_the_pairs_and_the_mde_of_the_new_measurement():
+    old = {"objectscript-review": {"lift": 0.29}}
+    new = [make_result("objectscript-review", 0.10, comparison=POWERED)]
+    diff = compute_diff(old, new)[0]
+    assert diff["n_pairs"] == 40
+    assert diff["mde"] == pytest.approx(POWERED["mde"])
+    assert diff["underpowered"] is False
+
+
+def test_a_diff_line_prints_the_pairs_and_mde_beside_the_delta():
+    """Governance detector 1 at the second place a lift reaches a human: the baseline summary."""
+    line = format_diff_line(
+        {
+            "skill": "a",
+            "old_lift": 0.29,
+            "new_lift": 0.10,
+            "new_skill": False,
+            "delta": -0.19,
+            "n_pairs": 40,
+            "mde": 0.16,
+            "underpowered": False,
+        }
+    )
+    assert "-0.19" in line
+    assert "40 pairs" in line
+    assert "0.16" in line
+
+
+def test_an_underpowered_diff_line_says_so_instead_of_reporting_a_change():
+    """8 pairs against a floor of 145 is not a change. The line must not read as one."""
+    diff = compute_diff(
+        {"objectscript-review": {"lift": 0.60}},
+        [make_result("objectscript-review", 0.10, comparison=UNDERPOWERED)],
+    )[0]
+    assert diff["underpowered"] is True
+    line = format_diff_line(diff)
+    assert "underpowered" in line
+    assert str(UNDERPOWERED["floor"]) in line, "the floor is the number that decides"
+
+
+def test_a_diff_line_with_no_comparison_says_the_pairs_are_unknown():
+    """Older result objects carry no comparison, and the line must not imply one existed."""
+    line = format_diff_line(
+        {
+            "skill": "a",
+            "old_lift": 0.29,
+            "new_lift": 0.10,
+            "new_skill": False,
+            "delta": -0.19,
+        }
+    )
+    assert "pairs unknown" in line
+    assert "-0.19" in line
+
+
+def test_a_new_skill_line_still_carries_its_pairs():
+    line = format_diff_line(
+        {
+            "skill": "a",
+            "old_lift": None,
+            "new_lift": 0.29,
+            "new_skill": True,
+            "delta": None,
+            "n_pairs": 40,
+            "mde": 0.16,
+            "underpowered": False,
+        }
+    )
+    assert "(new" in line
+    assert "40 pairs" in line
 
 
 # ── T023: merge-by-skill writes ──────────────────────────────────────────────
@@ -481,3 +622,120 @@ def test_a_differing_tool_surface_does_not_block_the_delta():
 
 def test_an_unchanged_tool_surface_has_nothing_to_annotate():
     assert surface_change(entry(), provenance()) is None
+
+
+# ── 120 T017: which harness drove it (FR-012) ─────────────────────────────────
+#
+# Same rule as the tool surface, for the same reason. `opencode` drove the pilot and
+# `prime-agent` is the candidate, so the release that swaps them is the release a Δ most needs
+# to be readable across — suppressing the comparison there would blind the gate on the one
+# change it was built to catch. The Δ stands; the driver change prints beside it.
+
+
+def test_the_driver_is_not_a_comparability_field():
+    assert "driver" not in COMPARABILITY_FIELDS
+    assert "harness_version" not in COMPARABILITY_FIELDS
+
+
+def test_a_differing_driver_does_not_block_the_delta():
+    prov = provenance(driver="prime-agent", harness_version="0.4.1")
+    assert comparability(entry(), prov) is None
+    note = driver_change(entry(), prov)
+    assert note and "opencode" in note and "prime-agent" in note
+
+
+def test_a_new_version_of_the_same_driver_annotates_too():
+    """An opencode upgrade changes tool-call reporting and idle detection, so a Δ across one is
+    worth a line even though the driver kind did not move."""
+    note = driver_change(entry(), provenance(harness_version="0.15.0"))
+    assert note and "0.14.3" in note and "0.15.0" in note
+    assert comparability(entry(), provenance(harness_version="0.15.0")) is None
+
+
+def test_the_same_driver_at_the_same_version_has_nothing_to_annotate():
+    assert driver_change(entry(), provenance()) is None
+
+
+def test_an_entry_that_never_recorded_a_driver_annotates_nothing():
+    """Every provenance block in the committed baseline predates FR-012. "unrecorded → opencode"
+    is not a driver change, it is a schema change, and printing it on every row would train
+    people to skip the line that matters."""
+    old = provenance()
+    del old["driver"]
+    del old["harness_version"]
+    assert driver_change(entry(prov=old), provenance()) is None
+
+
+# ── 121 T023: a withdrawn number is not a baseline ───────────────────────────
+#
+# Every rate in the committed baseline was graded through `lift.format_transcript`'s 500-character
+# cap, and four skills read 0.00 against 0.00 because of it (research.md § triage). The rates cannot
+# be re-graded — the result files never persisted per-item transcripts — so the six verdicted entries
+# are withdrawn rather than corrected.
+#
+# Withdrawn has to mean something mechanical, or it is a note in a spec. It means: this entry is not
+# a comparison basis. A Δ against a number nobody stands behind is not a regression signal.
+
+
+def withdrawn_entry(reason="graded through the 500-character transcript cap", **over):
+    payload = {
+        "verdict": "broken_check",
+        "reason": reason,
+        "recorded_by": "121 T021",
+    }
+    payload.update(over)
+    return {**entry(), "withdrawn": payload}
+
+
+def test_a_withdrawn_entry_is_not_a_comparison_basis():
+    reason = comparability(withdrawn_entry(), provenance())
+    assert reason and "withdrawn" in reason
+
+
+def test_the_withdrawal_reason_travels_into_the_refusal():
+    """ "Not comparable" with no reason sends someone to re-run a skill that is fine."""
+    reason = comparability(withdrawn_entry(reason="task set retired"), provenance())
+    assert "task set retired" in reason
+
+
+def test_compute_diff_treats_a_withdrawn_entry_as_no_prior_measurement():
+    old = {"iris-connectivity": {"lift": 0.0, "withdrawn": {"reason": "broken check"}}}
+    new = [make_result("iris-connectivity", 0.40)]
+    diff = compute_diff(old, new)
+    assert len(diff) == 1
+    assert diff[0]["new_skill"] is True
+    assert diff[0]["delta"] is None
+    assert diff[0]["old_lift"] is None
+
+
+def test_an_entry_with_no_withdrawal_still_compares():
+    assert comparability(entry(), provenance()) is None
+
+
+def test_every_verdicted_skill_is_withdrawn_in_the_committed_baseline():
+    """Cross-file assertion: the verdicts and the artifact they were reached on cannot disagree.
+
+    Without this, retiring a task set in `triage_records.py` leaves its −0.10 sitting in the
+    baseline as a live comparison basis, and the next night reports a Δ against it.
+    """
+    from tests.e2e.skill_eval.triage_records import RECORDS
+
+    with open(_SHIPPED_BASELINE) as handle:
+        skills = json.load(handle)["skills"]
+
+    for name in RECORDS:
+        block = skills[name].get("withdrawn")
+        assert block, f"{name} has a verdict but its baseline entry is not withdrawn"
+        assert block["verdict"] == RECORDS[name].verdict.value, name
+        assert block["reason"].strip(), name
+
+
+def test_no_healthy_skill_is_withdrawn_in_the_committed_baseline():
+    """The other direction: a withdrawal with no verdict behind it is unexplained data loss."""
+    from tests.e2e.skill_eval.triage_records import RECORDS
+
+    with open(_SHIPPED_BASELINE) as handle:
+        skills = json.load(handle)["skills"]
+
+    stray = [n for n, e in skills.items() if e.get("withdrawn") and n not in RECORDS]
+    assert stray == []

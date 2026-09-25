@@ -1,0 +1,37 @@
+id: CORPUS-04
+prompt: |
+  Bench.Json.Sum(pJson) in the BENCHMARK namespace parses a JSON object with numeric
+  members a and b and should return their sum. It concatenates them instead, so
+  {"a":2,"b":3} returns 23. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Json
+    content: |
+      Class Bench.Json Extends %RegisteredObject
+      {
+
+      ClassMethod Sum(pJson As %String) As %Integer
+      {
+          Set tObject = ##class(%DynamicObject).%FromJSON(pJson)
+          Quit tObject.%Get("a")_tObject.%Get("b")
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Json).Sum("{""a"":2,""b"":3}")=5)&&(##class(Bench.Json).Sum("{""a"":10,""b"":-4}")=6)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Json
+    content: |
+      Class Bench.Json Extends %RegisteredObject
+      {
+
+      ClassMethod Sum(pJson As %String) As %Integer
+      {
+          Set tObject = ##class(%DynamicObject).%FromJSON(pJson)
+          Quit tObject.%Get("a") + tObject.%Get("b")
+      }
+
+      }
+tags: [json, dynamic-objects]

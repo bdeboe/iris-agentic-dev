@@ -21,7 +21,8 @@ SCHEMA_VERSION = 2
 
 # The three fields that have to match before a Δ means anything. `tool_surface` is deliberately
 # not among them: suppressing the comparison when the binary changed would silence the gate on
-# exactly the releases it exists to check.
+# exactly the releases it exists to check. `driver` and `harness_version` (120 FR-012) are out for
+# the same reason — see `driver_change`.
 COMPARABILITY_FIELDS = ("task_ids", "scoring_mode", "scorer_model")
 
 _TASKS_SKILLS_DIR = os.path.abspath(
@@ -92,8 +93,15 @@ def load_ungated(path: str) -> dict:
 
 
 def entry_from_result(result: "SkillResult") -> dict:
-    """One skill's stored reference measurement, including what it was measured under."""
+    """One skill's stored reference measurement, including what it was measured under.
+
+    121: `comparison` rides along with the lift, because this entry is what next month's Δ is
+    subtracted from. A stored `lift: 0.29` on its own cannot support a comparison — the run
+    reading it has no way to tell 0.29 over 8 task-pairs from 0.29 over 100, and it subtracts
+    either one the same way. `None` on an entry the harness could not pair.
+    """
     return {
+        "comparison": getattr(result, "comparison", None),
         "fire_rate": result.fire_rate,
         "items": getattr(result, "arms", None),
         "lift": result.lift,
@@ -191,12 +199,33 @@ def coverage_census(tasks_skills_dir: str, path: str) -> list[str]:
     return problems
 
 
+def withdrawal(entry: dict) -> Optional[str]:
+    """The reason this entry's numbers were withdrawn, or `None` if they stand.
+
+    121 T023. Six of the nine entries in the committed baseline were graded through
+    `lift.format_transcript`'s 500-character cap and cannot be re-graded — the result files never
+    persisted per-item transcripts — so the numbers are withdrawn rather than corrected. A withdrawn
+    entry is not a comparison basis: a Δ against a figure nobody stands behind is not a signal.
+    The verdicts themselves live in `triage_records.py`, and `test_baseline.py` asserts the two
+    cannot disagree.
+    """
+    block = (entry or {}).get("withdrawn")
+    if not block:
+        return None
+    reason = block.get("reason") or "no reason recorded"
+    verdict = block.get("verdict")
+    return f"withdrawn ({verdict}): {reason}" if verdict else f"withdrawn: {reason}"
+
+
 def comparability(entry: dict, provenance: Optional[dict]) -> Optional[str]:
     """`None` when a Δ against this entry is meaningful, else the reason it is not.
 
     Named fields, not a boolean: "not comparable" with no reason sends someone to re-run a
     skill when what changed was the grader.
     """
+    reason = withdrawal(entry)
+    if reason:
+        return reason
     old = (entry or {}).get("provenance")
     if not old:
         return "no provenance recorded"
@@ -221,13 +250,56 @@ def surface_change(entry: dict, provenance: Optional[dict]) -> Optional[str]:
     return f"tool surface {was} → {now}"
 
 
+def driver_change(entry: dict, provenance: Optional[dict]) -> Optional[str]:
+    """The driver annotation that prints beside a Δ, or `None` when the harness did not move.
+
+    120 FR-012, and the same rule as `surface_change`: `driver` and `harness_version` are not in
+    `COMPARABILITY_FIELDS`, because the release that swaps `opencode` for `prime-agent` is the
+    one a Δ most needs to be readable across. Suppressing there would blind the gate on the
+    change it exists to catch.
+
+    Nothing is annotated when either side never recorded a driver. "unrecorded → opencode" is a
+    schema change, not a harness change, and it would print on every row of the first run after
+    this field landed — which teaches people to skip the line.
+    """
+    old = (entry or {}).get("provenance") or {}
+    new = provenance or {}
+    was, now = old.get("driver"), new.get("driver")
+    if not was or not now:
+        return None
+    was_version, now_version = old.get("harness_version"), new.get("harness_version")
+    if was == now and was_version == now_version:
+        return None
+    return f"driver {was} {was_version or 'version unrecorded'} → {now} {now_version or 'version unrecorded'}"
+
+
+def _resolution(result: "SkillResult") -> dict:
+    """The three fields that say what a Δ off this result can be read as (121, FR-008)."""
+    comparison = getattr(result, "comparison", None) or {}
+    return {
+        "n_pairs": comparison.get("n_pairs"),
+        "mde": comparison.get("mde"),
+        "floor": comparison.get("floor"),
+        "underpowered": bool(comparison.get("underpowered")),
+    }
+
+
 def compute_diff(old: dict, new: "list[SkillResult]") -> list[dict]:
-    """Compare new results against old baseline. Returns changed skills, largest Δ first."""
+    """Compare new results against old baseline. Returns changed skills, largest Δ first.
+
+    Each diff carries the new measurement's item count, MDE and floor, so `format_diff_line`
+    never has to print a Δ it cannot qualify.
+    """
     diffs = []
     for result in new:
         if result.lift is None:
             continue
         old_entry = old.get(result.skill)
+        # A withdrawn entry is not a prior measurement, so this run is the first one — the same
+        # shape as a skill with no entry at all, and for the same reason: there is nothing to
+        # subtract from.
+        if old_entry is not None and withdrawal(old_entry):
+            old_entry = None
         if old_entry is None:
             diffs.append(
                 {
@@ -236,6 +308,7 @@ def compute_diff(old: dict, new: "list[SkillResult]") -> list[dict]:
                     "new_lift": result.lift,
                     "delta": None,
                     "new_skill": True,
+                    **_resolution(result),
                 }
             )
             continue
@@ -252,6 +325,7 @@ def compute_diff(old: dict, new: "list[SkillResult]") -> list[dict]:
                 "new_lift": result.lift,
                 "delta": round(delta, 4),
                 "new_skill": False,
+                **_resolution(result),
             }
         )
     diffs.sort(key=lambda d: abs(d["delta"] or 0), reverse=True)
@@ -268,4 +342,25 @@ def format_diff_line(diff: dict) -> str:
     old = f"{diff['old_lift']:.2f}" if diff.get("old_lift") is not None else "n/a"
     delta = diff.get("delta")
     change = "new" if diff.get("new_skill") else f"{delta:+.2f}" if delta else "0.00"
-    return f"  {diff['skill']}: {old} → {diff['new_lift']:.2f} ({change})"
+    return f"  {diff['skill']}: {old} → {diff['new_lift']:.2f} ({change}, {_resolution_text(diff)})"
+
+
+def _resolution_text(diff: dict) -> str:
+    """What the Δ on this line can be read as: pairs and MDE, the floor, or nothing at all.
+
+    121 G1: the summary is the second place a lift reaches a human, and it used to print the
+    change alone. `-0.19` over eight task-pairs and `-0.19` over a hundred read identically and
+    are different facts — the first one is noise.
+    """
+    n_pairs = diff.get("n_pairs")
+    if n_pairs is None:
+        return "pairs unknown"
+    if diff.get("underpowered"):
+        floor = diff.get("floor")
+        return f"{n_pairs} pairs against a floor of {floor} — underpowered"
+    mde = diff.get("mde")
+    return (
+        f"{n_pairs} pairs, mde {mde:.2f}"
+        if mde is not None
+        else f"{n_pairs} pairs, mde n/a"
+    )

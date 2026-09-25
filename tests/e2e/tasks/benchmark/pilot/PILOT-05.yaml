@@ -1,0 +1,39 @@
+id: PILOT-05
+# A global write. Nothing about this is hard; the question is whether an agent with no IRIS tools can
+# see the global afterwards to know it worked.
+prompt: |
+  Pilot.Audit.Log(pMsg) in the BENCHMARK namespace is a stub. Implement it so it records the message
+  in the global ^Pilot.Audit, subscripted by the message itself, with the value 1 — that is,
+  ^Pilot.Audit(pMsg) = 1 — and returns $$$OK. Leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Pilot.Audit
+    content: |
+      Class Pilot.Audit Extends %RegisteredObject
+      {
+      ClassMethod Log(pMsg As %String) As %Status
+      {
+          Set tSC = $$$OK
+          Quit tSC
+      }
+      }
+# The check zeroes its own key before calling Log, so a value left behind by an earlier run cannot
+# stand in for a working Log. Set rather than Kill: killing a global is destructive-tier and disabled
+# by default, and a check should not need a gate opened for it.
+check: |
+  try { set ^Pilot.Audit("pilot-check")=0 do ##class(Pilot.Audit).Log("pilot-check") set ok=($get(^Pilot.Audit("pilot-check"))=1) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Pilot.Audit
+    content: |
+      Class Pilot.Audit Extends %RegisteredObject
+      {
+      ClassMethod Log(pMsg As %String) As %Status
+      {
+          Set tSC = $$$OK
+          Set ^Pilot.Audit(pMsg) = 1
+          Quit tSC
+      }
+      }
+tags: [globals]

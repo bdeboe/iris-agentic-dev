@@ -1,124 +1,33 @@
 name: Skill Regression
 
-# One job per skill. The suite is about 105 minutes of sequential opencode sessions, so the
-# old single job hit its 75-minute timeout and was cancelled every night from 2026-08-29 on.
-# Run 34093536537 got through five of nine skills in 68 minutes before the runner killed it.
-# Sharded, the wall clock is the slowest skill (iris-ai-hub, ~29 min) plus setup.
+# One job, three tasks, no lift.
+#
+# What this used to be: nine shards of five opencode sessions each, ~$3.70 and about two hours of
+# runner time a night, to publish a per-skill lift the corpus could not support. Six of nine skills
+# printed 0.00 against 0.00 and the job reported success. Then runs 34744344877, 34817991701 and
+# 34939912456 failed three nights in a row on Δs smaller than the harness's own resolution — the
+# regression threshold sat at 0.05 and the MDE at eight task-pairs is 0.35.
+#
+# 121 FR-016 changes the question rather than the threshold. The nightly asks three things with
+# cheap answers: does the harness still run, does the binary still advertise its tools, and does a
+# named canary set still pass. The canary set is assertion-scored — `tool_called`, `skill_invoked`,
+# and a two-tool chain — so a night needs three agent sessions, no judge, and no scorer credential.
+# Lift belongs to the full benchmark, which runs at a release and before a conference over a corpus
+# large enough to support it.
 
 on:
-  # Paused 2026-09-09, restored 2026-09-12. It had been spending ~$3.70 and ~2 hours of
-  # runner time a night to print 0% against 0% for six of nine skills and report success —
-  # run 34322181078 was the last one, and its objectscript-review leg shows `+0% ✓` with no
-  # warning. Nothing in that output separated "the scorer failed" from "the agent genuinely
-  # scored zero", which is the defect 118 removes.
-  #
-  # Restored on run 34704217675: preflight resolved the scorer (claude-sonnet-4-6 via
-  # AWS_BEARER_TOKEN_BEDROCK) and an 81-tool surface from the released binary, iris-connectivity
-  # measured 0% against 67% with 6 of 6 items scored, and a credential-less run exits 2 before
-  # spending anything.
   schedule:
     # Nightly at 02:00 UTC — avoids overlap with daytime CI runs
     - cron: "0 2 * * *"
   workflow_dispatch:
-    inputs:
-      skill:
-        description: "Single skill to evaluate (leave blank for all covered skills)"
-        required: false
-        default: ""
-      runs:
-        description: "Runs per skill"
-        required: false
-        default: "5"
-      update_baseline:
-        description: "Update baseline after run"
-        required: false
-        type: boolean
-        default: false
 
 jobs:
-  discover:
+  canary:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    outputs:
-      skills: ${{ steps.matrix.outputs.skills }}
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-
-      - name: Install Python dependencies
-        # The unit tests need yaml and requests only. `anthropic[bedrock]` is here for the
-        # preflight step below, which makes one real scoring call — the Bedrock extra pulls
-        # boto3, without which AnthropicBedrock cannot be constructed at all.
-        run: pip install pyyaml pytest requests 'anthropic[bedrock]'
-
-      - name: Run unit tests for skill_eval harness
-        run: |
-          python -m pytest tests/e2e/skill_eval/ \
-            --ignore=tests/e2e/skill_eval/test_integration.py \
-            --ignore=tests/e2e/skill_eval/test_debug_events.py \
-            --ignore=tests/e2e/skill_eval/test_debug_single.py \
-            --ignore=tests/e2e/skill_eval/test_debug_vector.py \
-            --ignore=tests/e2e/skill_eval/test_tovector_probe.py \
-            --ignore=tests/e2e/skill_eval/test_tovector_score.py \
-            -q
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-
-      - name: Install the released iris-agentic-dev binary
-        # The nightly ran for weeks with no iad tools in any session: isolated_env.py held the
-        # literal Homebrew path, which no GHA runner has. Every transcript was a bare model
-        # answering an IRIS question, and the judge scored it as the skill failing.
-        run: |
-          mkdir -p "$RUNNER_TEMP/iad"
-          gh release download --repo "$GITHUB_REPOSITORY" \
-            --pattern iris-agentic-dev-linux-x86_64 --dir "$RUNNER_TEMP/iad"
-          mv "$RUNNER_TEMP/iad/iris-agentic-dev-linux-x86_64" "$RUNNER_TEMP/iad/iris-agentic-dev"
-          chmod +x "$RUNNER_TEMP/iad/iris-agentic-dev"
-          echo "IAD_BINARY=$RUNNER_TEMP/iad/iris-agentic-dev" >> "$GITHUB_ENV"
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: Preflight — corpus, scorer, binary, tool surface
-        # One call, well under a cent, before the matrix starts nine containers. Exit 2 here
-        # means nothing was spent; nine shards each rediscovering a missing credential means
-        # nine opencode installs and nine IRIS starts to report the same one fact.
-        run: python -m tests.e2e.skill_eval --preflight-only
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-          AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}
-          AWS_REGION: us-east-1
-
-      - name: Build the shard matrix
-        id: matrix
-        run: |
-          # --list-skills reads the same two directories the eval reads, so the matrix cannot
-          # drift out of sync with what actually has an eval.yaml. A hand-written list would.
-          if [ -n "${{ github.event.inputs.skill }}" ]; then
-            SKILLS='["${{ github.event.inputs.skill }}"]'
-          else
-            SKILLS=$(python -m tests.e2e.skill_eval --list-skills)
-          fi
-          echo "skills=$SKILLS" >> "$GITHUB_OUTPUT"
-          echo "Sharding on: $SKILLS"
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-
-  evaluate:
-    needs: discover
-    runs-on: ubuntu-latest
-    # Slowest skill estimates at 29 min; the rest are 8-14. 45 leaves room for a slow runner
-    # without letting a wedged shard hold a runner for hours.
-    timeout-minutes: 45
-    strategy:
-      # One skill regressing must not cancel the other eight — the nightly report is the
-      # whole point, and a report covering one skill is worse than useless.
-      fail-fast: false
-      matrix:
-        skill: ${{ fromJSON(needs.discover.outputs.skills) }}
+    # Three sessions is about a minute of agent time. The rest is setup: npm, the binary
+    # download, and the IRIS container's ~90 s start plus the Atelier wait. 30 covers a slow
+    # runner and a cold npm cache without letting a wedged session hold a runner for hours.
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v7
@@ -144,9 +53,35 @@ jobs:
             'anthropic[bedrock]' \
             iris-devtester
 
+      - name: Run unit tests for skill_eval harness
+        # The cheapest breakage signal in the whole night, and it starts no session. If the
+        # harness cannot import its own modules there is no point starting a container.
+        #
+        # The --ignore list is no longer what keeps this step from spending money: every spawn point
+        # refuses unless IAD_BILLABLE_SESSIONS=1, and the tests that spawn carry a `billable` marker
+        # that skips them without it (tests/e2e/billing.py). Kept because skipping six files is
+        # faster than collecting them, not because it is load-bearing.
+        run: |
+          python -m pytest tests/e2e/skill_eval/ \
+            --ignore=tests/e2e/skill_eval/test_integration.py \
+            --ignore=tests/e2e/skill_eval/test_debug_events.py \
+            --ignore=tests/e2e/skill_eval/test_debug_single.py \
+            --ignore=tests/e2e/skill_eval/test_debug_vector.py \
+            --ignore=tests/e2e/skill_eval/test_tovector_probe.py \
+            --ignore=tests/e2e/skill_eval/test_tovector_score.py \
+            -q
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
       - name: Install the released iris-agentic-dev binary
-        # Every session in this job needs it. Without it the eval measures a model with no
-        # tools, which is not what any of these skills are about.
+        # The canary's second question is answered by asking this binary what it advertises,
+        # and `probe_tool_surface` reads IAD_BINARY to find it. Without the export the surface
+        # reads as None, which the report counts as breakage rather than as 81 tools.
+        #
+        # This is also the bug the whole check exists for: the nightly ran for weeks with no iad
+        # tools in any session because `isolated_env.py` held a literal Homebrew path that no
+        # runner has. Every transcript was a bare model and the judge scored it as the skill
+        # failing.
         run: |
           mkdir -p "$RUNNER_TEMP/iad"
           gh release download --repo "$GITHUB_REPOSITORY" \
@@ -154,8 +89,6 @@ jobs:
           mv "$RUNNER_TEMP/iad/iris-agentic-dev-linux-x86_64" "$RUNNER_TEMP/iad/iris-agentic-dev"
           chmod +x "$RUNNER_TEMP/iad/iris-agentic-dev"
           echo "IAD_BINARY=$RUNNER_TEMP/iad/iris-agentic-dev" >> "$GITHUB_ENV"
-          "$RUNNER_TEMP/iad/iris-agentic-dev" tool --list --json | python -c \
-            'import json,sys; print("tool surface:", len(json.load(sys.stdin)["tools"]), "tools")'
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -172,7 +105,7 @@ jobs:
             intersystemsdc/iris-community:2025.3
           sleep 15
           docker ps -a | grep iris-skill-eval
-          echo "=== Early container logs ==="
+          echo "--- Early container logs ---"
           docker logs iris-skill-eval 2>&1 | head -40 || true
           echo "Waiting 90s for IRIS to initialise..."
           sleep 75
@@ -219,32 +152,35 @@ jobs:
             fi
             echo "  $user: HTTP $status"
           done
-          # Do not fall through to a guess. Every candidate failing means the eval
+          # Do not fall through to a guess. Every candidate failing means the canary
           # cannot authenticate, and pretending otherwise produces a 401 several
           # steps later that looks like a harness bug rather than an auth problem.
-          echo "No working credentials for Atelier REST — cannot run the eval."
+          echo "No working credentials for Atelier REST — cannot run the canary."
           docker logs iris-skill-eval 2>&1 | tail -40
           exit 1
 
-      - name: Evaluate ${{ matrix.skill }}
-        id: eval
+      - name: Nightly canary
+        # Exit 0 healthy, 1 broken and named, 2 misconfigured — 2 means no session started, so
+        # nothing was spent. The canary set lives in `nightly_canary.CANARY_TASKS`; naming the
+        # tasks here as well would give the night two lists that can disagree.
         run: |
-          python -m tests.e2e.skill_eval \
-            --skill "${{ matrix.skill }}" \
-            --runs "${{ github.event.inputs.runs || '5' }}" \
-            --yes \
-            --output tests/e2e/results/ \
-            --model "openai/gpt-4.1"
+          python -m tests.e2e.skill_eval.nightly_canary \
+            --output tests/e2e/results/
         env:
           PYTHONPATH: ${{ github.workspace }}
-          # OPENAI_API_KEY runs the agent sessions. It is not the scorer's key, and it was the
-          # only one this step passed — which is the whole reason the nightly published a 0%
-          # pass rate for six of nine skills instead of "the scorer was never reachable".
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # Runs the three agent sessions. All three canary tasks declare a Bedrock model in
+          # their own YAML and `run_task` lets that override CANARY_MODEL, so the Bedrock token
+          # is the one that matters here — `missing_credentials()` checks per task and exits 2
+          # if the key present is not one any canary session can authenticate with.
+          #
+          # No scorer key of any kind: the canary set is assertion-scored, which is why a night
+          # now costs three sessions and no grading call.
           AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}
           # Literal, not a secret: the region is not sensitive, and a blank one silently sent
-          # every scoring call to the SDK's us-east-1 default.
+          # every call to the SDK's us-east-1 default.
           AWS_REGION: us-east-1
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CANARY_MODEL: "openai/gpt-4.1"
           IAD_BINARY: ${{ env.IAD_BINARY }}
           IRIS_HOST: localhost
           IRIS_WEB_PORT: "52773"
@@ -253,76 +189,13 @@ jobs:
           IRIS_NAMESPACE: USER
           IRIS_CONTAINER: iris-skill-eval
 
-      - name: Upload ${{ matrix.skill }} results
+      - name: Upload canary report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          # Per-skill name: a shared name means the last upload wins and the aggregate job
-          # reports one skill as the whole night.
-          name: skill-eval-results-${{ matrix.skill }}
-          path: tests/e2e/results/skill-eval-*.json
+          name: nightly-canary-${{ github.run_id }}
+          # Named for the report, not a glob over the whole results directory: the old
+          # `skill-eval-*.json` glob carried 35 tracked files from May and June into all nine
+          # shard artifacts, and the merge read 324 files to find nine.
+          path: tests/e2e/results/nightly-canary-*.json
           retention-days: 90
-
-  aggregate:
-    needs: evaluate
-    # Runs even when a shard regressed or timed out. A shard that left no artifact shows up
-    # in the merged report as a named hole rather than vanishing.
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-
-      - name: Install Python dependencies
-        # `anthropic` is here only because importing the CLI imports the scorer client. The
-        # merge job makes no scoring call — the shards already did — but a merge that cannot
-        # import is a night's results thrown away for a missing package.
-        run: pip install pyyaml anthropic
-
-      - name: Download shard results
-        uses: actions/download-artifact@v7
-        with:
-          pattern: skill-eval-results-*
-          path: shards/
-
-      - name: Merge shard results
-        run: |
-          # Exits 1 on any regression: this is the gate for the whole night.
-          python -m tests.e2e.skill_eval \
-            --merge-results shards/ \
-            --output tests/e2e/results/ \
-            --model "openai/gpt-4.1"
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-
-      - name: Upload combined results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: skill-eval-combined-${{ github.run_id }}
-          path: tests/e2e/results/skill-eval-*.json
-          retention-days: 90
-
-      - name: Update baseline
-        if: ${{ github.event.inputs.update_baseline == 'true' }}
-        run: |
-          # Merges the same shard results again with --update-baseline. It does not re-run
-          # the eval: the numbers are already measured, and a second full pass cost another
-          # 100 minutes and $5 for nothing. One job pushes, so there is nothing to race.
-          python -m tests.e2e.skill_eval \
-            --merge-results shards/ \
-            --update-baseline \
-            --output tests/e2e/results/ \
-            --model "openai/gpt-4.1"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add tests/e2e/results/skill-baseline.json
-          git diff --staged --quiet || git commit -m "chore: update skill regression baseline [skip ci]"
-          git push
-        env:
-          PYTHONPATH: ${{ github.workspace }}

@@ -4,6 +4,16 @@ Run the repair benchmark yourself, measure your skills, and submit results to th
 
 **Time required**: ~10 minutes for setup, ~5 minutes per skill run.
 
+> This is the `iris-agentic-dev benchmark` subcommand: 22 repair tasks, scored by a model,
+> runnable from the shipped binary with no clone. It is a fast signal for iterating on a
+> skill you are writing.
+>
+> It is **not** where the project's published figures come from. Those come from the graded
+> ladder — a committed train/holdout split, machine-checkable `PASS`/`FAIL` checks against
+> live IRIS, and no model in the scoring path. A number from here cannot be compared with a
+> number from there. See
+> [`specs/121-benchmark-program/quickstart.md`](../specs/121-benchmark-program/quickstart.md).
+
 ---
 
 ## Prerequisites
@@ -20,7 +30,7 @@ the prebuilt binary you already use for compile/execute/test:
 
 ```bash
 # Mac (Homebrew)
-brew tap intersystems-community/iris-agentic-dev
+brew tap intersystems-community/tap
 brew install iris-agentic-dev
 
 # Mac direct download (Apple Silicon)

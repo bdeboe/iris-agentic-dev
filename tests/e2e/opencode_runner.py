@@ -10,6 +10,8 @@ import tempfile
 import threading
 from typing import Generator
 
+from tests.e2e import billing
+
 
 def parse_mcp_tool(tool_name: str) -> tuple[str | None, str]:
     """Split MCP tool name into (server, tool).
@@ -155,6 +157,9 @@ def run_opencode(
     reparented to init, still holding the pipe open, so the read loop below
     blocks forever and the timeout never takes effect.
     """
+    # Before anything is spawned: a session nothing asked for is a bill nobody meant to pay. See
+    # `tests/e2e/billing.py`.
+    billing.assert_allowed("an opencode session")
     cmd = [
         "opencode",
         "run",

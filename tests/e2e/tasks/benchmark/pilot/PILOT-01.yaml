@@ -1,0 +1,31 @@
+id: PILOT-01
+# The classic: a class that does not compile. Drawn from benchmark/021's DBG-01, with the judge's
+# "expected_behavior" replaced by an assertion IRIS answers.
+prompt: |
+  The class Pilot.Buggy in the BENCHMARK namespace does not compile. Find the error, fix it, and
+  leave the class compiled on the server. Double(n) must return n*2.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Pilot.Buggy
+    content: |
+      Class Pilot.Buggy Extends %RegisteredObject
+      {
+      ClassMethod Double(n As %Integer) As %Integer
+      {
+          Quit n * 2
+      }
+check: |
+  try { set ok=(##class(Pilot.Buggy).Double(4)=8) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Pilot.Buggy
+    content: |
+      Class Pilot.Buggy Extends %RegisteredObject
+      {
+      ClassMethod Double(n As %Integer) As %Integer
+      {
+          Quit n * 2
+      }
+      }
+tags: [debug, compile-error]

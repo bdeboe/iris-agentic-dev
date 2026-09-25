@@ -1,4 +1,4 @@
-"""Unit tests for reporter — T009, extended for 118 T025.
+"""Unit tests for reporter — T009, extended for 118 T025 and 121 T013.
 
 Every column and footer line asserted below exists because its absence hid something in the
 runs of 2026-08/09. That report printed a skill name, a fire rate, and a lift, and nothing
@@ -11,8 +11,14 @@ import os
 
 import pytest
 
+from tests.e2e.skill_eval.comparison import GATE_THRESHOLD, Comparison, TaskPair
 from tests.e2e.skill_eval.evaluator import SkillResult
-from tests.e2e.skill_eval.reporter import EvalRun, print_summary, write_result
+from tests.e2e.skill_eval.reporter import (
+    EvalRun,
+    print_summary,
+    progress_line,
+    write_result,
+)
 
 
 def arm(pass_rate, total=12, unscored=0):
@@ -26,6 +32,34 @@ def arm(pass_rate, total=12, unscored=0):
     }
 
 
+def comparison_over(b, c, both_pass=0, both_fail=0) -> dict:
+    """A real `Comparison`, serialized the way `lift.py` writes it into the result JSON."""
+    pairs = []
+    for cell, (passed_a, passed_b) in (
+        (b, (False, True)),
+        (c, (True, False)),
+        (both_pass, (True, True)),
+        (both_fail, (False, False)),
+    ):
+        for _ in range(cell):
+            pairs.append(
+                TaskPair(
+                    f"t{len(pairs)}",
+                    "baseline",
+                    "skill",
+                    passed_a=passed_a,
+                    passed_b=passed_b,
+                )
+            )
+    return Comparison.from_pairs("baseline", "skill", pairs).to_dict()
+
+
+#: 100 pairs, 32 discordant, lift +0.28: powered, and above the threshold.
+POWERED = comparison_over(b=30, c=2, both_pass=30, both_fail=38)
+#: 8 pairs. Whatever the lift says, the floor says the number cannot be read.
+UNDERPOWERED = comparison_over(b=5, c=1, both_fail=2)
+
+
 def provenance(**over):
     prov = {
         "run_id": "2026-09-12T040211Z",
@@ -37,6 +71,8 @@ def provenance(**over):
         "runs": 3,
         "measured_at": "2026-09-12T04:11:07Z",
         "harness_commit": "7d82f7d",
+        "driver": "opencode",
+        "harness_version": "0.14.3",
     }
     prov.update(over)
     return prov
@@ -54,6 +90,8 @@ def make_result(
     arms=None,
     prov=None,
     surface_note=None,
+    driver_note=None,
+    comparison="auto",
 ):
     if outcome is None:
         outcome = (
@@ -76,18 +114,26 @@ def make_result(
         task_ids_used=["DBG-01"] if lift else [],
         outcome=outcome,
         outcome_reason=outcome_reason,
-        arms=arms
-        if arms is not None
-        else (
-            None
-            if no_coverage
-            else {"baseline": arm(0.71), "skill": arm(0.71 + (lift or 0))}
+        arms=(
+            arms
+            if arms is not None
+            else (
+                None
+                if no_coverage
+                else {"baseline": arm(0.71), "skill": arm(0.71 + (lift or 0))}
+            )
         ),
-        provenance=prov
-        if prov is not None
-        else (None if no_coverage else provenance()),
-        threshold_applied=0.05,
+        provenance=(
+            prov if prov is not None else (None if no_coverage else provenance())
+        ),
+        threshold_applied=GATE_THRESHOLD,
         surface_note=surface_note,
+        driver_note=driver_note,
+        comparison=(
+            (POWERED if lift is not None else None)
+            if comparison == "auto"
+            else comparison
+        ),
     )
 
 
@@ -97,7 +143,7 @@ def make_eval_run(skills, **over):
         "model": "amazon-bedrock/test",
         "judge_model": "claude-sonnet-4-6",
         "timestamp": "2026-05-31T00:00:00Z",
-        "regression_threshold": 0.05,
+        "regression_threshold": GATE_THRESHOLD,
         "skills": skills,
         "summary": {
             "regressions": [],
@@ -147,7 +193,7 @@ def test_write_result_carries_the_outcome_and_its_provenance(tmp_path):
     data = json.loads(open(write_result(run, str(tmp_path))).read())
     entry = data["skills"][0]
     assert entry["outcome"] == "held"
-    assert entry["threshold_applied"] == pytest.approx(0.05)
+    assert entry["threshold_applied"] == pytest.approx(GATE_THRESHOLD)
     assert entry["provenance"]["scorer_model"] == "claude-sonnet-4-6"
     assert entry["arms"]["skill"]["items_scored"] == 12
     assert entry["regression_flag"] == (entry["outcome"] == "regressed")
@@ -243,6 +289,24 @@ def test_a_changed_tool_surface_prints_beside_the_delta(capsys):
     assert "held" in out, "the annotation must not suppress the comparison"
 
 
+def test_a_changed_driver_prints_beside_the_delta(capsys):
+    """120 FR-012. The Δ across a harness swap is readable only if the swap is on the page."""
+    run = make_eval_run(
+        [
+            make_result(
+                "objectscript-review",
+                lift=0.12,
+                delta=0.02,
+                driver_note="driver opencode 0.14.3 → prime-agent 0.4.1",
+            )
+        ]
+    )
+    print_summary(run)
+    out = capsys.readouterr().out
+    assert "opencode 0.14.3 → prime-agent 0.4.1" in out
+    assert "held" in out
+
+
 def test_the_footer_prints_on_a_green_run_too(capsys):
     """The broken run printed none of these four lines, which is why it looked normal."""
     run = make_eval_run([make_result("iris-connectivity", lift=0.29, delta=0.01)])
@@ -251,7 +315,7 @@ def test_the_footer_prints_on_a_green_run_too(capsys):
     assert "scorer: claude-sonnet-4-6" in out
     assert "requested us.anthropic.claude-sonnet-4-6" in out
     assert "tool surface: 1.4.1+fa0b694f8725" in out
-    assert "threshold: 0.05" in out
+    assert "threshold: 0.20" in out
     assert "unscored: 0/24" in out
     assert "run valid: yes" in out
 
@@ -303,3 +367,210 @@ def test_a_skill_with_no_coverage_still_gets_a_row(capsys):
     out = capsys.readouterr().out
     assert "iris-docs" in out
     assert "no coverage" in out
+
+
+# ---------------------------------------------------------------------------
+# 121 T013 — every printed lift carries what it took to measure it
+# ---------------------------------------------------------------------------
+
+
+def row_for(out: str, skill: str) -> str:
+    return next(line for line in out.splitlines() if line.startswith(skill))
+
+
+def test_the_header_names_the_pairs_and_mde_columns(capsys):
+    """The columns exist in the header, so a reader knows what the numbers beside a lift are."""
+    print_summary(make_eval_run([make_result("iris-connectivity", lift=0.28)]))
+    out = capsys.readouterr().out
+    header = next(
+        line for line in out.splitlines() if "lift" in line and "mode" in line
+    )
+    for column in ("lift", "pairs", "mde"):
+        assert column in header, f"{column} missing from the header: {header!r}"
+
+
+def test_a_printed_lift_carries_its_item_count_and_its_mde(capsys):
+    """Governance detector 1, at the one place a lift reaches a human."""
+    print_summary(
+        make_eval_run([make_result("iris-connectivity", lift=0.28, delta=0.04)])
+    )
+    row = row_for(capsys.readouterr().out, "iris-connectivity")
+    assert "+0.28" in row
+    assert str(POWERED["n_pairs"]) in row, f"the item count is missing: {row!r}"
+    assert f"{POWERED['mde']:.2f}" in row, f"the MDE is missing: {row!r}"
+
+
+def test_a_lift_with_no_comparison_recorded_is_withheld_and_the_reason_printed(capsys):
+    """Refusing to format it is the refusal. A lift with no resolution beside it is the bug."""
+    run = make_eval_run([make_result("iris-connectivity", lift=0.28, comparison=None)])
+    print_summary(run)
+    out = capsys.readouterr().out
+    row = row_for(out, "iris-connectivity")
+    assert "0.28" not in row, f"an unaccompanied lift must not print: {row!r}"
+    assert "no comparison recorded" in out
+
+
+def test_an_underpowered_comparison_prints_as_underpowered_and_never_as_a_pass(capsys):
+    """FR-008 in the table. `held` on eight pairs is the reading that failed three nightlies."""
+    run = make_eval_run(
+        [
+            make_result(
+                "iris-connectivity",
+                lift=0.50,
+                delta=0.30,
+                outcome="held",
+                comparison=UNDERPOWERED,
+            )
+        ]
+    )
+    print_summary(run)
+    row = row_for(capsys.readouterr().out, "iris-connectivity")
+    assert "underpowered" in row
+    assert "held" not in row, (
+        f"underpowered replaces the pass, it does not annotate it: {row!r}"
+    )
+
+
+def test_an_underpowered_row_still_shows_the_pairs_it_had(capsys):
+    """The verdict is checkable from the row: 8 pairs against the floor it names."""
+    run = make_eval_run(
+        [make_result("iris-connectivity", lift=0.50, comparison=UNDERPOWERED)]
+    )
+    print_summary(run)
+    out = capsys.readouterr().out
+    row = row_for(out, "iris-connectivity")
+    assert str(UNDERPOWERED["n_pairs"]) in row
+    assert str(UNDERPOWERED["floor"]) in out
+
+
+def test_an_underpowered_regression_is_not_counted_as_a_regression(capsys):
+    """A drop the harness cannot see is not a regression, and the row must not call it one."""
+    run = make_eval_run(
+        [
+            make_result(
+                "iris-connectivity",
+                lift=0.10,
+                delta=-0.40,
+                outcome="underpowered",
+                comparison=UNDERPOWERED,
+            )
+        ]
+    )
+    print_summary(run)
+    row = row_for(capsys.readouterr().out, "iris-connectivity")
+    assert "underpowered" in row
+    assert "regress" not in row.lower()
+
+
+def test_an_indistinguishable_comparison_says_so_beside_the_outcome(capsys):
+    """Powered, and the interval contains zero. `held` alone would overstate it."""
+    flat = comparison_over(b=8, c=8, both_pass=20, both_fail=44)
+    assert flat["verdict"] == "indistinguishable"
+    run = make_eval_run(
+        [make_result("iris-connectivity", lift=0.0, delta=0.0, comparison=flat)]
+    )
+    print_summary(run)
+    row = row_for(capsys.readouterr().out, "iris-connectivity")
+    assert "indistinguishable" in row
+
+
+def test_zero_discordance_prints_no_mde_rather_than_a_perfect_one(capsys):
+    """`0.00` would claim the arms bought perfect resolution. They bought none."""
+    agreed = comparison_over(b=0, c=0, both_pass=20, both_fail=20)
+    assert agreed["mde"] is None
+    run = make_eval_run([make_result("iris-connectivity", lift=0.0, comparison=agreed)])
+    print_summary(run)
+    row = row_for(capsys.readouterr().out, "iris-connectivity")
+    assert "n/a" in row, f"a missing MDE is not a zero MDE: {row!r}"
+
+
+def test_the_footer_threshold_is_the_declared_gate_threshold(capsys):
+    print_summary(make_eval_run([make_result("iris-connectivity", lift=0.28)]))
+    out = capsys.readouterr().out
+    assert f"threshold: {GATE_THRESHOLD:.2f}" in out
+    assert "threshold: 0.05" not in out
+
+
+def test_the_gate_path_holds_no_005_threshold():
+    """T013's third clause, as a scan of the code rather than the prose.
+
+    The literal is what matters: the modules are free to explain in a comment what 0.05 used to
+    do, and `stats.py` is excluded because its 0.05 is a confidence level rather than a gate.
+    """
+    import ast
+
+    import tests.e2e.skill_eval.evaluator as evaluator
+    import tests.e2e.skill_eval.lift as lift
+    import tests.e2e.skill_eval.reporter as reporter
+    from tests.e2e.skill_eval import __main__ as cli
+    from tests.e2e.skill_eval import comparison as comparison_module
+
+    for module in (reporter, evaluator, lift, cli, comparison_module):
+        tree = ast.parse(open(module.__file__).read())
+        literals = [
+            node.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant) and node.value == 0.05
+        ]
+        assert not literals, (
+            f"{os.path.basename(module.__file__)} still carries a 0.05 threshold literal; "
+            "the gate threshold is GATE_THRESHOLD and the item floor is FR-008's"
+        )
+
+
+def test_the_progress_line_carries_the_pairs_and_mde_of_the_lift_it_prints():
+    """The per-skill line the nightly log is read from, which used to print a bare lift.
+
+    `[iris-connectivity] lift=0.5 (16/16 scored)` was the first number a reader saw, and 16
+    scored items is 8 task-pairs — a fifth of the floor. The line said nothing about that.
+    """
+    line = progress_line(
+        "iris-connectivity",
+        {"lift": 0.28, "items_scored": 200, "items_unscored": 0, "comparison": POWERED},
+    )
+    assert "iris-connectivity" in line
+    assert "0.28" in line
+    assert f"{POWERED['n_pairs']} pairs" in line
+    assert f"{POWERED['mde']:.2f}" in line
+    assert "200/200 scored" in line
+
+
+def test_the_progress_line_of_an_underpowered_run_says_so():
+    line = progress_line(
+        "iris-connectivity",
+        {
+            "lift": 0.50,
+            "items_scored": 16,
+            "items_unscored": 0,
+            "comparison": UNDERPOWERED,
+        },
+    )
+    assert "underpowered" in line
+    assert str(UNDERPOWERED["floor"]) in line
+
+
+def test_the_progress_line_withholds_a_lift_it_cannot_qualify():
+    """No comparison, no number: the same refusal the table makes, at the earlier call site."""
+    line = progress_line(
+        "iris-connectivity", {"lift": 0.28, "items_scored": 16, "items_unscored": 0}
+    )
+    assert "0.28" not in line
+    assert "no comparison" in line
+
+
+def test_the_progress_line_of_a_skill_that_measured_nothing_says_that():
+    line = progress_line(
+        "iris-docs", {"lift": None, "items_scored": 0, "items_unscored": 12}
+    )
+    assert "no lift" in line
+    assert "0/12 scored" in line
+
+
+def test_the_json_result_carries_the_comparison(tmp_path):
+    """`shard.py` merges these files and the report reads them; the MDE must survive the trip."""
+    run = make_eval_run([make_result("iris-connectivity", lift=0.28, delta=0.04)])
+    data = json.loads(open(write_result(run, str(tmp_path))).read())
+    comparison = data["skills"][0]["comparison"]
+    assert comparison["n_pairs"] == POWERED["n_pairs"]
+    assert comparison["mde"] == pytest.approx(POWERED["mde"])
+    assert comparison["verdict"] == POWERED["verdict"]

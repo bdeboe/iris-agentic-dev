@@ -33,6 +33,26 @@ truncated by every run.
           "pass_rate": 0.58
         }
       },
+      "comparison": {
+        "n_pairs": 12,
+        "b": 4,
+        "c": 1,
+        "discordance": 0.42,
+        "lift": 0.25,
+        "interval": [0.0, 0.5],
+        "mde": 0.32,
+        "floor": 37,
+        "threshold_applied": 0.32,
+        "verdict": "underpowered",
+        "underpowered": true,
+        "publishable": false,
+        "purpose": "result"
+      },
+      "withdrawn": {
+        "reason": "graded through the 500-character transcript cap and cannot be re-graded",
+        "verdict": "capped_transcript",
+        "withdrawn_at": "2026-09-15T18:22:04Z"
+      },
       "provenance": {
         "run_id": "2026-09-12T04-02-11Z-shard-3",
         "task_ids": [
@@ -52,6 +72,20 @@ truncated by every run.
   "ungated_skills": {}
 }
 ```
+
+Two of those keys arrived with spec 121 and both are optional; a v2 entry without them still loads.
+
+`comparison` is `Comparison.to_dict()` for the run that wrote the entry. It is here because this
+entry is what next month's Δ is subtracted from, and a stored `lift: 0.25` on its own cannot support
+that: the run reading it has no way to tell 0.25 over 12 task-pairs from 0.25 over 100, and it
+subtracts either one the same way. `null` when the harness could not pair the run at all.
+
+`withdrawn` marks an entry whose numbers no longer stand. Six of the nine committed entries were
+graded through `lift.format_transcript`'s 500-character cap and the result files never persisted
+per-item transcripts, so they cannot be re-graded — withdrawn rather than corrected. A withdrawn
+entry is not a comparison basis: a Δ against a figure nobody stands behind is not a signal, so the
+skill reads `new_skill` on the next run rather than `held`. The verdicts live in `triage_records.py`
+and `test_baseline.py` asserts the two cannot disagree.
 
 `ungated_skills` maps a skill name to the reason it has an eval config and deliberately no entry.
 It is FR-011's second branch, and it lives here so that "is every skill covered?" is answerable

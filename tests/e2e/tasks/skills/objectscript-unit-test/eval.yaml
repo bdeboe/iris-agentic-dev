@@ -4,7 +4,13 @@ fire_rate_prompt: |
   Use the objectscript-unit-test skill to write a %UnitTest.TestCase subclass for User.HarnessTestClass. Use docs_introspect first to read the class definition, then generate the test class with at least one test method.
 implicit_fire_rate_prompt: |
   Write a %UnitTest test class for EvalDemo.ListUtil that tests the FilterNonEmpty method with at least two test cases.
-benchmark_tasks:
-  - GEN-01
-  - GEN-02
+# Task set retired — 121 T021/T023, verdict `broken_check` in
+# tests/e2e/skill_eval/triage_records.py. GEN-01 and GEN-02 are plain class-generation prompts with
+# no %UnitTest class in them, so this skill was being measured on tasks that never ask for what it
+# generates. Both also read 0.00 against 0.00 through a judge that saw 500 characters; GEN-01's
+# reference solution scores 3/3/3 and one live baseline session scored a pass.
+#
+# No gated number until Phase 4 writes tasks that ask for a %UnitTest.TestCase subclass, under FR-004
+# (the check fails against the untouched fixture) and FR-022 (a reference solution passes it).
+benchmark_tasks: []
 domain_skill: false

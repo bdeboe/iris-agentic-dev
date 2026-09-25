@@ -1,0 +1,59 @@
+id: CORPUS-06
+prompt: |
+  Bench.Nodes.CountKeys() in the BENCHMARK namespace should return the number of
+  first-level subscripts under the global ^Bench.Nodes. It returns $Data instead, which is
+  not a count. Seed() already populates three subscripts. Fix CountKeys() and leave the
+  class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Nodes
+    content: |
+      Class Bench.Nodes Extends %RegisteredObject
+      {
+
+      ClassMethod Seed()
+      {
+          Kill ^Bench.Nodes
+          Set ^Bench.Nodes("a") = 1
+          Set ^Bench.Nodes("b") = 2
+          Set ^Bench.Nodes("c") = 3
+      }
+
+      ClassMethod CountKeys() As %Integer
+      {
+          Quit $Data(^Bench.Nodes)
+      }
+
+      }
+check: |
+  try { do ##class(Bench.Nodes).Seed() set ok=(##class(Bench.Nodes).CountKeys()=3) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Nodes
+    content: |
+      Class Bench.Nodes Extends %RegisteredObject
+      {
+
+      ClassMethod Seed()
+      {
+          Kill ^Bench.Nodes
+          Set ^Bench.Nodes("a") = 1
+          Set ^Bench.Nodes("b") = 2
+          Set ^Bench.Nodes("c") = 3
+      }
+
+      ClassMethod CountKeys() As %Integer
+      {
+          Set tKey = ""
+          Set tCount = 0
+          For {
+              Set tKey = $Order(^Bench.Nodes(tKey))
+              Quit:tKey=""
+              Set tCount = tCount + 1
+          }
+          Quit tCount
+      }
+
+      }
+tags: [globals, order-traversal]

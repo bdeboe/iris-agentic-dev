@@ -1,0 +1,40 @@
+id: CORPUS-07
+prompt: |
+  Bench.Div.Divide(pA, pB) in the BENCHMARK namespace should return the quotient, and the
+  string "ERR" when the division raises an error instead of letting it propagate to the
+  caller. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Div
+    content: |
+      Class Bench.Div Extends %RegisteredObject
+      {
+
+      ClassMethod Divide(pA As %Numeric, pB As %Numeric) As %String
+      {
+          Quit pA / pB
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Div).Divide(4,2)=2)&&(##class(Bench.Div).Divide(1,0)="ERR")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Div
+    content: |
+      Class Bench.Div Extends %RegisteredObject
+      {
+
+      ClassMethod Divide(pA As %Numeric, pB As %Numeric) As %String
+      {
+          Try {
+              Set tResult = pA / pB
+          } Catch {
+              Set tResult = "ERR"
+          }
+          Quit tResult
+      }
+
+      }
+tags: [exceptions]

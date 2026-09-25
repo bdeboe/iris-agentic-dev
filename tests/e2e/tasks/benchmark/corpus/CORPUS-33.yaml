@@ -1,0 +1,75 @@
+id: CORPUS-33
+prompt: |
+  Bench.Deep.CountLeaves() in the BENCHMARK namespace should count the values
+  stored two subscripts deep under ^Bench.Deep. It counts the first level instead, so it answers 2
+  where it should answer 5. Seed() is already there. Fix CountLeaves() and leave the class compiled on
+  the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Deep
+    content: |
+      Class Bench.Deep Extends %RegisteredObject
+      {
+
+      ClassMethod Seed()
+      {
+          Kill ^Bench.Deep
+          Set ^Bench.Deep("a", 1) = "x"
+          Set ^Bench.Deep("a", 2) = "y"
+          Set ^Bench.Deep("b", 1) = "p"
+          Set ^Bench.Deep("b", 2) = "q"
+          Set ^Bench.Deep("b", 3) = "r"
+      }
+
+      ClassMethod CountLeaves() As %Integer
+      {
+          Set tKey = ""
+          Set tCount = 0
+          For {
+              Set tKey = $Order(^Bench.Deep(tKey))
+              Quit:tKey=""
+              Set tCount = tCount + 1
+          }
+          Quit tCount
+      }
+
+      }
+check: |
+  try { do ##class(Bench.Deep).Seed() set ok=(##class(Bench.Deep).CountLeaves()=5) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Deep
+    content: |
+      Class Bench.Deep Extends %RegisteredObject
+      {
+
+      ClassMethod Seed()
+      {
+          Kill ^Bench.Deep
+          Set ^Bench.Deep("a", 1) = "x"
+          Set ^Bench.Deep("a", 2) = "y"
+          Set ^Bench.Deep("b", 1) = "p"
+          Set ^Bench.Deep("b", 2) = "q"
+          Set ^Bench.Deep("b", 3) = "r"
+      }
+
+      ClassMethod CountLeaves() As %Integer
+      {
+          Set tOuter = ""
+          Set tCount = 0
+          For {
+              Set tOuter = $Order(^Bench.Deep(tOuter))
+              Quit:tOuter=""
+              Set tInner = ""
+              For {
+                  Set tInner = $Order(^Bench.Deep(tOuter, tInner))
+                  Quit:tInner=""
+                  Set tCount = tCount + 1
+              }
+          }
+          Quit tCount
+      }
+
+      }
+tags: [globals, nested-subscripts]

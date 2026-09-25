@@ -1,0 +1,40 @@
+id: CORPUS-12
+prompt: |
+  Bench.Limit in the BENCHMARK namespace declares a class parameter MAX and a Cap(pN)
+  method that should return pN when it is under MAX and MAX when it is over. Cap() ignores
+  the parameter and hardcodes a different ceiling. Fix it so changing MAX alone changes
+  the behaviour, and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Limit
+    content: |
+      Class Bench.Limit Extends %RegisteredObject
+      {
+
+      Parameter MAX = 10;
+
+      ClassMethod Cap(pN As %Integer) As %Integer
+      {
+          Quit $Select(pN > 5:5, 1:pN)
+      }
+
+      }
+check: |
+  try { set ok=((##class(Bench.Limit).Cap(7)=7)&&(##class(Bench.Limit).Cap(20)=10)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Limit
+    content: |
+      Class Bench.Limit Extends %RegisteredObject
+      {
+
+      Parameter MAX = 10;
+
+      ClassMethod Cap(pN As %Integer) As %Integer
+      {
+          Quit $Select(pN > ..#MAX:..#MAX, 1:pN)
+      }
+
+      }
+tags: [class-definition, parameters]

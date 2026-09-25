@@ -1,0 +1,29 @@
+id: GOLDEN-01
+prompt: |
+  The class Golden.Buggy in the BENCHMARK namespace does not compile. Find the error, fix it, and
+  leave the class compiled on the server. Triple(n) must return n*3.
+fixtures:
+  - name: Golden.Buggy
+    content: |
+      Class Golden.Buggy Extends %RegisteredObject
+      {
+      ClassMethod Triple(n As %Integer) As %Integer
+      {
+          Quit n * 3
+      }
+      Property Broken As %String [ SqlFieldName = ];
+      }
+solution:
+  - name: Golden.Buggy
+    content: |
+      Class Golden.Buggy Extends %RegisteredObject
+      {
+      ClassMethod Triple(n As %Integer) As %Integer
+      {
+          Quit n * 3
+      }
+      }
+check: |
+  set tOK = 0
+  try { set tOK = ($classmethod("Golden.Buggy","Triple",4) = 12) } catch { set tOK = 0 }
+  write $select(tOK:"PASS",1:"FAIL")

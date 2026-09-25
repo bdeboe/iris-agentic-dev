@@ -1,0 +1,41 @@
+id: PILOT-06
+# %Status, the thing every ObjectScript reviewer complains about and no judge can check cheaply.
+prompt: |
+  Pilot.Validator.Check(pAge) in the BENCHMARK namespace returns $$$OK for every input. Change it so
+  a negative age returns an error %Status built with $$$ERROR($$$GeneralError, ...) and any
+  non-negative age still returns $$$OK. Leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Pilot.Validator
+    content: |
+      Include %occStatus
+
+      Class Pilot.Validator Extends %RegisteredObject
+      {
+      ClassMethod Check(pAge As %Integer) As %Status
+      {
+          Set tSC = $$$OK
+          Quit tSC
+      }
+      }
+check: |
+  try { set bad=##class(Pilot.Validator).Check(-1) set good=##class(Pilot.Validator).Check(30) set ok=($system.Status.IsError(bad)&&'$system.Status.IsError(good)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Pilot.Validator
+    content: |
+      Include %occStatus
+
+      Class Pilot.Validator Extends %RegisteredObject
+      {
+      ClassMethod Check(pAge As %Integer) As %Status
+      {
+          Set tSC = $$$OK
+          If pAge < 0 {
+              Set tSC = $$$ERROR($$$GeneralError, "age must not be negative")
+          }
+          Quit tSC
+      }
+      }
+tags: [status-handling]

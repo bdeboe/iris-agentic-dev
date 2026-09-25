@@ -44,9 +44,9 @@ def test_teardown_on_clean_exit():
     env.__enter__()
     skills_dir = env.skills_dir
     env.__exit__(None, None, None)
-    assert not os.path.isdir(skills_dir), (
-        "Should be torn down on clean exit even with keep_on_failure"
-    )
+    assert not os.path.isdir(
+        skills_dir
+    ), "Should be torn down on clean exit even with keep_on_failure"
 
 
 def test_config_content_has_options_apikey():
@@ -54,9 +54,9 @@ def test_config_content_has_options_apikey():
         cfg = json.loads(env.config_content)
         # Must use options.apiKey, not direct apiKey (I1 fix)
         assert cfg["provider"]["openai"]["options"]["apiKey"] == "sk-test-key"
-        assert "apiKey" not in cfg["provider"]["openai"], (
-            "apiKey must be nested under options"
-        )
+        assert (
+            "apiKey" not in cfg["provider"]["openai"]
+        ), "apiKey must be nested under options"
 
 
 def test_config_content_has_skills_path():
@@ -228,6 +228,7 @@ def _mcp_tool_names(command: list[str], env: dict, timeout: int = 30) -> list[st
         proc.wait(timeout=5)
 
 
+@pytest.mark.requires_binary
 def test_the_configured_mcp_command_serves_tools():
     """The command written into the config has to actually answer `tools/list`.
 
@@ -264,6 +265,7 @@ def test_the_configured_mcp_command_serves_tools():
         "Skipped, NOT passed: nothing here has verified that an agent session sees iad tools."
     ),
 )
+@pytest.mark.billable  # spawns a real agent session
 def test_isolated_env_has_tools():
     """A real session in an isolated env can call an iad tool.
 

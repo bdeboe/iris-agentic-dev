@@ -1,6 +1,6 @@
 # Next release notes (staging)
 
-Baseline: v1.4.2, whose notes are final in `docs/release-notes/v1.4.2.md`. Nothing is
+Baseline: v1.4.2, whose notes are final in `docs/release-notes/v1.4.2.md`. What follows is
 staged for the release after it.
 
 I add an entry here as each user-facing change lands, so release notes are not
@@ -22,7 +22,36 @@ Rules for anything written here:
 
 ## What's new
 
-Nothing staged.
+### The skills are measured at nothing, and the README says so
+
+The front page advertised **+27%** for `objectscript-review`. That number was true when it was
+measured, under a harness that used a model to judge whether a task passed, on a 22-task repair
+corpus. Both are gone. I built a graded corpus: 62 tasks, every one scored by an ObjectScript check
+that prints `PASS` or `FAIL`, with no model anywhere in the scoring path. Then I ran the skills
+against it on a 41-pair holdout.
+
+Adding the skills on top of the tools moved the pass rate **+0.098, interval [-0.034, +0.229]**. Six
+tasks won, two lost, p=0.1445. That is indistinguishable from no effect, and it is not an underpowered
+run hiding a win: 41 pairs clears the floor of 37, so the interval is a real answer rather than a
+shrug. The README leads with that now.
+
+The tools are the other half of the same run: **+0.829, interval [+0.714, +0.944]**, from the same 41
+pairs and the same check. So what iad is for has not changed. Which part of it has evidence has.
+
+If you installed the skills expecting the +27%, that figure never covered what the graded corpus
+measures. `objectscript-loop-patterns` still measures **−19%** on the older model-judged repair suite,
+which is the one skill I would not install.
+
+### `specs/121-benchmark-program/quickstart.md`
+
+Every number above is checkable from a fresh clone. The quickstart walks it: what runs for free (the
+split check, the harness suite, a dry-run cost ladder), what costs money and how much, how to resume a
+run that dies halfway, and how to read `b`, `c`, the Wilson interval and the floor. It says which
+commands need Docker and which need a model credential, because those are different failures.
+
+`tests/e2e/test_published_figures.py` ties both figures to
+`tests/e2e/results/ladder-121-tools-holdout.json`. If a future run moves them and the documents do
+not follow, that test fails.
 
 ## Notable fixes
 

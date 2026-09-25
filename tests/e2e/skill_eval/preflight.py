@@ -25,7 +25,12 @@ import yaml
 # Triggers the sys.path shim that makes `runner` importable.
 import tests.e2e.skill_eval  # noqa: F401
 from tests.e2e.skill_eval import provenance
-from runner._client import CREDENTIAL_VARS, auth_source, haiku_model, make_client  # noqa: E402
+from tests.e2e.skill_eval.scorer_client import (  # noqa: E402
+    CREDENTIAL_VARS,
+    auth_source,
+    haiku_model,
+    make_client,
+)
 
 _TARGETED_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "tasks", "skills", "targeted")

@@ -1,0 +1,39 @@
+id: CORPUS-29
+prompt: |
+  Bench.Patch.Without(pJson, pKey) in the BENCHMARK namespace should return the
+  JSON object with that member gone. It sets the member to an empty string instead, so the key is
+  still there. Fix it and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Patch
+    content: |
+      Class Bench.Patch Extends %RegisteredObject
+      {
+
+      ClassMethod Without(pJson As %String, pKey As %String) As %String
+      {
+          Set tObject = ##class(%DynamicObject).%FromJSON(pJson)
+          Do tObject.%Set(pKey, "")
+          Quit tObject.%ToJSON()
+      }
+
+      }
+check: |
+  try { set r=##class(Bench.Patch).Without("{""a"":1,""b"":2}","a") set o=##class(%DynamicObject).%FromJSON(r) set ok=('o.%IsDefined("a")&&(o.%Get("b")=2)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Patch
+    content: |
+      Class Bench.Patch Extends %RegisteredObject
+      {
+
+      ClassMethod Without(pJson As %String, pKey As %String) As %String
+      {
+          Set tObject = ##class(%DynamicObject).%FromJSON(pJson)
+          Do tObject.%Remove(pKey)
+          Quit tObject.%ToJSON()
+      }
+
+      }
+tags: [json, dynamic-objects]

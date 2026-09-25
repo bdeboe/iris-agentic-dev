@@ -1,0 +1,70 @@
+id: CORPUS-09
+prompt: |
+  Bench.Score in the BENCHMARK namespace is a persistent class with a Value property.
+  Seed() clears the extent and inserts the values 10, 20 and 30. TopValue() is meant to
+  return the largest stored value with a SQL aggregate, and returns the smallest. Fix it
+  and leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+fixtures:
+  - name: Bench.Score
+    content: |
+      Class Bench.Score Extends %Persistent
+      {
+
+      Property Value As %Integer;
+
+      ClassMethod Seed() As %Status
+      {
+          Set tSC = $$$OK
+          Do ..%DeleteExtent()
+          For tValue = 10, 20, 30 {
+              Set tRow = ..%New()
+              Set tRow.Value = tValue
+              Set tSC = tRow.%Save()
+              If $$$ISERR(tSC) { Quit }
+          }
+          Quit tSC
+      }
+
+      ClassMethod TopValue() As %Integer
+      {
+          &sql(SELECT MIN(Value) INTO :tTop FROM Bench.Score)
+          If SQLCODE '= 0 { Quit "" }
+          Quit tTop
+      }
+
+      }
+check: |
+  try { do ##class(Bench.Score).Seed() set ok=(##class(Bench.Score).TopValue()=30) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Score
+    content: |
+      Class Bench.Score Extends %Persistent
+      {
+
+      Property Value As %Integer;
+
+      ClassMethod Seed() As %Status
+      {
+          Set tSC = $$$OK
+          Do ..%DeleteExtent()
+          For tValue = 10, 20, 30 {
+              Set tRow = ..%New()
+              Set tRow.Value = tValue
+              Set tSC = tRow.%Save()
+              If $$$ISERR(tSC) { Quit }
+          }
+          Quit tSC
+      }
+
+      ClassMethod TopValue() As %Integer
+      {
+          &sql(SELECT MAX(Value) INTO :tTop FROM Bench.Score)
+          If SQLCODE '= 0 { Quit "" }
+          Quit tTop
+      }
+
+      }
+tags: [sql, persistence]
