@@ -76,3 +76,65 @@ fn extension_package_lock_version_matches_package_json() {
          writes the root version in both places and both have to move"
     );
 }
+
+/// The plugin launched `iris-dev`, a name no install channel has shipped since the rename: Cargo
+/// builds `iris-agentic-dev` and the Homebrew formula installs it under that name. On a clean
+/// Homebrew install the plugin's MCP server failed to start; on a machine with an old
+/// `~/.local/bin/iris-dev` it started silently on 0.9.10 while 1.4.2 was installed.
+///
+/// Checks every `mcpServers.*.command` against the Cargo `[[bin]]` name and against the name the
+/// formula installs, so a rename in any one of the three fails here.
+#[test]
+fn plugin_json_command_matches_installed_binary_name() {
+    let mut root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    root.pop(); // iris-agentic-dev-bin → crates
+    root.pop(); // crates → workspace root
+    let read = |rel: &str| -> String {
+        let path = root.join(rel);
+        std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()))
+    };
+
+    let cargo = read("crates/iris-agentic-dev-bin/Cargo.toml");
+    let sections: Vec<&str> = cargo.split("[[bin]]").skip(1).collect();
+    assert_eq!(
+        sections.len(),
+        1,
+        "expected exactly one [[bin]] in the bin crate"
+    );
+    let cargo_bin = sections[0]
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("name"))
+        .and_then(|rest| rest.trim().strip_prefix('='))
+        .map(|s| s.trim().trim_matches('"'))
+        .expect("[[bin]] needs a name");
+
+    let formula = read("Formula/iris-agentic-dev.rb");
+    let installed = formula
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("bin.install "))
+        .and_then(|rest| rest.rsplit("=>").next())
+        .map(|s| s.trim().trim_matches('"'))
+        .expect("formula must have a `bin.install <src> => \"<name>\"` line");
+    assert_eq!(
+        installed, cargo_bin,
+        "Formula installs `{installed}` but Cargo builds `{cargo_bin}`"
+    );
+
+    let manifest: serde_json::Value = serde_json::from_str(&read(".claude-plugin/plugin.json"))
+        .expect(".claude-plugin/plugin.json must be valid JSON");
+    let servers = manifest["mcpServers"]
+        .as_object()
+        .expect("plugin.json must have an mcpServers object");
+    assert!(!servers.is_empty(), "plugin.json declares no MCP servers");
+    for (name, server) in servers {
+        let command = server["command"]
+            .as_str()
+            .unwrap_or_else(|| panic!("mcpServers.{name}.command must be a string"));
+        assert_eq!(
+            command, cargo_bin,
+            "plugin.json mcpServers.{name} launches `{command}`, but the installed binary is \
+             `{cargo_bin}` — the plugin cannot start its server on a clean install"
+        );
+    }
+}
