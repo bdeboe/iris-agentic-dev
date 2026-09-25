@@ -22,8 +22,10 @@ TAP = "intersystems-community/tap"
 
 #: `brew tap <owner>/<name>`, and the same owner/name when passed to `brew install` as a
 #: fully-qualified formula.
-_TAP_RE = re.compile(r"brew\s+tap\s+(\S+)")
-_QUALIFIED_INSTALL_RE = re.compile(r"brew\s+(?:install|reinstall)\s+([\w.-]+/[\w.-]+)/")
+_TAP_RE = re.compile(r"\bbrew\s+tap\s+(\S+)")
+_QUALIFIED_INSTALL_RE = re.compile(
+    r"\bbrew\s+(?:install|reinstall)\s+([\w.-]+/[\w.-]+)/"
+)
 
 _REPO_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -72,3 +74,11 @@ def test_the_install_instructions_are_somewhere_a_reader_lands():
             f"{required} does not name the {TAP} tap. Both are entry points, and a reader who "
             f"lands on one should not have to find the other to install anything"
         )
+
+
+def test_prose_about_the_homebrew_tap_is_not_a_tap_command():
+    """Prose saying the Homebrew tap MUST name something once parsed as `brew tap MUST`."""
+    assert (
+        _TAP_RE.findall("Every document that names the Homebrew tap MUST name it") == []
+    )
+    assert _TAP_RE.findall("brew tap intersystems-community/tap\n") == [TAP]
