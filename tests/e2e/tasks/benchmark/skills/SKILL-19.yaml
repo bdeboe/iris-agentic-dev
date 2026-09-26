@@ -1,0 +1,39 @@
+id: SKILL-19
+prompt: |
+  Bench.Tdd.Total(pA, pB) in the BENCHMARK namespace must return pA + pB. The class compiles clean,
+  but callers get an error. Fix it. Leave the class compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: objectscript-tdd
+fixtures:
+- name: Bench.Tdd
+  content: |
+    Class Bench.Tdd Extends %RegisteredObject
+    {
+
+    ClassMethod Total(pA As %Integer, pB As %Integer) As %Integer
+    {
+        Set tSum = pA + pB
+        Quit tSun
+    }
+
+    }
+check: |
+  try { set ok=((##class(Bench.Tdd).Total(2,3)=5)&&(##class(Bench.Tdd).Total(10,-4)=6)) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+- name: Bench.Tdd
+  content: |
+    Class Bench.Tdd Extends %RegisteredObject
+    {
+
+    ClassMethod Total(pA As %Integer, pB As %Integer) As %Integer
+    {
+        Set tSum = pA + pB
+        Quit tSum
+    }
+
+    }
+tags:
+- runtime
+- undefined

@@ -1,0 +1,47 @@
+id: SKILL-17
+prompt: |
+  Bench.Ns.SysCount() in the BENCHMARK namespace returns the number of users defined on the instance.
+  It returns the right number, but callers find themselves in %SYS afterwards. Make it return the
+  count and leave the caller in the namespace it was called from. Leave the class compiled on the
+  server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: objectscript-guardrails
+fixtures:
+- name: Bench.Ns
+  content: |
+    Class Bench.Ns Extends %RegisteredObject
+    {
+
+    /// Number of users defined on the instance.
+    ClassMethod SysCount() As %Integer
+    {
+        Set $NAMESPACE = "%SYS"
+        Set tRs = ##class(%SQL.Statement).%ExecDirect(, "SELECT COUNT(*) FROM Security.Users")
+        Do tRs.%Next()
+        Quit tRs.%GetData(1)
+    }
+
+    }
+check: |
+  try { set n=##class(Bench.Ns).SysCount() set ok=((n>0)&&($namespace="BENCHMARK")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+- name: Bench.Ns
+  content: |
+    Class Bench.Ns Extends %RegisteredObject
+    {
+
+    /// Number of users defined on the instance.
+    ClassMethod SysCount() As %Integer
+    {
+        New $NAMESPACE
+        Set $NAMESPACE = "%SYS"
+        Set tRs = ##class(%SQL.Statement).%ExecDirect(, "SELECT COUNT(*) FROM Security.Users")
+        Do tRs.%Next()
+        Quit tRs.%GetData(1)
+    }
+
+    }
+tags:
+- namespace

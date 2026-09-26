@@ -12,8 +12,8 @@ Tests come first in every phase.
 
 ## Phase 2: ladder (US2)
 
-- [ ] T006 SKILL-13 to SKILL-19 plus the `split.toml` holdout entries
-- [ ] T007 Shape test and live before/after test pass for the new tasks
+- [X] T006 SKILL-13 to SKILL-19 plus the `split.toml` holdout entries
+- [X] T007 Shape test and live before/after test pass for the new tasks
 
 ## Phase 3: loop surface (US3)
 

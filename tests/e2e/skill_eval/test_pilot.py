@@ -306,7 +306,12 @@ def test_the_committed_pilot_is_not_publishable():
     assert written["model"] == PILOT_MODEL
     assert written["timeout_seconds"] == SESSION_TIMEOUT
     assert list(written["arms"]) == [BARE.name, TOOLS.name, TOOLS_SKILLS.name]
-    assert written["skills_installed"] == list(shipped_skills())
+    # The pilot installed the pack as it was. A skill added since is named here, so the record and the
+    # pack can only drift apart by a visible edit.
+    added_after_pilot = {"iris-query-plans"}
+    assert written["skills_installed"] == [
+        s for s in shipped_skills() if s not in added_after_pilot
+    ]
 
 
 # --- the pilot runs through the boundary — 120 T004/T005, Phase 1 gate ---------------------------

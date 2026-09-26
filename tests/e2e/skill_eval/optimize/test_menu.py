@@ -22,7 +22,7 @@ def test_loads_bundled_and_plugin_skills():
     names = {s.name for s in load_skills()}
     assert "objectscript-sql-patterns" in names
     assert "pyprod" in names, "plugin skills at the top of skills/ are on the menu too"
-    assert len(names) == 38
+    assert len(names) == 39  # 130 added iris-query-plans
 
 
 def test_every_skill_has_description_and_body():

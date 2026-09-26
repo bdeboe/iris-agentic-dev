@@ -613,9 +613,10 @@ def test_the_pooled_task_set_is_every_holdout_skill_task_and_each_one_names_a_sk
     from tests.e2e.skill_eval import ladder
 
     tasks = ladder.pooled_skill_tasks()
-    assert len(tasks) == 12
+    # 121's twelve over four skills, plus 130's SKILL-13 to SKILL-19.
+    assert len(tasks) == 19
     assert all(task.skill for task in tasks)
-    assert len({task.skill for task in tasks}) == 4
+    assert len({task.skill for task in tasks}) == 9
 
 
 # --- the dead-environment abort --------------------------------------------------------------------
