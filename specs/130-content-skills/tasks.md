@@ -12,14 +12,14 @@ Tests come first in every phase.
 
 ## Phase 2: ladder (US2)
 
-- [X] T006 SKILL-13 to SKILL-19 plus the `split.toml` holdout entries
-- [X] T007 Shape test and live before/after test pass for the new tasks
+- [x] T006 SKILL-13 to SKILL-19 plus the `split.toml` holdout entries
+- [x] T007 Shape test and live before/after test pass for the new tasks
 
 ## Phase 3: loop surface (US3)
 
-- [ ] T008 Offline tests: `editable` filter, the apply step refuses an untouched skill, corpus/split agree, CLI
-- [ ] T009 `editable` in `RoutingAdapter`, the `content-descriptions` surface, runner wiring
-- [ ] T010 Content corpus, two blind label passes, frozen split
+- [x] T008 Offline tests: `editable` filter, the apply step refuses an untouched skill, corpus/split agree, CLI
+- [x] T009 `editable` in `RoutingAdapter`, the `content-descriptions` surface, runner wiring
+- [x] T010 Content corpus, two blind label passes, frozen split
 
 ## Phase 4: runs, docs, cleanup
 

@@ -1,0 +1,759 @@
+## SKILL aihub-eap
+Headings: # InterSystems AI Hub — EAP Reference (Build 162) | ## 1. Getting the Build | ## 2. Docker Setup | ### Fix expired default password | # In session: | #  write ##class(Security.Users).UnExpireUserPasswords("*") | ### iris-devtester integration | ## 3. %AI.Agent — Build 159 Patterns | ### Pattern A: Declarative subclass (recommended) | ### Pattern B: Programmatic (for dynamic provider selection) | ### Pattern C: ConfigStore integration (production pattern) | ## 4. @{} Variable Substitution | ## 5. Session Management | ## 6. %AI.Provider — Supported Providers | ## 7. ConfigStore API | ## 8. Wallet (Secrets) | ## 9. Python (langchain-intersystems) | ## 10. Breaking Changes: Build 141 → 159 | ## 11. Quick Smoke Test | ## 12. Verified-on-Build-159 Findings (2026-04-25) | ### `@{}` substitution — `wallet` prefix NOT registered on 159 | ### `%AI.LLM.Response` — use `.Content`, never `.%Get("content")` | ### `LLMConfig` property is gone on 159 (confirmed) | ### `irishealth` vs `iris` image — use `irishealth` for MCP over HTTP | # ✅ For MCP over HTTP: | # ⚠️ Plain iris image has no web gateway — iris_execute HTTP path won't work | ### Empty `Parameter APIKEY` auto-reads from OS environment | ## 13. Build 161 MCP Server Breaking Changes (2026-04-26) | ### `%AI.MCP.Service.Utils` is GONE in build 161 | ### Compile order is critical in build 161 | ### `iris session IRIS -U USER "..."` hangs in build 161 | # ❌ Hangs — do not use for readiness checks: | # ✅ TCP probe — works reliably: | # ✅ Script file via irissession — works for class loading: | ### iris-mcp-server binary is architecture-specific | # ✅ Sidecar pattern — gets the right binary for the right arch: | ### `AutheEnabled=96` — must patch if iris.script ran at image build time | ## 14. Build 162 New Classes (community 2026-04-26; enterprise pending) | ### RAG stack (new in 162) | ### MCP client in ToolSet XData (consume external MCP servers, new in 162) | ### Built-in tool providers (new in 162) | ### Agent composition (new in 162) | ### ConfigStore/Wallet API (new in 162, NOT in enterprise 161) | ### MCP client in ToolSet (162 only) — consume external MCP servers | ### docker pull for 162 community | ## 15. Linux Docker Volume Permissions | ### Fix Options | #### Option 1 — POSIX ACLs (recommended) | #### Option 2 — tmpfs (no persistence) | # docker-compose.yml | #### Option 3 — Docker named volume
+# InterSystems AI Hub — EAP Reference (Build 162)
+> **Current build: 2026.2.0AI.162** (community image available; enterprise pending)
+> `LLMConfig` property is GONE. The pattern is now Parameters + `%Init()` + ConfigStore.
+> Build 161 has MCP server breaking changes — see section 13.
+> Build 162 adds 13 new `%AI` classes vs 161 — see section 14.
+---
+## 1. Getting the Build
+**EAP Portal**: <https://evaluation.intersystems.com/Eval/early-access/AIHub>
+**Current build: 2026.2.0AI.162.0** (as of 2026-04-26)
+Available downloads:
+```text
+iris-community-2026.2.0AI.158.0-docker.tar.gz          # x86_64 Docker (community, no key needed)
+iris_arm64-community-2026.2.0AI.158.0-docker.tar.gz    # ARM64 Docker (community)
+iris-container-x64.key                                   # License key (removes community limits)
+iris-container-arm64.key                                  # ARM64 license key
+iris.key                                                  # General license key
+langchain_intersystems-0.0.1-py3-none-any.whl           # Python SDK
+IRIS_Community-2026.2.0AI.158.0-macx64.tar.gz           # macOS Intel
+## SKILL ensemble-production
+Headings: ## When to use productions — scenario mapping | ## Context Detection | ## Python / pyprod API | ### Execution context — CRITICAL | ### Install | ### `director` module — lifecycle management (embedded Python only) | # --- Check status first (always) --- | # Returns 3-tuple: (status, production_name, state) | # status: IRIS %Status string — "1" means success | # production_name: str or None — None when state is 2 (stopped) | # state: "1"=running, "2"=stopped, "3"=suspended, "4"=troubled | ## Config change: hot update first | # Hot-apply config changes; the production keeps running | # Heavier: stop and start the whole production. Nothing is lost, but every host goes down | ### Full director API | # Lifecycle | # Items — do_update=True hot-applies immediately (production can stay running) | # Inspect all productions | # details[name] = {"status": ..., "last_start_time": ..., "last_stop_time": ...} | # Messages for a host (most recent first) | # Inject a message into a running production (adapterless service only) | ### State values — get_production_status() | ### Declarative production definition (external CLI only) | ## ObjectScript API (no MCP tools) | ### Start / stop / verify | ### Check running state | ### Key rules for ObjectScript | ## MCP Tool Process Flow | ### Investigating a production problem | ### Making a configuration change | ### Choosing update, host restart or stop | # Graceful stop (waits for the message in hand) | # Start with the production class name | # Confirm | ### Recovering a faulted production | ## Tool Reference | ## Interop depth tools | ### `iris_message_body(message_id)` | ### `iris_business_rule_info(action, rule_name?)` | ### `iris_production_diff` | ### `iris_lookup_manage(action, table, key?)` | ### `iris_lookup_transfer(action, table)` | ### `iris_credential_list` | ### `iris_credential_manage(action, id)` | ## Safety Rules | ## Common gotchas | ### OnRequest signature — must use `%Library.Persistent` | ### Ens.Request storage — leave it to the compiler | ### OnResponse required in BusinessProcess | ### iris_production start returning "Invalid Production" | ## Testing without the Management Portal | ## Output Format | ## Related skills
+## When to use productions — scenario mapping
+| Scenario                                                | Pattern                                |
+| ------------------------------------------------------- | -------------------------------------- |
+| Receive files/messages, validate, route to destinations | Production                             |
+| Transform between formats (HL7 ↔ JSON ↔ XML)            | Production + Business Process          |
+| Call external API or write to DB as part of a workflow  | Production + Business Operation        |
+| Simple scheduled script                                 | Task Scheduler (not productions)       |
+| Real-time REST endpoint                                 | CSP/REST application (not productions) |
+**Four components at a glance:**
+- **Service** — data in; receives/polls external input and injects messages into the production
+- **Process** — routing/transform; contains business logic, orchestrates multi-step workflows
+- **Operation** — data out; sends messages to external systems (APIs, files, databases)
+- **Message** — the carrier; extend `Ens.Request` / `Ens.Response` for typed payloads
+---
+## Context Detection
+**If you have `iris_production` MCP tool available** → use the MCP Process Flow below.
+**If writing Python code** (`.py` file, or `iris_execute` tool with embedded Python) → use the Python / pyprod API section.
+## SKILL iris-agentic-dev
+Headings: # iris-agentic-dev MCP | ## Task → skill map | ## The two facts that trip people up | ## Start with `check_config` — do not guess | ## `IRIS_UNREACHABLE` — cause and fix | # -> 52773/tcp -> 0.0.0.0:42773 | ## `<CLASS DOES NOT EXIST>` for a system class | ## Loading an XML export | ## `.iris-agentic-dev.toml` key reference | ### HTTPS behind an enterprise web gateway | ### `docker_only` — skip HTTP entirely | ### Multi-instance connection pool | ### Write protection — two tiers | ### Fleet / operate mode (multi-instance) | ### Per-connection policy | ### Config troubleshooting | ## Atelier REST requirement | ## Fallback: `docker exec` when MCP is unavailable | ## Toolset flag | ## Adding skills for private or local packages | ## Related skills
+# iris-agentic-dev MCP
+`iris-agentic-dev` is a Rust binary that runs an MCP server (`iris-agentic-dev mcp`)
+exposing IRIS dev tools — `iris_execute`, `iris_query`, `iris_doc`, `docs_introspect`,
+`iris_compile`, `kb`, `iris_global`, etc. Registered per-project in `~/.claude.json`
+under `mcpServers`, each with an `env: { IRIS_CONTAINER: "<name>" }`. It talks to IRIS
+over the **Atelier REST API** (needs the web server / web gateway — port 52773-family).
+## Task → skill map
+Load the skill(s) for what you're about to do. You don't need them all — just the ones for your task.
+| Task                              | Load skill                                        |
+| --------------------------------- | ------------------------------------------------- |
+| Write or review ObjectScript      | `objectscript-review` + `objectscript-guardrails` |
+| Fix a bug or runtime error        | `objectscript-debugging`                          |
+| Navigate an unfamiliar codebase   | `objectscript-navigation`                         |
+| Write or run %UnitTest tests      | `objectscript-unit-test`                          |
+| TDD loop (write → compile → test) | `objectscript-tdd`                                |
+| Measure test coverage             | `objectscript-coverage`                           |
+| Write SQL or fix SQLCODE errors   | `objectscript-sql-patterns`                       |
+| Work with `$LIST` / `$LISTBUILD`  | `objectscript-list-patterns`                      |
+| Interoperability production       | `ensemble-production`                             |
+| Python in IRIS                    | `iris-embedded-python` + `irispython-connector`   |
+| Vector search                     | `iris-vector-ai`                                  |
+## SKILL iris-ai-hub
+Headings: # iris-ai-hub | ## Availability — EAP only | ## When to load this skill | ## Python vs ObjectScript — choose first | ## `%AI.Agent` — ObjectScript inside IRIS | ## `%AI.Tool` — single tool class (simplest) | ## `%AI.ToolSet` — multiple tools in one class | ## Agent as Interoperability BO | ## BPL async suspend with agent BO + human workflow | ## Message classes
+# iris-ai-hub
+## Availability — EAP only
+**IRIS AI Hub (`%AI.*` classes) is not in any generally available IRIS release.**
+It is only available through the Early Access Program (EAP) as downloadable container
+images from [evaluation.intersystems.com](https://evaluation.intersystems.com).
+- Do NOT suggest `zpm install`, `pip install`, or any package manager path — none exist yet.
+- Do NOT suggest downloading from Docker Hub or GHCR — the images are gated behind EAP login.
+- If the user does not have an EAP image, direct them to evaluation.intersystems.com to request access.
+- All `%AI.*` classes shown below are confirmed against EAP container builds. They may change before GA.
+## When to load this skill
+Load when the user is working with an EAP IRIS AI Hub container and building:
+- `%AI.Agent` or `%AI.Tool` / `%AI.ToolSet` classes
+- Interoperability productions that invoke AI agents as Business Operations
+- Human-in-the-loop workflows combining AI assessment with `EnsLib.Workflow.Operation`
+- Python-vs-ObjectScript architecture decisions for AI Hub integrations
+---
+## Python vs ObjectScript — choose first
+## SKILL iris-connectivity
+Headings: # IRIS Connectivity — Hard Gate | ## HARD GATE | ## Python — DBAPI (SQL queries) | # Install: pip install intersystems-irispython | # WRONG — ModuleNotFoundError: no module named 'intersystems_iris.dbapi' | #   import intersystems_iris.dbapi as iris | # `dbapi` is an attribute on that package, not an importable submodule. | # Stored procedures — use SELECT not CALL or EXEC: | ## Python — Native API (globals, ClassMethods) | # Same package, different import path: | # Call a ClassMethod: | # Read/write globals: | ## JDBC | ## Port Reference | ## pgwire Gotcha — TEXT columns are streams | # pgwire (psycopg2) + IRIS: TEXT/LONGVARCHAR columns are %Stream objects | # WRONG — will return garbled binary or error: | # CORRECT — cast to VARCHAR in the query: | ## When to use which interface | ### Package → module names | ## Connecting to a test container (iris-devtester)
+# IRIS Connectivity — Hard Gate
+**IRIS connection syntax is unique. Every other database pattern is wrong.**
+## HARD GATE
+- [ ] Python package: `pip install intersystems-irispython` → `import iris.dbapi` (DBAPI) or `import iris` (Native API) — NOT `pyodbc`, `iris-python`
+- [ ] **`import intersystems_iris.dbapi` raises `ModuleNotFoundError`** — `dbapi` is an attribute, not a submodule. Use `import iris.dbapi`, or `from intersystems_iris import dbapi` if you are on the `intersystems-iris` package instead (see the package/module table below)
+- [ ] Python procedures: `cursor.execute("SELECT MyProc(?)")` — NOT `cursor.callproc()` or `EXEC`
+- [ ] JDBC URL: `jdbc:IRIS://host:1972/NAMESPACE` — NOT `jdbc:Cache://` (old Caché) or `jdbc:intersystems:iris://`
+- [ ] JDBC driver class: `com.intersystems.jdbc.IRISDriver` — NOT `com.intersystems.jdbc.CacheDriver`
+- [ ] Superserver port: **1972** (DBAPI/JDBC/Native API) vs web port **52773** (REST/Atelier/MCP) — these are different
+- [ ] pgwire TEXT columns are streams in IRIS — `LENGTH()` fails with SQLCODE -37 on stream fields
+---
+## Python — DBAPI (SQL queries)
+```python
+# Install: pip install intersystems-irispython
+import iris.dbapi as irisdbapi
+# WRONG — ModuleNotFoundError: no module named 'intersystems_iris.dbapi'
+#   import intersystems_iris.dbapi as iris
+# `dbapi` is an attribute on that package, not an importable submodule.
+## SKILL iris-container-graceful-shutdown
+Headings: # IRIS Container Graceful Shutdown | ## The Problem | ## Fix: Always Run `iris stop IRIS quietly` Before `docker stop` | ## docker-compose Pattern | #!/bin/bash | ## iris-devtester (v1.18.1+) | # __exit__ calls iris stop IRIS quietly before docker stop | ## Why a Webgateway, CPF Merge, or stop_grace_period Alone Is Not Enough | ## Custom Entrypoint (Full SIGTERM Trap) | #!/bin/sh | # graceful-iris-entrypoint.sh | ## Kubernetes PreStop Hook | ## Diagnosis | # After restart, check WIJ state at startup | # Clean startup:   "Journal startup: WIJ is clean" | # Recovery needed: "Journal startup: WIJ recovery in progress"
+# IRIS Container Graceful Shutdown
+## The Problem
+`docker stop` sends SIGTERM then SIGKILL after the grace period. **IRIS does not trap SIGTERM in its default entrypoint.** Docker kills it. The WIJ (write image journal — IRIS's write buffer) is not flushed. On restart, IRIS runs journal recovery which takes 30-300 seconds. Uncommitted in-flight writes are lost.
+**Symptom**: After `docker stop` + `docker start`, tables exist (schema survived) but rows are 0.
+**This is silent** — no error, no warning, IRIS starts cleanly, data appears empty.
+---
+## Fix: Always Run `iris stop IRIS quietly` Before `docker stop`
+```bash
+docker exec <container> iris stop IRIS quietly
+docker stop <container>
+```
+This flushes the WIJ, checkpoints globals, and marks the database clean. Next start is instant.
+---
+## docker-compose Pattern
+## SKILL iris-cpf-merge
+Headings: # IRIS CPF Merge | ## HARD GATE | ## Standard Presets (iris-devtester CPFPreset) | # Enable CallIn service only | # → [Actions] | # → ModifyService:Name=%Service_CallIn,Enabled=1,AutheEnabled=48 | # Clear ChangePassword for _SYSTEM + SuperUser, enable CallIn | # → [Actions] | # → ModifyService:Name=%Service_CallIn,Enabled=1,AutheEnabled=48 | # → ModifyUser:Name=SuperUser,PasswordHash=<hash>,ChangePassword=0,PasswordNeverExpires=1 | # → ModifyUser:Name=_SYSTEM,ChangePassword=0,PasswordNeverExpires=1 | # Memory tuning for CI | # → [config] | # → globals=0,0,256,0,0,0 | # → gmheap=64000 | ## grongierisc Template Pattern | # merge.cpf | # docker-compose.yml | ## CPF Actions Reference | # Create a namespace with separate databases | # Enable CallIn (required for DBAPI) | # Clear password expiration | # Custom user with known password hash | ## Generating a PasswordHash | ## iris-devtester Usage | # Automatic (1.18.0+): start() injects SECURE_DEFAULTS automatically | # Manual override: provide your own CPF content | # From file | ## Anti-Patterns | # WRONG: calling unexpire_all_passwords() before every connection | # RIGHT (1.18.0+): CPF merge handles it at startup | # iris.get_connection() is optimistic — no pre-emptive docker exec | # WRONG: only patching SuperUser | # RIGHT: patch both
+# IRIS CPF Merge
+**What it is**: A `merge.cpf` file processed by IRIS at startup (before the superserver opens) via the `ISC_CPF_MERGE_FILE` environment variable. Enables zero-`docker exec` configuration of users, services, memory, and namespaces.
+---
+## HARD GATE
+- `ChangePassword=0` must be set for **both** `_SYSTEM` and `SuperUser` — only patching one leaves the default connection user broken
+- CPF merge fires **before** IRIS opens the superserver — this is a feature, not a limitation
+- Do NOT rely on `unexpire_all_passwords()` via docker exec as the primary path — CPF merge is faster, more reliable, and works in restricted CI environments
+---
+## Standard Presets (iris-devtester CPFPreset)
+```python
+from iris_devtester.config.presets import CPFPreset
+# Enable CallIn service only
+CPFPreset.ENABLE_CALLIN
+# → [Actions]
+# → ModifyService:Name=%Service_CallIn,Enabled=1,AutheEnabled=48
+# Clear ChangePassword for _SYSTEM + SuperUser, enable CallIn
+## SKILL iris-devtester
+Headings: # iris-devtester — Container Testing Toolkit | ## HARD GATE — Common Mistakes | ## Factory Methods | # Community — default, auto-detects ARM64 vs x86 | # Light — CI/CD, 580MB, no web server | # Enterprise — needs IRIS_LICENSE_KEY env var or license_key= kwarg | # Health — irishealth-community + FHIR R4 pre-installed (see irishealth-container skill) | # AI Hub — %AI.Agent, VECTOR SQL, ISC internal registry (see irishealth-container skill) | # Attach — reconnect to existing container (e.g. started by idt container up) | ## Password Strategy (1.18.0+) — CPF-First | ## Connection Flow | ## Diagnostic Tools (1.16.0+) | # Inspect connection state (schemas, IRIS version, latency) | # Health check from container (includes schema visibility) | ## Public Exports | ## pytest Fixtures | ## CLI (idt) | ## Gotchas
+# iris-devtester — Container Testing Toolkit
+**PyPI**: `pip install iris-devtester>=1.18.0`
+**Repo**: `github.com/intersystems-community/iris-devtester`
+---
+## HARD GATE — Common Mistakes
+- **DO NOT** call `unexpire_all_passwords()` proactively in `get_connection()` — 1.18.0 is CPF-first; docker exec only fires as fallback
+- **DO NOT** connect as `localhost` on macOS — use `127.0.0.1` (IPv6 resolution bug)
+- **DO NOT** use `IRISContainer(); iris.start()` — always `with IRISContainer.community() as iris:`
+- **DO NOT** hardcode ports — use `iris.get_mapped_port(1972)`
+- **DO NOT** bind-mount host directories on Linux without fixing uid 51773 — see `iris-linux-docker` skill
+---
+## Factory Methods
+```python
+from iris_devtester import IRISContainer
+# Community — default, auto-detects ARM64 vs x86
+with IRISContainer.community() as iris:
+    conn = iris.get_connection()
+## SKILL iris-docs
+Headings: # iris-docs — InterSystems Documentation Lookup | ## Decision table — which tool to use | ## Primary: `iris_doc_search` tool | ## Query formulation — bare tokens win | ## Recipe: "what parameters does class X accept?" | ## Fallback: Algolia recipe (manual, if tool is unavailable) | ## Fallback: Documatic URL (class reference, known class name) | ## Known gotchas (verified against IRIS 2025.1)
+# iris-docs — InterSystems Documentation Lookup
+## Decision table — which tool to use
+| Situation                                        | Tool                               |
+| ------------------------------------------------ | ---------------------------------- |
+| "What are all the ways to do X in IRIS?"         | `iris_doc_search`                  |
+| "What does error code Y mean?"                   | `iris_doc_search`                  |
+| "What methods does `%SQL.Statement` have?"       | `iris_doc_search`                  |
+| "Does this method exist / what's its signature?" | `docs_introspect` (live container) |
+| "Read/write a class document in IRIS"            | `iris_doc`                         |
+**`iris_doc_search` is the primary path.** Use it for any question where the answer
+lives in official documentation. `docs_introspect` is for inspecting classes in a
+running container. `iris_doc` is for reading/writing IRIS documents, not docs.
+---
+## Primary: `iris_doc_search` tool
+```json
+{
+  "tool": "iris_doc_search",
+  "query": "SQL execution methods ObjectScript",
+  "product": "InterSystems IRIS",
+## SKILL iris-embedded-python
+Headings: # iris-embedded-python | ## What it does | ## Key patterns | ### Call Python from ObjectScript | ### Call IRIS from Python | # Open a global | # Run a SQL query | ### Define a Python method in a class | ## SQL from embedded Python — known traps | ## Install | ## When to recommend
+# iris-embedded-python
+**Project**: [iris-embedded-python-wrapper](https://github.com/intersystems-community/iris-embedded-python-wrapper)
+**Install**: `zpm "install iris-embedded-python-wrapper"` (or built into IRIS 2021.2+)
+**Requires**: IRIS 2021.2+ (Embedded Python is a built-in feature; the wrapper adds convenience utilities)
+## What it does
+Embedded Python lets you write Python methods directly in ObjectScript classes, call any Python library from IRIS, and call IRIS globals/SQL from Python — all in-process, without a separate server.
+The `iris-embedded-python-wrapper` package adds:
+- Simplified gateway setup helpers
+- Utility methods for common patterns (e.g., calling ML models from ObjectScript)
+- Examples and documentation for the most common integration patterns
+## Key patterns
+### Call Python from ObjectScript
+```objectscript
+ClassMethod RunPython() As %Status
+{
+    Set pyobj = ##class(%SYS.Python).Import("mymodule")
+    // Quote a Python name that contains _. Unquoted, _ is ObjectScript concatenation:
+## SKILL iris-linux-docker
+Headings: # IRIS Docker — Linux Volume Permissions | ## The Problem | ## Fix Options | ### Option 1 — POSIX ACLs (recommended) | ### Option 2 — tmpfs (no persistence needed) | # docker-compose.yml | ### Option 3 — chown on host (broad, simple) | ### Option 4 — Named Docker volume (avoid bind-mount) | ## iris-devtester Pattern | # If this fails on Linux with iris-main.log error: | # Run: setfacl -R -m u:51773:rwX /home/user/myproject | #      setfacl -R -d -m u:51773:rwX /home/user/myproject | ## Anti-Pattern | # DO NOT do this on Linux without fixing permissions first:
+# IRIS Docker — Linux Volume Permissions
+## The Problem
+ALL IRIS container editions run as UID 51773 (`irisowner`). On Linux, if you
+bind-mount a host directory owned by UID 1000 (typical Linux user), the container
+can read the volume but cannot write to it. IRIS needs write access at startup.
+**Symptom** — container exits immediately with:
+```text
+terminate called after throwing an instance of 'std::runtime_error'
+what(): Unable to find/open file iris-main.log in current directory /home/irisowner/dev
+```
+**Affected**: All IRIS editions on Linux — community, enterprise, irishealth, ai_hub, light.
+**Not affected**: macOS (VirtioFS translates permissions transparently).
+Source: READY 2026 hackathon (Anthony Master, careconnect team).
+---
+## Fix Options
+### Option 1 — POSIX ACLs (recommended)
+## SKILL iris-objectscript-eval
+Headings: # Evaluating ObjectScript via MCP Tools | ## Preferred: MCP Tools (when objectscript MCP is connected) | ### Run arbitrary ObjectScript | ### Compile a .cls file | ### Run %UnitTest tests | ### Discover classes | ### Route a call to a different server | ## Fallback: docker exec (when MCP is unavailable) | ### Wait for IRIS to be ready | ### Execute ObjectScript non-interactively | # Single expression | # Multi-line via heredoc (always end with halt) | ### Script file approach | ### Compile via docker exec | # Load directory recursively (4th arg 1 = recursive; picks up .cls/.mac/.inc/.int) | # Restrict to one file type | ### Run tests via docker exec | ### Read test results programmatically | ### ZPM package loading — always compile afterward | ## Start a container (when none is running) | # Via iris-devtester (preferred — handles password auto-remediation) | # Via idt CLI | # Via docker run (manual — requires password fix afterward) | ## Windows notes | ## Common Mistakes
+# Evaluating ObjectScript via MCP Tools
+## Preferred: MCP Tools (when objectscript MCP is connected)
+Check with `/mcp` — if `objectscript` is listed, use these tools exclusively.
+### Run arbitrary ObjectScript
+```text
+iris_execute(code="write $ZVERSION,!", namespace="USER")
+iris_execute(code="set x=42\nwrite x,!")          # multiline: separate with \n
+iris_execute(code="write ##class(My.Pkg).Run()")  # call class methods
+```
+Returns `{success, output, namespace}`. Runtime errors are returned as structured errors, not exceptions.
+### Compile a .cls file
+```text
+iris_doc(mode="put", name="MyPackage.MyClass.cls", content="...", compile=true, namespace="USER")
+iris_compile(target="MyPackage.MyClass.cls")   # recompile what IRIS already holds
+iris_compile(target="*.cls")   # every class in the namespace, on the server
+```
+### Run %UnitTest tests
+## SKILL iris-pgwire
+Headings: # iris-pgwire | ## What it does | ## When to use this vs the alternatives | ## Install | # On the IRIS instance | ## Connection string | ## psycopg3 usage pattern | ## Key gotchas | ### Parameter style: `%s` only | # Correct | # Wrong — do not use | ### Type mapping | ### Transaction semantics | ### Namespace isolation | ### DDL support | ## Reference
+# iris-pgwire
+**Project**: [iris-pgwire](https://github.com/intersystems-community/iris-pgwire)
+**Status**: community preview
+**Requires**: IRIS 2024.1+; `iris-pgwire` package installed via ZPM
+## What it does
+`iris-pgwire` exposes IRIS SQL over the PostgreSQL wire protocol. Any
+`psycopg3`, `psycopg2`, `asyncpg`, or JDBC/Postgres-compatible client can
+connect to IRIS without the `intersystems-irispython` package.
+Useful when:
+- You're deploying to an environment where the IRIS Python gateway isn't
+  available (AWS Lambda, Docker minimal images, etc.)
+- You want to use standard Postgres tooling (`psql`, `pgAdmin`, `dbt`)
+- Your library requires a Postgres connection and you can't swap drivers
+## When to use this vs the alternatives
+| Scenario                               | Preferred driver                          |
+| -------------------------------------- | ----------------------------------------- |
+| Python inside IRIS (Embedded Python)   | `iris` native module                      |
+| Python outside IRIS, full IRIS API     | `intersystems-irispython`                 |
+## SKILL iris-product-features
+Headings: # IRIS Product Features — Hard Gate | ## HARD GATE | ## Native MCP Server (IRIS 2026.1+) | ## Full-Text Search — iFind (NOT PostgreSQL FTS) | ## Interoperability — HL7 Routing | ## IRIS Product Family (Not the Same Thing) | ## Mirroring / High Availability | ## Version Feature Quick Reference | ## VECTOR / EMBEDDING License Tiers — CRITICAL | ### Which tiers have vector search? | ### `$vectorop` / ObjectScript vector built-ins | ### What iris-vector-graph features work where | ### Capability detection | ### Never say | ## Interoperability — Namespace Enablement (The Key Bit) | ## %AI.RAG — What It Is and Is NOT | ### What %AI.RAG actually is | ### The right primitive for typed memory | ### Vector Search license — the two facts that are ALWAYS true
+# IRIS Product Features — Hard Gate
+**AI models deny features that exist and invent features that don't. Check here first.**
+## HARD GATE
+- [ ] **MCP**: IRIS has NATIVE MCP support (`%AI.MCP.Service`) since 2026.1 — no third-party FastMCP wrapper needed
+- [ ] **Full-text search**: Use `%CONTAINS` predicate with iFind index — NOT `to_tsvector` or `LIKE '%term%'`
+- [ ] **HL7/Interoperability**: Routing is done in the Management Portal or ObjectScript — NO Python API exists
+- [ ] **IRIS for Health ≠ HealthShare**: different products (see below)
+- [ ] **Mirroring**: configured via Management Portal or CPF files — NO CLI command `iris config mirroring`
+- [ ] **IRIS ≠ Caché**: Class/method naming and some APIs changed — always use IRIS docs, not Caché docs
+---
+## Native MCP Server (IRIS 2026.1+)
+```objectscript
+// IRIS has a built-in MCP server — no FastMCP, no Python required
+// The native server is %AI.MCP.Service
+// Configure via Management Portal: System > AI Configuration > MCP
+// Wrong assumption models make:
+// "IRIS doesn't support MCP natively, you need to wrap it with FastMCP"
+// This was true before 2026.1. It is FALSE for IRIS 2026.1+.
+## SKILL iris-query-plans
+Headings: # IRIS query plans and indexes | ## Read the plan | ## An index added in the class is empty until you build it | ## `INSERT %NOINDEX` leaves the index behind | ## `TUNE TABLE` | ## An outlier value reads the master map on purpose | ## Checklist | ## Related skills
+# IRIS query plans and indexes
+## Read the plan
+`iris_query(mode="explain", query="SELECT ... WHERE ...")` returns the plan IRIS will run. Two lines matter most:
+| Plan line                                                        | Meaning                                  |
+| ---------------------------------------------------------------- | ---------------------------------------- |
+| `Read master map Pkg.Table.IDKEY, looping on the subrange of ID` | full scan of the data rows               |
+| `Read index map Pkg.Table.StatusIdx`                             | the query uses the index `StatusIdx`     |
+| `Cost`                                                           | relative estimate; compare plans with it |
+On a 5,000-row table, `WHERE Status = 'OPEN'` with no index costs 33000 and reads the master map. After `CREATE INDEX StatusIdx ON Pkg.Orders (Status)` the same query reads the index map at cost 13720.
+## An index added in the class is empty until you build it
+Adding `Index CustIdx On Customer;` to a persistent class and compiling it defines the index but does not fill it. Queries that the planner sends through the index then return short, with `SQLCODE = 0` and no error. On a table with 10 rows for customer `C1`:
+```sql
+SELECT COUNT(*) FROM Pkg.Orders WHERE Customer = 'C1'            -- 0
+SELECT COUNT(*) FROM Pkg.Orders WHERE %NOINDEX Customer = 'C1'   -- 10
+```
+`%NOINDEX` in the WHERE clause tells the planner not to use an index for that condition, so it reads the data. When the two counts differ, the index is stale. Build it:
+## SKILL iris-sql
+Headings: # IRIS SQL — Quirks and Deviations from Standard SQL | ## HARD GATE | ## 1. Table Naming (the #1 source of SQLCODE -30) | ## 2. SQLCODE Semantics (backwards from intuition) | ## 3. Reserved Words — Complete Reference | ### Full IRIS SQL reserved word list | ### Most dangerous as table/class names | ### Most dangerous as property/column names | ### Aggregates as aliases: avg, count, sum, min, max | ### No Underscores in ObjectScript Member Names (IRIS 2025.1+) | ## 4. NULL vs Empty String | ## 5. IN Clause Limit (~500 params) | ## 6. Calling Procedures from Python iris.dbapi | # WRONG — raises SQLCODE -51 "SQL statement expected, IDENTIFIER found": | # CORRECT: | ## 7. DDL: What IRIS Doesn't Support | ## 8. %INLIST / FOR SOME — Searching %List Columns | ## 9. Date and Time Arithmetic | ## 10. Stream Columns in SQL Results | ## EXAMPLE: FOR SOME %ELEMENT — Both %INLIST and LIKE break on %List columns | ## EXAMPLE: IN clause chunking with `%Execute(args...)` | ## %ROWCOUNT and %ROWID After DML | ## %MATCHES — IRIS SQL Regex Operator | ## INSERT Syntax — No SQLite/MySQL Shortcuts | # WRONG — IRIS does not support INSERT OR IGNORE (SQLite syntax): | # Error: SQLCODE -1 "UPDATE expected, IDENTIFIER (IGNORE) found" | # WRONG — IRIS does not support INSERT IGNORE (MySQL syntax): | # WRONG — IRIS does not support ON CONFLICT (SQLite/PostgreSQL syntax): | # CORRECT — Standard INSERT (will raise on duplicate PK): | ### Handling duplicates in IRIS | #### Option 1: Pre-filter with a Python set (best for bulk loads) | # Load existing IDs first, then skip before inserting | #### Option 2: Catch the duplicate key error | #### Option 3: DELETE + INSERT (upsert) | # For true upsert behavior — delete first, then insert | #### Option 4: ObjectScript embedded SQL UPSERT | ### Key IRIS INSERT constraints | ## %STARTSWITH vs LIKE for Prefix Search
+# IRIS SQL — Quirks and Deviations from Standard SQL
+## HARD GATE
+Before writing any IRIS SQL, check these. Every one has caused production bugs.
+- [ ] **Table name**: last dot = schema separator (`pkg.isc.Foo` → `pkg_isc.Foo`, NOT `pkg_isc_Foo`)
+- [ ] **`SQLCODE = 0`** means success (falsy) — never use `If SQLCODE` as a success check
+- [ ] **Column alias `avg`** is a reserved word — use `avgval`, `avgprice`, not `avg`
+- [ ] **IN clause** — hard limit ~500 params; chunk at 499
+- [ ] **`CALL` not supported** in iris.dbapi — use `SELECT procedure(args)`
+- [ ] **NULL ≠ empty string** — `IS NULL` won't find `""` stored by ObjectScript
+---
+## 1. Table Naming (the #1 source of SQLCODE -30)
+```sql
+-- Two-level class → schema.table (dot preserved)
+Catalog.Item         → SELECT FROM Catalog.Item       ✓
+Healthcare.Patient   → SELECT FROM Healthcare.Patient  ✓
+-- Three+ levels → underscores except last dot
+pkg.isc.genai.Router → SELECT FROM pkg_isc_genai.Router  ✓
+## SKILL iris-vector-ai
+Headings: # IRIS Vector & AI — Hard Gate | ## HARD GATE | ## CRITICAL GOTCHA: ERROR #15806 Is NOT Always a License Issue | ### What ERROR #15806 Actually Means | ### Diagnosis Protocol | ### The exact false-alarm pattern | ## VECTOR Column and Index | ### Failed CREATE INDEX looks exactly like an inert index | ## Similarity Search | ### `TOP N` + `ORDER BY` is what activates the HNSW index | ## Driver Behavior — What the DB-API Returns | # row[0] is a str: "0.1,0.2,0.3,..." — NOT a list, NOT a numpy array, NOT bytes | # type(row[0]) == str   ← this is permanent, not a bug, not fixable | # WRONG — will fail or silently corrupt | # RIGHT — always use VECTOR_COSINE / VECTOR_DOT_PRODUCT in SQL | # Convert in SQL, not in Python | # Returns a comma-separated string you can then parse: | ## TO_VECTOR Type Contract | # Column defined as VECTOR(DOUBLE, 384) | # CORRECT: | # WRONG — causes SQLCODE -259 "different datatypes": | ## Inserting Vectors | ## Version Matrix | ## Embedded Python (`%SYS.Python`) | ## `%AI.RAG.VectorStore.IRIS` — What the API Actually Is
+# IRIS Vector & AI — Hard Gate
+**IRIS vector syntax is NOT pgvector. Stop. Read this before writing any vector code.**
+## HARD GATE
+- [ ] VECTOR column: `VECTOR(DOUBLE, 384)` — type AND dimension required, not just `vector(384)`
+- [ ] HNSW index: `AS HNSW(Distance='Cosine')` — NOT `USING hnsw (col vector_cosine_ops)`
+- [ ] Distance parameter: `'Cosine'` or `'DotProduct'` only — NOT `'l2'`, `'euclidean'`, `'inner_product'`
+- [ ] HNSW tuning params are exactly `M` and `efConstruction` — spelled `efConstruction`, NOT `efConstruct`, NOT `ef_construction`
+- [ ] **`efSearch` is NOT a `AS HNSW(...)` parameter** — it is a runtime property on `%SQL.VectorIndex.HNSWIndexer`, not settable in DDL. Passing it to `AS HNSW(...)` fails the CREATE INDEX.
+- [ ] Similarity function: `VECTOR_COSINE(a, b)` — NOT `<=>` or `<->` operators
+- [ ] Parameter binding: `TO_VECTOR(?, DOUBLE, 384)` — 3 args: value, type, dimension. NOT casting with `::vector`. The type and dimension MUST match the column definition.
+- [ ] **NEVER SELECT a VECTOR column directly** — the DB-API driver returns it as a plain `str` (comma-separated floats). Use `VECTOR_COSINE()` or `VECTOR_DOT_PRODUCT()` in the SQL; never try to deserialize the raw column value as a list or array.
+- [ ] **TO_VECTOR type mismatch causes SQLCODE -259** — `TO_VECTOR(?)` with no type arg creates a different internal datatype than `TO_VECTOR(?, DOUBLE, 384)`. Always pass all 3 args. Mismatched type (e.g., DOUBLE vs FLOAT) or dimension causes "different datatypes" or "different lengths" errors even when the content looks the same.
+- [ ] Embedding function: `EMBEDDING('config-name', ?)` — references `%Embedding.Config` table
+- [ ] Embedded Python: `%SYS.Python.Import("module")` — NOT `IRIS.Python.New()`
+- [ ] **HNSW activation**: the query MUST use `TOP N ... ORDER BY <score> DESC` — no `ORDER BY` means the HNSW index is ignored and the query full-scans the table
+- [ ] **ERROR #15806 "Vector Search not permitted"** — read the CRITICAL GOTCHA below BEFORE concluding it is a license issue
+- [ ] **Vector search ships in ALL editions** — Community, Enterprise, AI builds — do NOT say "you need Enterprise for VECTOR"
+---
+## CRITICAL GOTCHA: ERROR #15806 Is NOT Always a License Issue
+## SKILL iris-vscode-objectscript
+Headings: # VSCode ObjectScript Extension — IRIS Setup | ## Which Images Have Atelier REST on Port 52773? | ## Enterprise + Webgateway: The Working Pattern | ### docker-compose | ### webgateway-init.sh (all three bugs fixed) | #!/bin/sh | # Start the webgateway in background | # BUG 1 FIX: Wait for CSP.ini to be fully initialized before patching | # BUG 2 FIX: Add credentials to [LOCAL] server section. | # Default tries CSPSystem which doesn't exist in fresh enterprise containers. | # Must add Username/Password so the webgateway can authenticate to IRIS. | # Point LOCAL at the IRIS container (use Docker service name, not localhost) | # BUG 3 FIX: Use CSP On directive (not SetHandler csp-handler-sa). | # SetHandler in <Location> doesn't work — only CSP On routes correctly. | # This is the ISC official pattern from webgateway-examples. | ### After starting: unexpire passwords | ### Verify | # → IRIS for UNIX ... 2026.1 ... | ### VSCode settings.json | ## The Three Bugs (Hard-Won 2026-05-03) | ### Bug 1: CSP.ini race condition | ### Bug 2: Missing credentials in `[LOCAL]` | ### Bug 3: Wrong Apache directive | ### Diagnosis via CSP.log | ## Community (Direct, No Webgateway) | # merge.cpf — prevents password expiry prompt | ## Verify Before Opening VSCode | # 404 → web server not running (enterprise without webgateway, or IRIS still starting) | # 401 → wrong credentials or expired password | # 500 → webgateway connecting but auth failing (check CSP.log) | # 200 + version string → working
+# VSCode ObjectScript Extension — IRIS Setup
+## Which Images Have Atelier REST on Port 52773?
+| Image                                                          | Has private web server | Atelier REST      | Solution  |
+| -------------------------------------------------------------- | ---------------------- | ----------------- | --------- |
+| `intersystemsdc/iris-community:*`                              | ✅ built-in            | ✅ port 52773     | Direct    |
+| `intersystemsdc/irishealth-community:*`                        | ✅ built-in            | ✅ port 52773     | Direct    |
+| `containers.intersystems.com/intersystems/iris:*` (enterprise) | ❌ WebServer=0         | ✅ via webgateway | See below |
+| `irishealth:2026.2.0AI.*`                                      | ❌ WebServer=0         | ✅ via webgateway | See below |
+Enterprise images have `WebServer=0` and no httpd binary. **The webgateway container DOES work** — but requires correct configuration (see three bugs below).
+---
+## Enterprise + Webgateway: The Working Pattern
+Verified working 2026-05-03 against `intersystems/iris:2026.1`.
+### docker-compose
+```yaml
+services:
+  iris:
+    image: containers.intersystems.com/intersystems/iris:2026.1
+## SKILL iris-windows-iis-setup
+Headings: # Skill: iris-windows-iis-setup | ## Overview | ## Step 1: Verify the `/api` web application exists in IIS Manager | ## Step 2: Verify `CSP.ini` has an `[APP_PATH:/api]` entry | ## Step 3: Confirm the correct port | ## Step 4: Use `127.0.0.1` if you see per-connection delays | # .iris-agentic-dev.toml | ## Step 5: Minimal `.iris-agentic-dev.toml` for native IRIS | # Native IRIS on Windows — no Docker required
+# Skill: iris-windows-iis-setup
+**Type**: How-to guide
+**Applies to**: IRIS installed natively on Windows (no Docker), connecting via IIS
+## Overview
+When IRIS is installed directly on Windows (not in Docker), it uses IIS as its web server (IRIS 2024.1+) or the bundled Private Web Server on port 52773 (pre-2024.1). This guide covers the full IIS configuration procedure so `iris-agentic-dev` can connect.
+The #1 failure mode: `/api/atelier` returns 404 even when the Management Portal loads correctly. This means the `/api` web application is missing from IIS.
+---
+## Step 1: Verify the `/api` web application exists in IIS Manager
+Open **IIS Manager** (run `inetmgr`). Expand the server → **Sites** → **Default Web Site**. Look for an application named `api` in the tree.
+**If it is missing**, add it:
+1. Right-click **Default Web Site** → **Add Application**
+2. Alias: `api`
+3. Physical path: the Web Gateway bin directory, typically `C:\InterSystems\IRIS\CSP\bin`
+4. Click OK
+Then add a wildcard script handler:
+## SKILL irishealth-container
+Headings: # irishealth Container Editions | ## CRITICAL: Enterprise Images Have No Private Web Server — Use the Webgateway Container | ## VSCode ObjectScript Extension — Server Configuration | # → IRIS 2026.1 (or similar) confirms Atelier REST is working | ## Two Editions, Two Jobs | ## Factory Methods | # FHIR R4 — Foundation.Install + InstallInstance baked at build time | # No ZPM, no network. Ready in ~90 seconds. | # AI Hub — %AI.Agent, %AI.MCP.Service, VECTOR SQL, SuperServer only | # Requires docker.iscinternal.com registry access | ## FHIR Setup (No ZPM, No Network) | ## 4 Hard-Won Gotchas | ### Gotcha 1: `/durable` Volume Ownership | # Host path must be pre-chowned: chown 51773:51773 /host/path/durable | ### Gotcha 2: Double-Start Bug | ### Gotcha 3: No Web Server in Enterprise Image | ### Gotcha 4: `%AI.*` in Read-Only irislib | ## Two-Container Split (docker-compose) | ## FHIRContainerHealth
+# irishealth Container Editions
+---
+## CRITICAL: Enterprise Images Have No Private Web Server — Use the Webgateway Container
+| Image                      | `WebServer` in iris.cpf | Port 52773 direct | Atelier REST      | Solution          |
+| -------------------------- | ----------------------- | ----------------- | ----------------- | ----------------- |
+| `iris:2026.1` (enterprise) | `0` — disabled          | ❌                | ✅ via webgateway | See below         |
+| `iris-community:2026.1`    | `1` — enabled           | ✅                | ✅                | Direct port 52773 |
+| `irishealth-community`     | `1` — enabled           | ✅                | ✅                | Direct port 52773 |
+| `irishealth:2026.2.0AI.*`  | `0` — disabled          | ❌                | ✅ via webgateway | See below         |
+Enterprise images have `WebServer=0` — the httpd binary and CSP.ini are not installed. However, **the `intersystems/webgateway` sidecar container DOES work** for Atelier REST. The webgateway uses `CSP On` (not `SetHandler`) to route all requests through the CSP module to IRIS via the superserver, and IRIS routes `/api/atelier/` internally.
+**Three bugs that cause 404/403/500 during setup** (verified 2026-05-03 — see `iris-vscode-objectscript` skill for full detail):
+1. CSP.ini race condition — patch after `Configuration_Initialized` appears, not immediately
+2. Missing credentials in `[LOCAL]` — add `Username=_SYSTEM` and `Password=SYS` to CSP.ini `[LOCAL]` section; default tries CSPSystem which doesn't exist
+3. Wrong Apache directive — use `CSP On` inside `<Location />`, NOT `SetHandler csp-handler-sa`
+**Also required after first start:** `Do ##class(Security.Users).UnExpireUserPasswords("*")` in `%SYS` — fresh enterprise containers force a password change that blocks the webgateway connection.
+Load the `iris-vscode-objectscript` skill for the complete working `webgateway-init.sh` and docker-compose.
+## SKILL irispython-connector
+Headings: ## This skill vs. iris-embedded-python | ## Connection — which port | ### Install | ### DB-API — positional args only | # CORRECT — positional args | # WRONG — keyword args cause SIGSEGV on irispython >= 5.x outside an IRIS install | # conn = dbapi.connect(hostname="localhost", port=11975, ...)  # DO NOT USE | ### SQLAlchemy | ## Crash-triggering patterns — avoid all three | ## Type normalization | ## IRISINSTALLDIR warning suppression | ## IRIS SQL dialect differences | ## Quick-start (10 lines)
+## This skill vs. iris-embedded-python
+|                 | This skill                                          | iris-embedded-python                                  |
+| --------------- | --------------------------------------------------- | ----------------------------------------------------- |
+| Python location | External process, connects over TCP                 | Inside IRIS (Embedded Python)                         |
+| Import          | `intersystems_irispython.dbapi`                     | `import iris`                                         |
+| Connection      | Superserver port (default 1972)                     | In-process, no network                                |
+| Use when        | Running `.py` scripts, notebooks, external services | ObjectScript calls Python, or Python calls `iris.sql` |
+If you see `import iris` in the code, use the `iris-embedded-python` skill instead.
+---
+## Connection — which port
+**Always use the superserver port, not the web port.**
+Run `check_config` to see both ports:
+```text
+iris-agentic-dev tool check_config --args '{}'
+```
+Look for `iris_port` (superserver, default 1972), not `web_port` (default 52773/52780).
+## SKILL objectscript-coverage
+Headings: ## Purpose | ## Quick Start | ## Pre-flight Check | ## Modes | ## Parameters | ## Response | ## Inline coverage with iris_test | ## TestCoverage IPM Package | ## Best Practices | ## Error Codes | ## Related skills
+## Purpose
+Measure line coverage for ObjectScript classes using `iris_coverage`. Coverage tells
+you which executable lines were hit during a test run — essential for knowing whether
+your test suite exercises production code.
+## Quick Start
+> **Toolset note:** `iris_coverage` is only available in the **merged toolset**. If it
+> returns `NOT_IMPLEMENTED` or is absent from the tool list, add `toolset = "merged"` to
+> `.iris-agentic-dev.toml` or set `IRIS_TOOLSET=merged`.
+Most tasks need `mode=run` — it starts the monitor, runs tests, stops, and returns results:
+```text
+iris_coverage(
+  mode="run",
+  classes=["MyApp.MyClass", "MyApp.OtherClass"],
+  test_path="MyApp.Tests",
+  namespace="USER"
+)
+```
+Or use `package` to auto-discover all concrete classes:
+## SKILL objectscript-debugging
+Headings: ## Purpose | ## When to Use | ## Primary Tool: `iris_debug` | ### Toolset note | ## Workflow | ### Step 0 — Read the actual class source before guessing | # Preferred: structured method signatures + inheritance chain | # When you need full raw source with macros (e.g. $$$DISPATCH, #define): | # Export from IRIS, then read the file: | # Then use the Read tool on /tmp/out.cls — NEVER cat it | ### Step 1 — Capture Diagnostic Packet | ### Step 2 — Map .INT Offset to .CLS Source | ### Step 3 — Read Error Logs | ### Step 4 — Correlate and Fix | ### If IRIS tools return errors — fix the connection first | # List all registered IRIS instances (named pool + Docker containers): | # Route a single call to a named instance without changing the default: | # Or switch the default to a different Docker container (legacy): | # Then retry the failing tool | ## Common Error Patterns | ## Output Format | ## Benchmark-Observed Pattern: SQL Table Name Red Herring | ## Related skills
+## Purpose
+Ground AI debugging in real IRIS signals — compiler errors, `messages.log` entries, stack traces, and local variable state — rather than guessing from code alone.
+## When to Use
+- Any `<UNDEFINED>`, `<SUBSCRIPT>`, `<PROTECT>`, or other IRIS runtime error
+- Compile failures where the error message references a `.INT` offset (e.g. `+3^MyApp.Foo.1`)
+- Debugging a Business Operation or Production component that is failing silently
+- Correlating multiple error log entries to a single root cause
+## Primary Tool: `iris_debug`
+`iris_debug` is a unified dispatcher that covers all debugging actions in a single tool call.
+| Action                            | What it does                                                      |
+| --------------------------------- | ----------------------------------------------------------------- |
+| `iris_debug(action="map_int")`    | Map a `.INT` offset to the originating `.CLS` source line         |
+| `iris_debug(action="error_logs")` | Fetch recent error log entries from `messages.log` and `^ERRORS`  |
+| `iris_debug(action="capture")`    | Capture current error state (packet snapshot with stack + locals) |
+| `iris_debug(action="source_map")` | Build the full `.INT` → `.CLS` mapping for a routine              |
+### Toolset note
+`iris_debug` is available in the **merged toolset**. In the baseline toolset, use the individual tools:
+## SKILL objectscript-fewshot-fixes
+Headings: # ObjectScript Fix Examples | ## EXAMPLE 1: Quit-in-Loop Returns Wrong Value | ## EXAMPLE 2: HTML Escaping Order | ## EXAMPLE 3: SQL Missing Date Filter | ## EXAMPLE 4: Forward Iteration With Removal Skips Items | ## EXAMPLE 5: Missing $IsObject Check After %OpenId | ## EXAMPLE 6: Postfix Quit Syntax Error | ## EXAMPLE 7: CSV Building — O(n²) String Concat | ## HOW TO APPLY: Structured Fix Protocol
+# ObjectScript Fix Examples
+**HOW TO USE THESE**: Before generating any fix, first identify which pattern matches
+the bug, state the root cause explicitly, THEN generate the fix. Research shows this
+"identify-then-fix" order reduces errors by ~15%.
+---
+## EXAMPLE 1: Quit-in-Loop Returns Wrong Value
+BUGGY CODE:
+```objectscript
+ClassMethod IsNameUnique(name As %String, existingNames As %ListOfDataTypes) As %Boolean
+{
+    For i=1:1:existingNames.Count() {
+        If (existingNames.GetAt(i) = name) {
+            Quit 1
+        }
+    }
+    Quit 0
+}
+```
+BUG PATTERN: `Quit value` inside a `For` loop exits the loop, not the method.
+## SKILL objectscript-guardrails
+Headings: # ObjectScript — Hard Gate | ## HARD GATE Checklist | ## Output Format | ## Quick Reference | ## Related skills
+# ObjectScript — Hard Gate
+**Do not show ObjectScript code until this checklist passes.**
+## HARD GATE Checklist
+- [ ] **Quit/Return**: No `Quit value` inside For/While/Try — use `Return value`
+- [ ] **Postfix syntax**: `Quit:key=""` — NO spaces in the condition (`Quit:key = ""` is ERROR #1054). It may share a line
+- [ ] **$IsObject**: Check `'$IsObject(obj)`after every`%OpenId` before touching properties
+- [ ] **SQL table name**: Last dot = schema separator. `Catalog.Item` → SQL `Catalog.Item` (not `Catalog_Item`)
+- [ ] **SQLCODE**: `0` = success (falsy). Check `SQLCODE = 0` not just `SQLCODE`
+- [ ] **HTML escaping**: `&` FIRST, then `<`, then `>`
+- [ ] **Arithmetic**: Left-to-right, no precedence. Use `1.8` not `9/5`. Parenthesize everything
+- [ ] **$ListBuild()**: Empty list is `""` not `$ListBuild()`—`$ListLength($ListBuild()) = 1`
+- [ ] **%Status**: Use `$$$ISERR(sc)` / `$$$ThrowOnError(sc)`. Never return `$$$OK` after catching an error
+- [ ] **Transactions**: Record `Set entry=$TLevel` before `TSTART` and roll back one level with `TROLLBACK:$TLevel>entry 1`. A bare `TROLLBACK` also rolls back the caller's transaction (IRIS 2026.2). Never `Return` inside TSTART without rollback
+- [ ] **Namespace**: `New $NAMESPACE` before `Set $NAMESPACE = "%SYS"`. When the method exits, the caller's namespace comes back. Without the `New`, the caller is left in `%SYS`
+- [ ] **Storage blocks**: Never edit `Storage Default { ... }` — compiler auto-maps properties on compile, added or removed (orphans are fine). Rename exception: also rename its Storage entry. Reset needs explicit user confirmation.
+- [ ] **%INLIST in ObjectScript**: `%INLIST` is SQL-only. In ObjectScript method code use `$ListFind(list, value) > 0`. Writing `Return (x %INLIST list)` causes ERROR #1010.
+- [ ] **`'=` in SQL strings**: `'=` is the ObjectScript not-equal operator. Inside SQL string literals, use `<>`. `"WHERE Tags '= ''"` → parser sees `'` as start of SQL string.
+## Output Format
+If violations found:
+## SKILL objectscript-list-patterns
+Headings: # ObjectScript List Patterns | ## 1. Building a List Incrementally | ## 2. CSV Building — O(n) Pattern | ## 3. Iterating a %List With $LISTNEXT | ## 4. Deduplication With Local Array (O(1) Lookup) | ## 5. Backwards Iteration for Safe Removal | ## 6. $LISTFROMSTRING vs $LISTBUILD | ## 7. %ListOfDataTypes vs %List
+# ObjectScript List Patterns
+## 1. Building a List Incrementally
+```objectscript
+// CORRECT — append with _$LISTBUILD. Linear: 80,000 items in 0.002 s (IRIS 2026.2).
+Set lst = ""
+For i=1:1:values.Count() {
+    Set lst = lst _ $LISTBUILD(values.GetAt(i))
+}
+Set csv = $LISTTOSTRING(lst, ",")   // for CSV output
+// SLOW in a loop — $LIST(lst, *+1) is quadratic: 80,000 items in 1.71 s on the same instance.
+Set lst = ""
+For i=1:1:values.Count() {
+    Set $LIST(lst, *+1) = values.GetAt(i)
+}
+// ALSO FINE — a %ListOfDataTypes when you need an object collection:
+Set result = ##class(%ListOfDataTypes).%New()
+For i=1:1:values.Count() {
+    Do result.Insert(values.GetAt(i))
+}
+```
+## SKILL objectscript-loop-patterns
+Headings: # ObjectScript Loop Patterns | ## 1. THE GOLDEN RULE: Return vs Quit in Loops | ## 2. $Order Loop — Correct Pattern | ## 3. Backwards Loop for Safe Removal | ## 4. $Order on Globals | ## 5. For Loop Variants | ## 6. HTML Escaping — Order Matters | ## 7. For Loop Counter — Never Modify the Loop Variable | ## 8. Global Negative-Key Trick — Descending Sort Without a Sort Step
+# ObjectScript Loop Patterns
+## 1. THE GOLDEN RULE: Return vs Quit in Loops
+```objectscript
+// Quit with a value inside a For/While block is not allowed. The class compiles, and the
+// Quit fails at runtime with <COMMAND>. Inside Try/Catch the compiler rejects it:
+// ERROR #1043 QUIT argument not allowed. (Both verified on IRIS 2026.2.)
+// WRONG — Quit 0 inside For: <COMMAND> when a match is found:
+ClassMethod IsUnique(name As %String, lst As %ListOfDataTypes) As %Boolean
+{
+    For i=1:1:lst.Count() {
+        If (lst.GetAt(i) = name) {
+            Quit 0    // <COMMAND> at runtime, not a return value
+        }
+    }
+    Quit 1            // only reached after loop completes
+}
+// CORRECT — Return always exits the method:
+ClassMethod IsUnique(name As %String, lst As %ListOfDataTypes) As %Boolean
+{
+    For i=1:1:lst.Count() {
+        If (lst.GetAt(i) = name) {
+## SKILL objectscript-mac-routines
+Headings: # MAC Routine Hard Gate — Check BEFORE Writing Code | ## Correct MAC Structure | ## $ZTRAP Error Handling (legacy pattern) | ## Reading and writing .MAC via Atelier | # Read | # Write — ignoreConflict=1 overwrites regardless of server timestamp | # List MAC routines | ## Common Bugs in Legacy MAC Code
+# MAC Routine Hard Gate — Check BEFORE Writing Code
+Before generating any `.MAC` code, verify all 8 items:
+| #   | Check                  | Wrong                  | Right                                          |
+| --- | ---------------------- | ---------------------- | ---------------------------------------------- |
+| 1   | Routine entry          | `MYROUTINE()` (parens) | `MYROUTINE` (no parens)                        |
+| 2   | Label indentation      | `LABEL {` (braces)     | `LABEL` then tab-indented body                 |
+| 3   | Include syntax         | `Include %occStatus`   | `#include %occStatus`                          |
+| 4   | Extrinsic call         | `##class(X).Method()`  | `$$LABEL(args)` or `$$LABEL^RTN(args)`         |
+| 5   | Error trap             | none                   | `Try { } Catch e { }` or `Set $ZTRAP="ERRHAN"` |
+| 6   | Cross-routine call     | `.Method()`            | `Do LABEL^ROUTINE` or `$$FUNC^ROUTINE(args)`   |
+| 7   | Variable scope         | Method-scoped (class)  | `New var` to create local scope                |
+| 8   | Return from subroutine | none                   | `Quit` or `Return`                             |
+## Correct MAC Structure
+```objectscript
+MYROUTINE
+    ;Entry point - no parens, no braces
+    Set x = $$CALC(3,4)
+    Quit
+    ;
+CALC(a,b)   ;Extrinsic function - called with $$CALC(a,b)
+    Quit a+b
+## SKILL objectscript-navigation
+Headings: # ObjectScript Semantic Navigation Skill | ## Toolset Awareness | ## Discovery Strategy | ### 1. Symbol Anchoring | ### 2. Dependency Tracing | ### 3. Hierarchical Exploration | ### 4. Dynamic Dispatch Resolution | ### 5. Interoperability Routing | ## Bridging the Gap | ## Guidelines | ## Related skills
+# ObjectScript Semantic Navigation Skill
+This skill provides strategies for mapping out ObjectScript codebases using the available MCP tools.
+## Toolset Awareness
+Some tools listed below are only available in the merged toolset. If a tool is absent
+(e.g. `iris_doc_search`, `iris_execute_method`), switch to the merged toolset before
+proceeding — these tools are not available in the standard toolset.
+## Discovery Strategy
+### 1. Symbol Anchoring
+Before editing, always locate the **Symbol Anchor** (the definition of the class or method you intend to change).
+- **Tool**: `iris_symbols(query)` — searches the live IRIS namespace by name pattern (supports `*` wildcards)
+- **Tool**: `iris_symbols_local(workspace_path)` — parses `.cls` files on disk via tree-sitter when IRIS is unavailable
+- **Tool**: `iris_search` — full-text regex search across all IRIS documents in a namespace; use when symbol lookup is too narrow and you need to find arbitrary patterns in source
+- **Strategy**: Don't just search for the name; check the `containerName` to confirm you are in the correct package.
+### 2. Dependency Tracing
+When changing a signature, use **Upstream Tracing** to find every caller.
+## SKILL objectscript-repair
+Headings: # Multi-File Repair Skill | ## When to use | ## Procedure | ### 1. Dependency Discovery | ### 2. Multi-File Planning | ### 3. Coordinated Patching | ### 4. Atomic Verification | ## Common Scenarios | ### 1. Method Signature Update | ### 2. Class/Member Rename | ### 3. Interface Implementation Sync | ## Common Pitfalls | ## Related skills
+# Multi-File Repair Skill
+This skill provides a procedure for handling ObjectScript repairs that span multiple files.
+## When to use
+- Compilation errors in files other than the one being edited.
+- Method signature updates where callers need to be updated.
+- Renaming properties or classes that are referenced elsewhere.
+- Implementing an interface that requires updates to several implementations.
+## Procedure
+### 1. Dependency Discovery
+When a change is made to a class member, identify all call sites before touching any file.
+- **Tool**: `docs_introspect(class_name)` — confirms the current method signature and shows the full class definition from `%Dictionary`
+- **Tool**: `iris_symbols(query="ClassName.*")` — lists all members of the class
+- **Tool**: `Grep` (regex search across `.cls` files) — finds every reference to the old symbol name
+- **Requirement**: You MUST perform this check for every public `ClassMethod`, `Method`, or `Property` change before writing any edits.
+### 2. Multi-File Planning
+Update the repair plan to include all affected files.
+## SKILL objectscript-review
+Headings: ## Purpose | ## HARD GATE | ## Review Checklist | ## Output Format | ## Related skills
+## Purpose
+Automatically confirm generated ObjectScript follows the critical project rules before showing it to the user.
+## HARD GATE
+Do not show ObjectScript code to the user until this review passes.
+## Review Checklist
+For each item, check the generated code and flag any violations:
+- [ ] **QUIT/RETURN**: No `Quit <value>` inside TRY/CATCH or loops
+- [ ] **Method calls**: Intra-class calls use `..MethodName()` syntax
+- [ ] **Error handling**: Uses `$$$ThrowOnError` / `$$$ISERR` macros, not raw status checks
+- [ ] **THROW**: Never throws a `%Status` directly — uses `%Exception` objects
+- [ ] **Precedence**: Complex arithmetic has explicit parentheses
+- [ ] **Transactions**: A method rolls back only its own level: `Set entry=$TLevel`, `TSTART`, then `TROLLBACK:$TLevel>entry 1`. A bare `TROLLBACK` rolls back every level, the caller's too (IRIS 2026.2)
+- [ ] **NEW**: No `New` on a plain variable inside a procedure block (ERROR #1038). `New $Namespace` is fine: it is how a method switches namespace and gets the caller's back on exit (IRIS 2026.2)
+- [ ] **%TimeStamp**: Uses `YYYY-MM-DD HH:MM:SS` format, not ISO 8601 with `T`
+- [ ] **%Status returns**: Methods returning %Status use `$$$OK` and check with `$$$ISOK`/`$$$ISERR`
+- [ ] **Globals**: No temporary data stored in globals when locals suffice
+- [ ] **Storage blocks**: Never edit `Storage Default { ... }` — compiler auto-maps properties on compile, added or removed (orphans are fine). Rename exception: also rename its Storage entry. Reset needs explicit user confirmation.
+## Output Format
+## SKILL objectscript-sql-patterns
+Headings: # ObjectScript SQL Patterns | ## 1. Table Naming: IRIS SQL Schema Convention | ## 2. Active Record Filter — NULL OR Future Date | ## 3. SQLCODE Semantics — 0 = Success (Falsy), 100 = No Rows | ## 4. %SQL.Statement Full Pattern | ## 5. Embedded SQL vs %SQL.Statement | ## 6. IS NULL in IRIS SQL | ## 7. ObjectScript Operators That Break Inside SQL Strings | ## 8. $HOROLOG Date Arithmetic | ## 9. Embedded SQL INTO Variable — Must Be Initialized First | ## 10. Debugging SQL Table Name Errors — Agent Red Herring Alert
+# ObjectScript SQL Patterns
+## 1. Table Naming: IRIS SQL Schema Convention
+The SQL table name depends on package depth:
+```text
+// Two-level class (Package.ClassName):
+Catalog.Item  →  SQL table: Catalog.Item   (schema=Catalog, table=Item)
+Healthcare.Patient  →  SQL table: Healthcare.Patient
+// Three+ levels (dots before last become underscores):
+pkg.isc.genai.Router  →  SQL table: pkg_isc_genai.Router
+My.Deep.Pkg.Widget   →  SQL table: My_Deep_Pkg.Widget
+```
+Rule: **last dot = schema/table separator; all preceding dots → underscores**.
+Verified on IRIS 2026.2: `Test127.Ext` answers as `Test127.Ext` and gives SQLCODE -30 as
+`Test127_Ext`; `Test127.Sub.Deep` answers as `Test127_Sub.Deep`.
+```objectscript
+// CORRECT for two-level class Catalog.Item:
+Set sc = stmt.%Prepare("SELECT Name FROM Catalog.Item WHERE Category = ?")
+## SKILL objectscript-tdd
+Headings: ## Purpose | ## Process Flow | ## Compile Command | ## Key Principle | ## Common Compile Errors and Fixes | ## Related skills
+## Purpose
+Close the feedback loop: write → compile → fix errors → run tests → fix failures → done.
+## Process Flow
+1. **Write** the class
+2. **Review** — run objectscript-review skill first
+3. **Compile** — run the compile command for this project
+4. **If compile errors**: read the error, identify the line, fix it. Return to step 3.
+5. **Run tests** — run the unit test suite
+6. **If test failures**: read the failure message, fix the code or the test. Return to step 3.
+7. **Done** when: compiles clean + all tests pass
+## Compile Command
+Use the objectscript MCP tool when available (check `/mcp`):
+```text
+iris_doc(mode="put", name="MyPackage.MyClass.cls", content="...", compile=true, namespace="USER")
+```
+Fallback when MCP is unavailable:
+```bash
+## SKILL objectscript-unit-test
+Headings: ## Purpose | ## When to Use | ## Workflow | ### Step 1 — Generate Test Class | ### Step 2 — Review Generated Scaffold | ### Step 3 — Compile and Run | ### Step 4 — Add Real Assertions | ## Naming Conventions | ## What Gets Generated | ## Output Format | ## Related skills
+## Purpose
+Generate idiomatic IRIS `%UnitTest.TestCase` test scaffolds grounded in live class introspection — not guessed from code. Each generated test compiles and runs against a real IRIS instance.
+## When to Use
+- Writing tests for a new or existing ObjectScript class
+- Adding coverage for a specific method before refactoring
+- Validating that a bug fix doesn't regress
+## Workflow
+### Step 1 — Generate Test Class
+```text
+Tool: iris_generate_test
+Inputs: class_name (e.g. "MyApp.Utils"), method_name (optional, generates all if omitted), test_directory (default "tests")
+Returns: test class code + suggested output path
+```
+The tool uses `docs_introspect` to read the live class definition — method signatures, return types, class vs instance methods — and generates appropriate test scaffolds.
+### Step 2 — Review Generated Scaffold
+Each generated test method follows this pattern:
+## SKILL opencode-introspect
+Headings: # OpenCode Session Introspection | ## Architecture (read this first) | ### part.data JSON structure | ## 1. List recent sessions | ## 2. List sessions by project directory | ## 3. Read a session's full activity log | ## 4. Search across sessions for a keyword | ## 5. Count sessions and check DB health | ## DB Wipe Recovery | ### When does a wipe happen? | ### Recovery procedure | # Step 1: Restore projects | # Step 2: Restore sessions | # Step 3: Restore messages | ## Key facts
+# OpenCode Session Introspection
+## Architecture (read this first)
+OpenCode stores data in **two parallel stores**:
+| Store           | Path                                  | Role                                       |
+| --------------- | ------------------------------------- | ------------------------------------------ |
+| SQLite DB       | `~/.local/share/opencode/opencode.db` | Query cache — can be wiped and rebuilt     |
+| Flat JSON files | `~/.local/share/opencode/storage/`    | **Ground truth** — never wiped by opencode |
+The DB schema has these key tables: `project`, `session`, `message`, `part`.
+- `session.directory` — working directory the session ran in
+- `message.session_id` → FK to session
+- `part.message_id` → FK to message; `part.data` is a **JSON blob** (not columns)
+### part.data JSON structure
+```text
+type: "text"       → d['text']                            (assistant/user prose)
+type: "tool"       → d['tool'], d['state']['input'], d['state']['output']
+type: "step-start" → d['snapshot']                        (context snapshot hash)
+type: "step-finish"→ d['cost'], d['tokens']               (billing info)
+type: "patch"      → file diff applied by agent
+## SKILL iris-agentic-dev-setup
+Headings: # Setting up iris-agentic-dev | ## 1. Is the binary already here? | ## 2. Install the binary | ## 3. Find an IRIS instance before starting one | ## 4. Clear the expired password and confirm the port | ## 5. Register the MCP server | ## 6. Verify against the instance you meant | ## When it does not connect
+# Setting up iris-agentic-dev
+Work through the steps in order. Each one ends in a command whose output decides the next step,
+so run the command rather than assuming the state.
+The goal state: `iris-agentic-dev` on PATH, one IRIS instance reachable and authenticating, an
+MCP server registered against it, and a query returning rows.
+## 1. Is the binary already here?
+```bash
+command -v iris-agentic-dev && iris-agentic-dev --version
+```
+Found: skip to step 3. Not found: step 2.
+## 2. Install the binary
+Mac, Homebrew:
+```bash
+brew tap intersystems-community/tap
+brew install iris-agentic-dev
+```
+## SKILL iris-coverage-run
+Headings: # /iris-coverage-run — Measure ObjectScript Line Coverage | ## Invoke | ## What this does | ## CoverageRunner reference implementation | ## Template for any project | ## Key caveats | ## Expected output format
+# /iris-coverage-run — Measure ObjectScript Line Coverage
+Run a test suite wrapped in `%Monitor.System.LineByLine` and report per-class coverage.
+Prerequisite: `/iris-coverage-setup` must have been run (bbsiz set, IRIS restarted, `$zu(84)` verified).
+## Invoke
+```text
+/iris-coverage-run <test-path> [classes...]
+```
+Example — fhir-017 full suite:
+```text
+/iris-coverage-run Test.HS.FHIRServer.VectorSearch \
+  HS.FHIRServer.VectorSearchParameter \
+  HS.FHIRServer.Storage.Json.SearchColumn \
+  HS.FHIRServer.Storage.SearchTableBuilder \
+  HS.FHIRServer.Storage.JsonAdvSQL.Indexer \
+  HS.FHIRServer.Storage.JsonAdvSQL.Search \
+  HS.FHIRServer.API.Data.QueryParameters \
+  HS.FHIRServer.Tools.CapabilityStatementBuilder
+```
+## What this does
+## SKILL iris-coverage-setup
+Headings: # /iris-coverage-setup — Enable IRIS Line-by-Line Monitor | ## Background | ## Step 1 — Check if monitor is already functional | ## Step 2 — Set bbsiz and restart | ## Step 3 — Verify monitor is functional after restart | ## Step 4 — Verify result query returns data | ## Notes
+# /iris-coverage-setup — Enable IRIS Line-by-Line Monitor
+Configure the IRIS instance so `%Monitor.System.LineByLine` can collect execution counts.
+Required before running `/iris-coverage-run`. **Needs an IRIS restart.**
+## Background
+`%Monitor.System.LineByLine` wraps `$zu(84,...)` kernel calls. The shared memory buffer
+for line counting is controlled by `bbsiz` in `iris.cpf [config]`. It defaults to `-1`
+(disabled). Without it set, `Start()` appears to succeed but collects nothing.
+**Build compatibility:**
+| Build                   | Works? | Notes                                    |
+| ----------------------- | ------ | ---------------------------------------- |
+| AI builds (2026.x.0AI)  | ✓      | Standard kernel                          |
+| SQLT.145+ / sqlt146     | ✓      | Standard kernel                          |
+| TBLP 127 (2026.3.0TBLP) | ✗      | `$zu(84)` not wired — `<FUNCTION>` error |
+## Step 1 — Check if monitor is already functional
+```objectscript
+// In any namespace — if this returns 1, skip to Step 3
+write $zu(84,0,1,1,1,1,1,1), !   // returns 1 = OK, throws <FUNCTION> = not available
+do $zu(84,0,0)                    // stop/cleanup after check
+## SKILL pyprod
+Headings: # Building with pyprod | ## Messages | ## BusinessService | ## BusinessProcess | ## BusinessOperation | ## IRISProperty vs IRISParameter | ## Status and Logging | ## Common Mistakes | ## Production Definition and Director
+# Building with pyprod
+**Read this skill once, then write all required files in one pass. Do not re-read
+between writes.**
+pyprod is the InterSystems Python library for IRIS interoperability productions.
+Import from `intersystems_pyprod` — not `grongier.pex` or any other package.
+Import only what your component needs — do not copy-paste the full import list into every file:
+| Component         | Typical imports                                                   |
+| ----------------- | ----------------------------------------------------------------- |
+| Message           | `Column, JsonSerialize` (or `PickleSerialize`)                    |
+| BusinessService   | `IRISParameter, IRISProperty, BusinessService, IRISLog, Status`   |
+| BusinessProcess   | `IRISProperty, BusinessProcess, IRISLog, Status`                  |
+| BusinessOperation | `IRISParameter, IRISProperty, BusinessOperation, IRISLog, Status` |
+Set the IRIS package name at module level (applies to all classes in the file):
+```python
+iris_package_name = "MyPackage"
+```
+---

@@ -73,9 +73,20 @@ class RoutingAdapter:
     propose_new_texts = None  # replaced per instance; gepa checks the attribute
 
     def __init__(
-        self, skills, client, model, ledger, *, reflect, split, workers: int = 8
+        self,
+        skills,
+        client,
+        model,
+        ledger,
+        *,
+        reflect,
+        split,
+        workers: int = 8,
+        editable=None,
     ):
         self.skills = skills
+        # None: every skill may change (128). A set: the rest are scored but never proposed for.
+        self.editable = None if editable is None else frozenset(editable)
         self.by_name = {s.name: s for s in skills}
         self.seed = {s.name: s.description for s in skills}
         self.client = client
@@ -154,25 +165,30 @@ class RoutingAdapter:
     def select_component(
         self, state, trajectories, subsample_scores, candidate_idx, candidate
     ):
-        """The skill most involved in this minibatch's errors; ties broken by name."""
+        """The editable skill most involved in this minibatch's errors; ties broken by name."""
+        pool = sorted(
+            n for n in candidate if self.editable is None or n in self.editable
+        )
         blame = Counter()
         for t in trajectories:
             if not t["scored"] or t["pick"] in t["gold"]:
                 continue
             for g in t["gold"]:
-                if g in candidate:
+                if g in pool:
                     blame[g] += 1
-            if t["pick"] in candidate:
+            if t["pick"] in pool:
                 blame[t["pick"]] += 1
         if blame:
             top = max(blame.values())
             return [sorted(n for n, c in blame.items() if c == top)[0]]
-        return [sorted(candidate)[state.i % len(candidate)]]
+        return [pool[state.i % len(pool)]]
 
     # gepa: proposal --------------------------------------------------------------------------
     def _propose(self, candidate, reflective_dataset, components_to_update):
         out = {}
         for name in components_to_update:
+            if self.editable is not None and name not in self.editable:
+                continue
             rows = reflective_dataset.get(name) or []
             if not rows:
                 continue

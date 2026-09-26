@@ -44,6 +44,19 @@ def load_corpus(corpus_dir: Path = CORPUS_DIR):
     return items, split
 
 
+def corpus_for(surface: str, corpus_dir: Path = CORPUS_DIR):
+    """The routing corpus, plus the surface's own corpus when it has one; each keeps its frozen split."""
+    items, split = load_corpus(corpus_dir)
+    extra = SURFACES[surface].extra_corpus
+    if extra is not None:
+        more, more_split = load_corpus(extra)
+        clash = {i["id"] for i in items} & {i["id"] for i in more}
+        if clash:
+            raise ValueError(f"{extra} reuses routing ids: {sorted(clash)}")
+        items, split = items + more, {**split, **more_split}
+    return items, split
+
+
 def side(items, split, which):
     """The items on one side of the frozen split, passed through that side's leak guard."""
     picked = [i for i in items if split.get(i["id"]) == which]
@@ -136,12 +149,19 @@ def run(
     if ledger.stream_path is None:
         ledger.stream_path = run_dir / "ledger.jsonl"
 
-    items, split = load_corpus(corpus_dir)
+    items, split = corpus_for(surface, corpus_dir)
     skills = SURFACES[surface].load(root)
     seed = {s.name: s.description for s in skills}
     hold = side(items, split, holdout.HOLDOUT)
     adapter = RoutingAdapter(
-        skills, client, model, ledger, reflect=reflect, split=split, workers=workers
+        skills,
+        client,
+        model,
+        ledger,
+        reflect=reflect,
+        split=split,
+        workers=workers,
+        editable=SURFACES[surface].editable,
     )
     best, info = run_loop(
         adapter,

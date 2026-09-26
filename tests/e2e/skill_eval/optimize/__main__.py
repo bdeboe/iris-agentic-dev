@@ -160,7 +160,7 @@ def _drift(args) -> int:
     return 0 if ok else 1
 
 
-def main(argv=None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="python -m tests.e2e.skill_eval.optimize",
         description=__doc__.split("\n\n")[0],
@@ -211,8 +211,11 @@ def main(argv=None) -> int:
     )
     billable(d, 2.0)
     d.set_defaults(fn=_drift)
+    return p
 
-    args = p.parse_args(argv)
+
+def main(argv=None) -> int:
+    args = build_parser().parse_args(argv)
     return args.fn(args)
 
 
