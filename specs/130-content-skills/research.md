@@ -113,3 +113,46 @@ Also seen: `iris_macro(action="expand", name="eProductionStateRunning")` returns
 An XML export goes on the server by putting it under its `.cls` name. Atelier imports it and stores UDL, but only when the XML declaration is on a line of its own. I first reproduced this with a one-line export and recorded "XML under `.cls` stores nothing". That was wrong: the cause was the single line, not the XML. The re-check is in the live test.
 
 iad bug, drafted and not filed: `iris_doc put` ignores the error in `result.status`, so #16021 never reaches the agent, and the only error it sees is #5351 from the compile after.
+
+## T011: the billable runs (2026-09-26, SC-004)
+
+Total spend is about $2.47 of the $3 cap: about $0.50 for drift, $1.19 estimated for the ladder, and $0.78 for the loop.
+
+### 128 drift re-measure
+
+`optimize drift` exited 0. Holdout Recall@1 is 0.25 (n=32), inside the committed band of 0.13 to 0.42. The false-hint rate is 0.638. The 130 skill edits did not move 128's routing figure out of its band.
+
+### Ladder, SKILL-13 to SKILL-19
+
+Arms `tools` and `tools+its-own-skill`, one run each, 14 sessions. The per-session record is `tests/e2e/results/ladder-20260926T193103.runs.jsonl`.
+
+| Task     | Skill                       | tools | tools+skill |
+| -------- | --------------------------- | ----- | ----------- |
+| SKILL-13 | `iris-query-plans`          | PASS  | FAIL        |
+| SKILL-14 | `objectscript-unit-test`    | PASS  | FAIL        |
+| SKILL-15 | `objectscript-sql-patterns` | PASS  | PASS        |
+| SKILL-16 | `ensemble-production`       | PASS  | FAIL        |
+| SKILL-17 | `objectscript-guardrails`   | PASS  | PASS        |
+| SKILL-18 | `iris-agentic-dev`          | PASS  | PASS        |
+| SKILL-19 | `objectscript-tdd`          | PASS  | PASS        |
+
+Tools alone passed 7 of 7 (Wilson 95% interval 0.65 to 1.00). With the skill, 4 of 7 passed. The paired figures are b=0 and c=3, a lift of −0.43. The minimum detectable effect at n=7 is 0.58, so the harness marks the run underpowered. Each skill has one pair, and one pair cannot show harm or help. Every skill gets **no lift claim**, and all seven ship, as FR-006 says.
+
+The three failures are still a signal. Each was "tried and failed": no timeout, and tool calls were made.
+
+- SKILL-13 with `iris-query-plans` ran 10 calls, including docs, `iris_table_info` and two queries. It never called `%BuildIndices`, so it found the stale index and stopped. The tools arm called `iris_execute_method` and passed.
+- SKILL-14 with `objectscript-unit-test` ran 44 calls. It tried `iris_generate_test` (LLM_UNAVAILABLE) and made many `iris_execute_method` attempts.
+- SKILL-16 with `ensemble-production` began by calling `iris_add_server` and `iris_reload_pool`, then went through six compile rounds.
+
+The ladder keeps no transcripts, so I cannot tell from these records whether the skill text misled the agent. The next step is at least three runs per arm on these three tasks, with transcripts kept.
+
+### `optimize run --surface content-descriptions`
+
+`--budget 1.0 --max-minutes 40`. Run directory `tests/e2e/results/optimize/20260926T235225Z-content-descriptions/` (git-ignored). Spend $0.78; the run stopped on budget.
+
+| Arm       | Recall@1 [95% Wilson] | False-hint rate | Exact-name Recall@1 |
+| --------- | --------------------- | --------------- | ------------------- |
+| seed      | 0.500 [0.371, 0.629]  | 0.569 (n=51)    | 1.000 (n=8)         |
+| candidate | 0.519 [0.389, 0.646]  | 0.608 (n=51)    | 1.000 (n=8)         |
+
+Verdict HOLD. The recall interval's lower bound is 0, the false-hint rate went up, and there is no ladder run. The budget ran out after the base valset (40 items) and the holdout scoring, so gepa made no proposals and the candidate is the seed. The two rows score the same descriptions, so their difference (+0.019, one item) is scorer noise, and the gate held on it as it should. A run that proposes anything needs about $3 on its own.

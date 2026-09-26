@@ -1,0 +1,27 @@
+# 130 issue drafts (not filed)
+
+Bugs in iad itself that the 130 probes found. None is fixed in 130. Each is written as a GitHub issue body, and none has been filed. The reproductions are in `research.md`.
+
+## 1. `iris_test` package pattern returns NO_TESTS_FOUND and blames the name
+
+`iris_test(pattern="IadProbe130")` returns `NO_TESTS_FOUND` although `IadProbe130.Misnamed` is a compiled `%UnitTest.TestCase` with a passing `TestOk`. The hint says to use a bare package name with no wildcard, which is what I passed. `iris_test(pattern=":IadProbe130.Misnamed")` finds and runs it.
+
+What I expected: either the package form runs the package's test classes, or the hint says the working form is `:Package.Class`. Under the hood, `RunTest("IadProbe130")` wants a directory `^UnitTestRoot/IadProbe130/` and runs nothing without it, so the package form may never be able to work over Atelier. Then the hint is the fix.
+
+Side effect: `^UnitTestRoot` on iris-dev-iris is now `/tmp/`. I did not record its old value.
+
+## 2. `&sql(INSERT ...)` in a `For` loop fails in `iris_execute`
+
+Embedded `&sql(INSERT INTO ...)` inside a `For` loop, run through `iris_execute`, fails with `<UNDEFINED> sqlSQLCODE1`. The same insert outside the loop works. My guess is the generated wrapper method and the loop's embedded-SQL variables, but I have not checked the generated INT.
+
+## 3. `iris_macro expand` returns `{}` for a defined macro
+
+`iris_macro(action="expand", name="eProductionStateRunning")` returns `result: {}`. `EnsConstants.inc` defines it as 1. The call should return the expansion, or an error naming the include it searched.
+
+## 4. `iris_doc put` hides `result.status` errors
+
+For a one-line XML class export put under its `.cls` name, Atelier answers `result.status: ERROR #16021: Illegal Header Line`, with `status.errors` empty, and stores nothing. `iris_doc(mode="put", compile=true)` reports the put as fine, and the agent's only error is `#5351: Class ... does not exist` from the compile after it. So the agent never learns that the put failed or why. `iris_doc put` should fail on a non-empty `result.status`, and show the text.
+
+## 5. `iad exec` prints nothing when the CODE_EDIT gate refuses
+
+`iad exec 'Set tSC=$system.OBJ.DeletePackage("X","-d")'` exits 1 with nothing on stdout or stderr. The same code through `iad tool iris_execute` returns `CODE_EDIT_BLOCKED` with the matched text, the reason and the remediation (use `iris_doc`). The CLI drops all of it. Someone scripting `exec` sees a bare failure and nothing to act on. `exec` should print the refusal message and the remediation on stderr.

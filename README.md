@@ -456,6 +456,7 @@ into `.github/instructions/`.
 | `objectscript-review`        | Hard-gate checklist: 10 most common AI mistakes in ObjectScript                                 | 100% repair |
 | `objectscript-guardrails`    | All-in-one hard gate, works without MCP                                                         | 86% repair  |
 | `objectscript-sql-patterns`  | IRIS SQL quirks: reserved words, SQLCODE, table naming, NULL handling                           | 100% SQL    |
+| `iris-query-plans`           | Reading query plans; stale indexes, `%BuildIndices`, `TUNE TABLE`, outlier selectivity          |             |
 | `objectscript-unit-test`     | Generates `%UnitTest` scaffolding from live class introspection                                 | 86% repair  |
 | `objectscript-list-patterns` | `%List`, `$LISTBUILD`, `$LISTNEXT`, `$LISTTOSTRING` patterns                                    | 91% repair  |
 | `objectscript-navigation`    | Codebase discovery using MCP introspection tools                                                | 82% repair  |
