@@ -27,7 +27,7 @@ Close the feedback loop: write → compile → fix errors → run tests → fix 
 Use the objectscript MCP tool when available (check `/mcp`):
 
 ```text
-iris_compile(target="MyPackage/MyClass.cls", namespace="USER")
+iris_doc(mode="put", name="MyPackage.MyClass.cls", content="...", compile=true, namespace="USER")
 ```
 
 Fallback when MCP is unavailable:

@@ -44,7 +44,7 @@ Apply edits to all target files in a single pass.
 
 Always verify the workspace as a whole after the full patch is applied.
 
-- **Compile**: `iris_compile(target="Package/SubPackage/ClassName.cls")` — compile each changed file by path; fix any errors before proceeding to the next file
+- **Compile**: push each changed file with `iris_doc(mode="put", name="Package.SubPackage.ClassName.cls", content=..., compile=true)`; fix any errors before proceeding to the next file
 - **Test**: Run the full test suite related to the change via `iris_test`
 - **Revert**: If any file fails to compile or tests regress, revert ALL changes in the iteration using `git checkout -- <file>` (via Bash) before starting the next attempt
 
@@ -92,7 +92,7 @@ Always verify the workspace as a whole after the full patch is applied.
 - Forgetting to update a caller in a different package.
 - Mismatching parameter counts after a signature change.
 - Circular dependencies causing compilation loops — compile in dependency order (base class first).
-- Using `iris_compile` without a file path — always pass the `.cls` file path, not a wildcard.
+- Compiling before pushing — `iris_compile` compiles the source IRIS holds, so push local edits with `iris_doc(mode="put", compile=true)` first.
 
 ## Related skills
 

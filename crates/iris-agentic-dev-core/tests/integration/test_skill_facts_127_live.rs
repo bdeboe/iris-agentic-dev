@@ -503,3 +503,234 @@ async fn bare_trollback_kills_callers_level_and_one_level_does_not() {
     );
     drop_classes(&c, &client, &["Test127.PC"]).await;
 }
+
+const PROD_CLASSES: &[(&str, &str)] = &[
+    (
+        "Test127.PMsg.cls",
+        "Class Test127.PMsg Extends Ens.Request
+{
+
+Property N As %Integer;
+
+}",
+    ),
+    (
+        "Test127.SlowOp.cls",
+        "Class Test127.SlowOp Extends Ens.BusinessOperation
+{
+
+Method OnMessage(pRequest As Test127.PMsg, Output pResponse As Ens.Response) As %Status
+{
+    Hang 1
+    Set ^Test127.Done(pRequest.N) = $Increment(^Test127.Done)
+    Quit $$$OK
+}
+
+}",
+    ),
+    (
+        "Test127.Svc.cls",
+        "Class Test127.Svc Extends Ens.BusinessService
+{
+
+Method OnProcessInput(pInput As %RegisteredObject, Output pOutput As %RegisteredObject) As %Status
+{
+    Quit ..SendRequestAsync(\"Test127.SlowOp\", pInput)
+}
+
+}",
+    ),
+    (
+        "Test127.Prod.cls",
+        "Class Test127.Prod Extends Ens.Production
+{
+
+XData ProductionDefinition
+{
+<Production Name=\"Test127.Prod\">
+  <Item Name=\"Test127.Svc\" ClassName=\"Test127.Svc\" PoolSize=\"0\" Enabled=\"true\"/>
+  <Item Name=\"Test127.SlowOp\" ClassName=\"Test127.SlowOp\" PoolSize=\"1\" Enabled=\"true\"/>
+</Production>
+}
+
+}",
+    ),
+];
+
+/// Send six one-second messages, wait until one is done, stop with `stop_args`, and report
+/// `done,queued` right after the stop.
+async fn send_six_then_stop(
+    c: &IrisConnection,
+    client: &reqwest::Client,
+    stop_args: &str,
+) -> String {
+    run(
+        c,
+        client,
+        &format!(
+            " Kill ^Test127.Done\n \
+             Set sc=##class(Ens.Director).CreateBusinessService(\"Test127.Svc\",.svc) If 'sc {{ Write \"svc failed\" Quit }}\n \
+             For i=1:1:6 {{ Set m=##class(Test127.PMsg).%New(), m.N=i Set sc=svc.ProcessInput(m) }}\n \
+             Kill svc\n \
+             Hang 1.5\n \
+             Set sc=##class(Ens.Director).StopProduction({stop_args}) If 'sc {{ Write \"stop failed\" Quit }}\n \
+             Write $Get(^Test127.Done,0),\",\",##class(Ens.Queue).GetCount(\"Test127.SlowOp\")"
+        ),
+    )
+    .await
+}
+
+/// Start the production, give the queue time to drain, and report `runs,distinct,queued`.
+async fn start_and_drain(c: &IrisConnection, client: &reqwest::Client) -> String {
+    run(
+        c,
+        client,
+        " Set sc=##class(Ens.Director).StartProduction(\"Test127.Prod\") If 'sc { Write \"start failed\" Quit }\n \
+         For w=1:1:20 { Quit:##class(Ens.Queue).GetCount(\"Test127.SlowOp\")=0  Hang 0.5 }\n \
+         Hang 1.5\n \
+         Set k=\"\",d=0 For { Set k=$Order(^Test127.Done(k)) Quit:k=\"\"  Set d=d+1 }\n \
+         Write $Get(^Test127.Done,0),\",\",d,\",\",##class(Ens.Queue).GetCount(\"Test127.SlowOp\")",
+    )
+    .await
+}
+
+fn done_plus_queued(pair: &str) -> i64 {
+    pair.split(',')
+        .map(|n| {
+            n.parse::<i64>()
+                .unwrap_or_else(|_| panic!("not a count: {pair}"))
+        })
+        .sum()
+}
+
+/// US2.10. Stopping a production loses nothing. A graceful stop finishes the message in hand and
+/// leaves the rest queued; a force stop puts the interrupted message back on the queue, so it runs
+/// again after the restart. Every message is delivered once the production starts again.
+#[tokio::test]
+#[ignore]
+async fn production_stop_keeps_queued_messages_and_force_stop_requeues() {
+    let Some((c, client)) = conn() else { return };
+    let _ = c
+        .execute_via_generator(
+            " Do ##class(Ens.Director).StopProduction(10,1)",
+            NS,
+            &client,
+        )
+        .await;
+    for (doc, src) in PROD_CLASSES {
+        let r = put_and_compile(&c, &client, doc, src).await;
+        assert!(r.success(), "{doc}: {}", compile_text(&r));
+    }
+    let started = run(
+        &c,
+        &client,
+        " Set sc=##class(Ens.Director).StartProduction(\"Test127.Prod\") Write +sc",
+    )
+    .await;
+    assert_eq!(started, "1", "Test127.Prod must start");
+
+    let graceful = send_six_then_stop(&c, &client, "2,0").await;
+    assert_eq!(
+        done_plus_queued(&graceful),
+        6,
+        "graceful stop lost messages (done,queued = {graceful})"
+    );
+    assert_eq!(start_and_drain(&c, &client).await, "6,6,0");
+
+    let forced = send_six_then_stop(&c, &client, "0,1").await;
+    assert_eq!(
+        done_plus_queued(&forced),
+        6,
+        "force stop lost messages (done,queued = {forced})"
+    );
+    assert_eq!(start_and_drain(&c, &client).await, "6,6,0");
+
+    let _ = c
+        .execute_via_generator(
+            " Do ##class(Ens.Director).StopProduction(10,1) Kill ^Test127.Done",
+            NS,
+            &client,
+        )
+        .await;
+    drop_classes(
+        &c,
+        &client,
+        &[
+            "Test127.Prod",
+            "Test127.Svc",
+            "Test127.SlowOp",
+            "Test127.PMsg",
+        ],
+    )
+    .await;
+}
+
+/// US3.2. A hand-written `DataLocation` on an `Ens.Request` subclass is rejected by the compiler
+/// with #5477. The skill said runtime and then showed a hand-edited Storage block as the fix.
+#[tokio::test]
+#[ignore]
+async fn ens_request_custom_datalocation_is_5477_at_compile() {
+    let Some((c, client)) = conn() else { return };
+    let msg = "Class Test127.Msg Extends Ens.Request
+{
+
+Property MyField As %String;
+
+Storage Default
+{
+<Data name=\"MsgDefaultData\">
+<Subscript>\"Msg\"</Subscript>
+<Value name=\"1\">
+<Value>MyField</Value>
+</Value>
+</Data>
+<DataLocation>^Test127.MsgD</DataLocation>
+<DefaultData>MsgDefaultData</DefaultData>
+<Type>%Storage.Persistent</Type>
+}
+
+}";
+    let r = put_and_compile(&c, &client, "Test127.Msg.cls", msg).await;
+    let text = compile_text(&r);
+    assert!(!r.success(), "a custom DataLocation must not compile");
+    assert!(text.contains("#5477"), "expected #5477, got: {text}");
+    assert!(
+        text.contains("^Ens.MessageBodyD"),
+        "the error names the required location: {text}"
+    );
+
+    // Without a Storage block the compiler writes one, and the class compiles.
+    let plain = "Class Test127.Msg Extends Ens.Request
+{
+
+Property MyField As %String;
+
+}";
+    let r = put_and_compile(&c, &client, "Test127.Msg.cls", plain).await;
+    assert!(r.success(), "no Storage block: {}", compile_text(&r));
+    drop_classes(&c, &client, &["Test127.Msg"]).await;
+}
+
+/// US3.2. There is no 31-character global-name limit to design around: a long class name
+/// compiles, IRIS hashes the global name, and rows save.
+#[tokio::test]
+#[ignore]
+async fn long_class_name_compiles_and_saves() {
+    let Some((c, client)) = conn() else { return };
+    let name = "Test127.VeryLongPackageName.Data.PatientRecordHistory";
+    let src = format!("Class {name} Extends %Persistent\n{{\n\nProperty Name As %String;\n\n}}");
+    let r = put_and_compile(&c, &client, &format!("{name}.cls"), &src).await;
+    assert!(r.success(), "{}", compile_text(&r));
+    let out = run(
+        &c,
+        &client,
+        &format!(
+            " Set o=##class({name}).%New(), o.Name=\"x\" Set sc=o.%Save() If 'sc {{ Write \"save failed\" Quit }}\n \
+             Set loc=$Get(^oddCOM(\"{name}\",\"s\",\"Default\",22))\n \
+             Write +sc,\",\",$Select(loc=\"\":\"none\",1:$Length(loc)<=31)"
+        ),
+    )
+    .await;
+    assert_eq!(out, "1,1", "save and a short hashed DataLocation");
+    drop_classes(&c, &client, &[name]).await;
+}

@@ -91,8 +91,8 @@ iris_symbols_local()                 # parse .cls files on disk, no IRIS needed
 docs_introspect(class_name="MyPackage.MyClass")
 docs_introspect(class_name="%ASQ.Engine")   # works on system classes too
 
-# Compile a .cls file
-iris_compile(target="MyPackage/MyClass.cls", namespace="USER")
+# Push a local .cls file to IRIS and compile it
+iris_doc(mode="put", name="MyPackage.MyClass.cls", content="...", compile=true, namespace="USER")
 
 # Run %UnitTest tests
 iris_test(pattern="MyPackage.Tests.*")

@@ -28,8 +28,9 @@ Returns `{success, output, namespace}`. Runtime errors are returned as structure
 ### Compile a .cls file
 
 ```text
-iris_compile(target="MyPackage/MyClass.cls", namespace="USER")
-iris_compile(target="*.cls")   # compile all .cls files in workspace
+iris_doc(mode="put", name="MyPackage.MyClass.cls", content="...", compile=true, namespace="USER")
+iris_compile(target="MyPackage.MyClass.cls")   # recompile what IRIS already holds
+iris_compile(target="*.cls")   # every class in the namespace, on the server
 ```
 
 ### Run %UnitTest tests

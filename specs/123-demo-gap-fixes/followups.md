@@ -25,6 +25,17 @@ I can't choose between the fixes without knowing what the tier is for:
 
 **Next step**: write the purpose into the constitution (Environment Guard). Then pick one.
 
+**Skill text (127)**: `ensemble-production` taught the same route: when `iris_production` refused
+to start a production, it said to call `Ens.Director` through `iris_execute`. Spec 127 removed that
+and tells the reader to check compile and namespace, then report the tool issue. A skill should not
+teach a way around a tool refusal, whatever the tier's purpose turns out to be.
+
+**Server instruction (found in 127, out of scope for 127–130)**: the instruction says
+`iris_compile` "never reads local files". On the HTTP path that is false: a target containing `/`
+or `\` is read from disk and uploaded by Atelier PUT before compiling. On `docker_only` it goes to
+`$SYSTEM.OBJ.Compile` as a name and fails. Either make the instruction say that, or make the two
+paths agree. Skills now push with `iris_doc(mode="put", compile=true)`, which works on both.
+
 ## (e) SQL errors come back without a hint that names the likely fix
 
 **Status**: its own spec, 125, after the freeze. Rows only for errors reproduced live.

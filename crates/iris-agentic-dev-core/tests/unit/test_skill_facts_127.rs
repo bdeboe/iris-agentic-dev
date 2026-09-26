@@ -222,3 +222,114 @@ fn embedded_python_quotes_underscore_names() {
         "must show the quoted form"
     );
 }
+
+/// US2.10. On 2026.2 a graceful stop leaves queued messages queued and a force stop requeues the
+/// one in hand; neither loses a message. The skill said restarting drops in-flight messages.
+#[test]
+fn production_stop_is_not_described_as_losing_messages() {
+    let text = skill("ensemble-production");
+    for old in [
+        "drops in-flight messages",
+        "Restart loses in-flight messages",
+        "Force-stop drops",
+    ] {
+        assert!(
+            !text.contains(old),
+            "ensemble-production still says {old:?}"
+        );
+    }
+    assert!(
+        text.contains("requeue"),
+        "ensemble-production must say a force stop requeues the interrupted message"
+    );
+}
+
+/// US3.2. #5477 is a compile error, a hand-written Storage block contradicts guardrails, and the
+/// 31-character global limit does not exist (IRIS hashes long names).
+#[test]
+fn ensemble_production_storage_and_name_claims_match_iris() {
+    let text = skill("ensemble-production");
+    assert!(
+        !text.contains("errors at runtime") && !text.contains("at runtime\n"),
+        "ensemble-production still places #5477 at runtime"
+    );
+    assert!(
+        !text.contains("<IdLocation>^Ens.MessageBodyD</IdLocation>"),
+        "ensemble-production still shows a hand-written Storage block as the right form"
+    );
+    assert!(
+        !text.contains("31-character limit"),
+        "ensemble-production still claims a 31-character global name limit"
+    );
+}
+
+/// US3.2. The skill routed around an `iris_production` refusal with `iris_execute`.
+#[test]
+fn ensemble_production_does_not_bypass_tool_refusal() {
+    let text = skill("ensemble-production");
+    assert!(
+        !text.contains("Use `iris_execute` as the\nreliable workaround")
+            && !text.contains("reliable workaround"),
+        "ensemble-production still routes around iris_production through iris_execute"
+    );
+}
+
+/// US3.3. The skill forbade curl on DocBook, then curled DocBook in its own re-scrape recipe.
+#[test]
+fn iris_docs_has_one_docbook_rule() {
+    let text = skill("iris-docs");
+    assert!(
+        !text.contains("DO NOT use WebFetch or curl on DocBook URLs"),
+        "iris-docs still forbids curl on DocBook beside a curl recipe"
+    );
+    assert!(
+        !text.contains("often a 504"),
+        "iris-docs still claims a 504 that was not reproduced"
+    );
+    assert!(
+        text.contains("ALG-"),
+        "iris-docs must keep the ALG-* meta tag recipe"
+    );
+}
+
+/// FR-005. `iris_compile` compiles what the server holds; a path works only on the HTTP path, and
+/// `*.cls` is a namespace wildcard, not the workspace. Skills push with `iris_doc(mode="put")`.
+#[test]
+fn no_skill_passes_a_local_path_to_iris_compile() {
+    let mut files: Vec<PathBuf> = std::fs::read_dir(skills_dir())
+        .unwrap()
+        .filter_map(|e| {
+            let p = e.ok()?.path().join("SKILL.md");
+            p.is_file().then_some(p)
+        })
+        .collect();
+    for e in std::fs::read_dir(skills_dir().join("..")).unwrap() {
+        let p = e.unwrap().path();
+        if p.extension().is_some_and(|x| x == "md") {
+            files.push(p);
+        }
+    }
+    let mut bad = Vec::new();
+    for f in &files {
+        let text = std::fs::read_to_string(f).unwrap();
+        for (i, line) in text.lines().enumerate() {
+            let Some(at) = line.find("iris_compile(target=\"") else {
+                continue;
+            };
+            let target: String = line[at + 21..].chars().take_while(|c| *c != '"').collect();
+            if target.contains('/') || target.contains('\\') || line.contains("in workspace") {
+                bad.push(format!("{}:{}: {line}", f.display(), i + 1));
+            }
+        }
+        assert!(
+            !text.contains("always pass the `.cls` file path"),
+            "{} tells the reader to pass a file path to iris_compile",
+            f.display()
+        );
+    }
+    assert!(
+        bad.is_empty(),
+        "iris_compile given a local path:\n{}",
+        bad.join("\n")
+    );
+}

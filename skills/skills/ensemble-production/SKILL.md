@@ -73,16 +73,18 @@ elif state == "1":
     print(f"Running: {prod_name}")
 ```
 
-## CRITICAL: use `update_production()`, not stop+start
+## Config change: hot update first
 
 ```python
-# CORRECT — hot-apply config changes, zero downtime, no message loss
+# Hot-apply config changes; the production keeps running
 director.update_production()
 
-# WRONG — drops in-flight messages, causes unnecessary downtime
+# Heavier: stop and start the whole production. Nothing is lost, but every host goes down
 director.stop_production()
 director.start_production("MyApp.Production")
 ```
+
+See "Choosing update, host restart or stop" below for when each one fits.
 
 ### Full director API
 
@@ -241,12 +243,31 @@ log_type="error,warning")`.
 To enable, disable, or reconfigure a single item without touching the rest of the
 production, use `iris_production_item(action="enable"|"disable"|"get_settings"|"set_settings")`.
 
-### Restarting a production
+### Choosing update, host restart or stop
 
-Only restart if status shows the production is stopped or stuck:
+Pick the smallest action that applies the change:
+
+1. **Hot update** — settings changed: `iris_production(action="update")`. The production keeps
+   running.
+2. **One host** — one item is stuck or needs new code:
+   `iris_production_item(action="disable")`, then `action="enable"`. The rest keep running.
+3. **Controlled stop and start** — the production itself is stuck, or the change needs a full
+   restart.
+
+What a stop does to messages, observed on IRIS 2026.2 with six messages queued to a
+one-at-a-time operation:
+
+- **Graceful** (`force=false`): the operation finishes the message in hand and the rest stay
+  queued. After the next start all six are delivered.
+- **Force** (`force=true`): the interrupted message goes back on the queue (requeued) and runs
+  again after the next start. All six ran once each, because the side effect came after the
+  interruption point. Code whose side effect happens before a force stop would do it twice, so
+  make it idempotent or use a graceful stop.
+
+Neither loses a message.
 
 ```text
-# Graceful stop (waits for in-flight messages)
+# Graceful stop (waits for the message in hand)
 iris_production(action="stop", timeout=30, force=false)
 
 # Start with the production class name
@@ -343,13 +364,14 @@ Create, update, or delete Ensemble credentials. Write-gated **and destructive-ga
 
 ## Safety Rules
 
-- **Never force-stop** (`force=true`) unless graceful stop has timed out. Force-stop drops
-  in-flight messages.
+- **Prefer a graceful stop** (`force=false`). A force stop requeues the interrupted message and
+  runs it again after restart, which repeats any side effect it had already made.
 - **Always run `iris_production(action="check")` before `iris_production(action="update")`** —
   calling update when not needed is a no-op, but it's good hygiene to confirm first.
 - **Namespace matters** — every tool accepts a `namespace` parameter. Default is `USER`.
   Productions in `HSCUSTOM` or application-specific namespaces require the correct namespace.
-- **Do not restart to fix a config change** — use `update` instead. Restart loses in-flight messages.
+- **Do not restart to fix a config change** — use `update` instead. A restart takes every host
+  down to change one setting.
 
 ## Common gotchas
 
@@ -374,54 +396,22 @@ Method OnRequest(req As %Library.Persistent, output response As %Library.Persist
 }
 ```
 
-### Ens.Request storage — never set DataLocation
+### Ens.Request storage — leave it to the compiler
 
-When subclassing `Ens.Request` or `Ens.Response`, do **not** add a `<DataLocation>`
-tag in your `XData Storage` block. IRIS manages all message body storage in
-`^Ens.MessageBodyD` automatically. Setting a custom `DataLocation` causes `#5477`
-errors at runtime.
-
-```objectscript
-// Wrong — triggers #5477 "DataLocation mismatch" at runtime
-XData Storage [XMLNamespace = "http://www.intersystems.com/storage"]
-{
-<Storage defaultsavemode="objectglobals">
-<DataLocation>^MyPkg.MyMsgD</DataLocation>  // Remove this line
-...
-</Storage>
-}
-
-// Right — omit <DataLocation> entirely; IRIS uses ^Ens.MessageBodyD
-XData Storage [XMLNamespace = "http://www.intersystems.com/storage"]
-{
-<Storage defaultsavemode="objectglobals">
-<Data name="MyMsgDefaultData">
-  <Value name="1"><Value>%%CLASSNAME</Value></Value>
-  <Value name="2"><Value>MyField</Value></Value>
-</Data>
-<IdLocation>^Ens.MessageBodyD</IdLocation>
-<IndexLocation>^MyPkg.MyMsgI</IndexLocation>
-<StreamLocation>^MyPkg.MyMsgS</StreamLocation>
-<Type>%Storage.Persistent</Type>
-</Storage>
-}
-```
-
-### Global name 31-character limit
-
-IRIS appends `"D"` (data) and `"I"` (index) suffixes to the class name to derive
-global names. The combined result must be ≤ 31 characters, or the class fails to
-compile with a cryptic error.
+When subclassing `Ens.Request` or `Ens.Response`, do not write an `XData Storage` block. The
+compiler generates one that puts the body in `^Ens.MessageBodyD`. A hand-written
+`<DataLocation>` pointing anywhere else fails at compile time (IRIS 2026.2):
 
 ```text
-// Class name too long
-MyLongPackage.Data.PatientRecord        → global ^MyLongPackage.Data.PatientRecordD  (34 chars) ✗
-
-// Shorten the class name to fit
-MyPkg.PatientRecord                     → global ^MyPkg.PatientRecordD               (20 chars) ✓
+ERROR #5477: Keyword signature error in MyPkg.MyMsg:Storage:Default,
+keyword 'DataLocation' must be '^Ens.MessageBodyD'
 ```
 
-If you hit this limit on an existing class, rename it and update all references.
+Fix: delete the Storage block and compile again. See `objectscript-guardrails` on Storage.
+
+Long class names are fine. IRIS hashes a long package or class name into a short global name:
+`Test127.VeryLongPackageName.Data.PatientRecordHistory` compiled and saved on 2026.2, with its
+data in a hashed global of 31 characters or fewer. No rename needed.
 
 ### OnResponse required in BusinessProcess
 
@@ -447,19 +437,10 @@ Method OnResponse(
 
 ### iris_production start returning "Invalid Production"
 
-The `iris_production` MCP tool can return `"Invalid Production"` even for a
-correctly-defined class (a known tool-layer issue). Use `iris_execute` as the
-reliable workaround:
-
-```objectscript
-// Via iris_execute — always works when the class itself is valid
-do ##class(Ens.Director).StartProduction("YourPkg.Production")
-```
-
-Verify the class compiles first (`iris_compile`) and that the namespace is correct
-before blaming the production definition.
-
----
+Check the cause before anything else: the class must compile (`iris_doc(mode="put",
+compile=true)` or `iris_compile`), and the `namespace` argument must be the one the production
+lives in. If both are right and the tool still refuses, report it as an iris-agentic-dev issue
+with the tool's output. Do not route around the refusal with `iris_execute`.
 
 ## Testing without the Management Portal
 

@@ -49,11 +49,11 @@ Parameters:
 
 Returns `{query, total_hits, hits: [{title, url, excerpt, breadcrumbs, version, product}]}`.
 
-**DO NOT use WebFetch or curl on DocBook URLs.** `docs.intersystems.com` is a JavaScript
-SPA. Naive fetching returns only a navigation shell, not the documentation content. The
-`iris_doc_search` tool uses the real Algolia search index and returns actual body text.
-`Doc.View.cls` and `DocBook.UI.Page.cls` give you a JS nav shell and often a 504.
-Documatic URLs (below) are the exception — they render server-side and WebFetch works.
+**Use `iris_doc_search` for DocBook content, not WebFetch or curl.** `docs.intersystems.com` is
+a JavaScript SPA: a fetch of `DocBook.UI.Page.cls` returns HTTP 200 with a navigation shell and
+no body text. The shell does carry the `ALG-*` meta tags (the Algolia credentials), and that is
+all the re-scrape recipe below reads from it. `iris_doc_search` queries the Algolia index and
+returns the body text. Documatic URLs (below) render server-side and WebFetch works on them.
 
 ---
 
