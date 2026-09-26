@@ -26,4 +26,4 @@ Tests come first in every phase.
 - [X] T011 Billable: loop run, 128 drift re-measure, ladder (capped at $3)
 - [X] T012 `docs/skills.md`, CLAUDE.md Recent Changes, markdown lint
 - [X] T013 Drop the `IadProbe130` scratch objects
-- [ ] T014 fmt, clippy, all suites; local commit
+- [X] T014 fmt, clippy, all suites; local commit
