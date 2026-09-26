@@ -116,6 +116,22 @@ a `hint` to the error when it sees this case.
 Their SQL tables behave the same way. `SELECT Name FROM Security.Users` from `USER` fails with
 SQLCODE -30 `Table 'SECURITY.USERS' not found`; pass `namespace: "%SYS"` to `iris_query`.
 
+## Loading an XML export
+
+`iris_doc(mode="put")` takes an XML export (`<Export>` with a `<Class>` inside) when you put it
+under the class's `.cls` name. IRIS imports it, stores it as UDL, and `compile=true` compiles it.
+Two things go wrong:
+
+- A `.xml` document name is refused with `ERROR #16006: Document ... name is invalid`.
+- The `<?xml ...?>` declaration must be on its own line, followed by a newline. An export squashed
+  onto one line is refused with `ERROR #16021: Illegal Header Line`. iad does not show that error
+  yet; you see only the compile failure that follows, because nothing was stored. If a put of an
+  XML export stores nothing, check the line breaks first.
+
+```text
+iris_doc(mode="put", name="MyApp.Greeter.cls", content="<?xml version=\"1.0\" encoding=\"UTF8\"?>\n<Export ...>...</Export>", compile=true)
+```
+
 ## `.iris-agentic-dev.toml` key reference
 
 Generate a documented sample: `iris-agentic-dev init`

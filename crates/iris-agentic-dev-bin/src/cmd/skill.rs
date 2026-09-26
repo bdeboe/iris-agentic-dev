@@ -212,6 +212,7 @@ fn run_list(args: SkillListArgs) -> Result<()> {
         "objectscript-review",
         "objectscript-guardrails",
         "iris-sql",
+        "iris-query-plans",
         "iris-vector-ai",
         "objectscript-list-patterns",
         "objectscript-loop-patterns",

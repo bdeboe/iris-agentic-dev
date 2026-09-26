@@ -26,7 +26,7 @@
     },
     {
       "title": "IRIS SQL",
-      "skills": ["iris-sql"]
+      "skills": ["iris-sql", "iris-query-plans"]
     },
     {
       "title": "IRIS Vector & AI",

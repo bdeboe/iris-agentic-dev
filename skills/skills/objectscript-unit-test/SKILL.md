@@ -24,12 +24,12 @@ Generate idiomatic IRIS `%UnitTest.TestCase` test scaffolds grounded in live cla
 ### Step 1 — Generate Test Class
 
 ```text
-Tool: objectscript_iris_generate_test
+Tool: iris_generate_test
 Inputs: class_name (e.g. "MyApp.Utils"), method_name (optional, generates all if omitted), test_directory (default "tests")
 Returns: test class code + suggested output path
 ```
 
-The tool uses `objectscript_docs_introspect` to read the live class definition — method signatures, return types, class vs instance methods — and generates appropriate test scaffolds.
+The tool uses `docs_introspect` to read the live class definition — method signatures, return types, class vs instance methods — and generates appropriate test scaffolds.
 
 ### Step 2 — Review Generated Scaffold
 
@@ -57,15 +57,14 @@ Do $$$AssertStatusOK(tSC, "MyMethod should succeed")
 
 ### Step 3 — Compile and Run
 
-```text
-Tool: objectscript_iris_compile
-Inputs: target (path to generated .cls file)
-```
+Put the class on the server and compile it there. `iris_compile` only recompiles source IRIS already holds; it does not read local files.
 
 ```text
-Tool: objectscript_iris_test
-Inputs: pattern (e.g. "Test.MyApp.*")
+iris_doc(mode="put", name="Test.MyApp.Utils.cls", content="...", compile=true)
+iris_test(pattern=":Test.MyApp.Utils")
 ```
+
+The leading colon runs one class. Only methods whose names start with `Test` run. A method named `CheckSum` or `VerifySub` is skipped without a word. If no method runs, `%UnitTest` still prints `All PASSED`; iad returns NO_TESTS_FOUND instead. Treat NO_TESTS_FOUND as a failure, not a pass.
 
 Fix any compile errors, then confirm all generated tests pass before adding assertions.
 
@@ -94,7 +93,7 @@ The scaffold generates placeholder assertions. Replace them with meaningful expe
 
 > ✅ Generated test class `Test.MyApp.Utils` — `N` test methods
 > Output path: `tests/Test/MyApp/Utils.cls`
-> Next: compile and run with `objectscript_iris_test("Test.MyApp.*")`
+> Next: put and compile with `iris_doc(mode="put", ..., compile=true)`, then run `iris_test(pattern=":Test.MyApp.Utils")`
 
 ## Related skills
 

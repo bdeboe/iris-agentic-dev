@@ -15,6 +15,7 @@ skills = [
     "skills/objectscript-navigation",    # 82% pass rate
     "skills/objectscript-list-patterns", # 91% pass rate
     "skills/objectscript-sql-patterns",  # SQL table naming, SQLCODE, $HOROLOG
+    "skills/iris-query-plans",           # plans, stale indexes, %BuildIndices
     "skills/objectscript-loop-patterns", # $Order, Return vs Quit in loops
     # Tier 2: Workflow skills (complement MCP tools or running IRIS)
     "skills/objectscript-tdd",

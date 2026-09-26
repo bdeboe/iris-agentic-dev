@@ -207,8 +207,13 @@ fn no_frontmatter_value_breaks_strict_yaml_parsing() {
             let path = entry.path();
             let name = entry.file_name();
             if path.is_dir() {
-                // Skip build output and vendored trees; keep dotted agent dirs.
-                if name == "target" || name == "node_modules" || name == ".git" {
+                // Skip build output, vendored trees and the gitignored `.iad-local` scratch
+                // (mined third-party skills, never shipped); keep dotted agent dirs.
+                if name == "target"
+                    || name == "node_modules"
+                    || name == ".git"
+                    || name == ".iad-local"
+                {
                     continue;
                 }
                 collect(&path, out);

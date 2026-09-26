@@ -111,11 +111,16 @@ If $$$ISERR(sc) { Return $$$ERROR($$$GeneralError, "Prepare failed: "_$System.St
 Set rs = stmt.%Execute(name)
 If rs.%SQLCODE < 0 { Return $$$ERROR($$$GeneralError, "Execute failed: "_rs.%Message) }
 
-While rs.%Next() {
+Set tSC = $$$OK
+While rs.%Next(.tSC) {
     Set name = rs.%Get("Name")
     Set val  = rs.%Get("Value")
 }
+If $$$ISERR(tSC) { Return tSC }
+If rs.%SQLCODE < 0 { Return $$$ERROR($$$GeneralError, "Fetch failed: "_rs.%Message) }
 ```
+
+Check twice. `%SQLCODE` after `%Execute` covers errors raised before the first row. With `%ExecDirect`, a missing table is -30 here. An error in the select list happens when the row is fetched. `SELECT Amount/? ...` with 0 has `%SQLCODE = 0` after execute. Then `%Next(.tSC)` returns 0 with SQLCODE -400 `<DIVIDE>` in `tSC`, and `%SQLCODE` is -400 after the loop. Check only after execute and that error reads as an empty result.
 
 ## 5. Embedded SQL vs %SQL.Statement
 
@@ -127,7 +132,8 @@ If SQLCODE < 0   { Return "" }    // error
 
 // %SQL.Statement — dynamic, preferred for variable table/field names:
 Set stmt = ##class(%SQL.Statement).%New()
-Do stmt.%Prepare("SELECT Name FROM " _ tableName _ " WHERE Key = ?")
+Set tSC = stmt.%Prepare("SELECT Name FROM " _ tableName _ " WHERE Key = ?")
+If $$$ISERR(tSC) { Return tSC }    // %Prepare returns the error; it does not throw
 Set rs = stmt.%Execute(key)
 ```
 

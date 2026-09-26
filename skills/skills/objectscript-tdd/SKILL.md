@@ -42,6 +42,23 @@ Never present code to the user that hasn't compiled. If you can't compile (no IR
 
 > ⚠️ No IRIS connection available — code is unverified. Recommend compiling before use.
 
+A class that compiles clean has not been tested. The compiler does not check that a local is set before it is read, and it cannot check a method name built at runtime. Both of these compile with no error and fail when called:
+
+```objectscript
+ClassMethod Total(pA As %Integer, pB As %Integer) As %Integer
+{
+    Set tSum = pA + pB
+    Quit tSun                  // <UNDEFINED> tSun at runtime
+}
+
+ClassMethod Dyn() As %String
+{
+    Quit $CLASSMETHOD("MyPackage.MyClass", "Nope")   // <METHOD DOES NOT EXIST> at runtime
+}
+```
+
+A literal `..Nope()` is caught at compile time, but a dynamic call is not. Call every method you changed at least once, through `iris_execute` or a test, before you call it done.
+
 ## Common Compile Errors and Fixes
 
 | Error                              | Cause                                       | Fix                               |

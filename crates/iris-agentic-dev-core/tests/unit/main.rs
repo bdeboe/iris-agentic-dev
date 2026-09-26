@@ -21,6 +21,7 @@ mod test_cli_dispatch_helpers;
 mod test_code_edit_gate_unit;
 mod test_compile_params;
 mod test_connection_fixes;
+mod test_content_skills_130;
 mod test_coverage_gaps;
 mod test_coverage_unit;
 mod test_coverage_wave3;

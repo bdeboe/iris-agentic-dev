@@ -27,6 +27,7 @@ mod test_cmd_live;
 mod test_codemode_gate_live;
 mod test_comparison_e2e;
 mod test_compile_cmd;
+mod test_content_skills_130_live;
 mod test_coverage_live;
 mod test_discovery_docker_live;
 mod test_dispatch_gate_handlers;

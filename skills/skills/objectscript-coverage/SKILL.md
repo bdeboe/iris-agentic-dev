@@ -110,7 +110,7 @@ no separate `iris_coverage` invocation needed:
 
 ```text
 iris_test(
-  pattern="MyApp.Tests",
+  pattern=":MyApp.Tests.OrderTest",
   namespace="USER",
   coverage=true,
   coverage_target_pct=80.0

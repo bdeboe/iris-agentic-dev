@@ -118,6 +118,7 @@ missing from the table, so any skill in the binary belongs here.
 | `iris-objectscript-eval`           | Execute/compile/test loop over the MCP tools, with docker exec only as a fallback               |             |
 | `iris-pgwire`                      | Connecting to IRIS over the PostgreSQL wire protocol (psycopg3 and other PG clients)            |             |
 | `iris-product-features`            | What IRIS actually ships — the features and product boundaries models invent                    |             |
+| `iris-query-plans`                 | Reading query plans; stale indexes, `%BuildIndices`, `TUNE TABLE`, outlier selectivity          |             |
 | `iris-sql`                         | Writing and debugging IRIS SQL: table naming, NULL semantics, `SQLCODE`, DDL quirks             |             |
 | `iris-vector-ai`                   | IRIS vector search syntax (HNSW, `VECTOR_COSINE`, `TO_VECTOR`)                                  | domain      |
 | `iris-vscode-objectscript`         | VS Code ObjectScript setup against a container, including the 52773-vs-1972 trap                |             |

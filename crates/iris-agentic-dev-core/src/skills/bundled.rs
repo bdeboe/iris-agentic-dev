@@ -95,6 +95,7 @@ const EMBEDDED_SKILLS: &[(&str, &str)] = &[
     embedded_skill!("iris-objectscript-eval"),
     embedded_skill!("iris-pgwire"),
     embedded_skill!("iris-product-features"),
+    embedded_skill!("iris-query-plans"),
     embedded_skill!("iris-sql"),
     embedded_skill!("iris-vector-ai"),
     embedded_skill!("iris-vscode-objectscript"),

@@ -56,6 +56,7 @@ trigger: Use for tdyar/iris-light-slim
 - [ ] **$ListBuild()**: Empty list is `""` not `$ListBuild()`—`$ListLength($ListBuild()) = 1`
 - [ ] **%Status**: Use `$$$ISERR(sc)` / `$$$ThrowOnError(sc)`. Never return `$$$OK` after catching an error
 - [ ] **Transactions**: Record `Set entry=$TLevel` before `TSTART` and roll back one level with `TROLLBACK:$TLevel>entry 1`. A bare `TROLLBACK` also rolls back the caller's transaction (IRIS 2026.2). Never `Return` inside TSTART without rollback
+- [ ] **Namespace**: `New $NAMESPACE` before `Set $NAMESPACE = "%SYS"`. When the method exits, the caller's namespace comes back. Without the `New`, the caller is left in `%SYS`
 - [ ] **Storage blocks**: Never edit `Storage Default { ... }` — compiler auto-maps properties on compile, added or removed (orphans are fine). Rename exception: also rename its Storage entry. Reset needs explicit user confirmation.
 - [ ] **%INLIST in ObjectScript**: `%INLIST` is SQL-only. In ObjectScript method code use `$ListFind(list, value) > 0`. Writing `Return (x %INLIST list)` causes ERROR #1010.
 - [ ] **`'=` in SQL strings**: `'=` is the ObjectScript not-equal operator. Inside SQL string literals, use `<>`. `"WHERE Tags '= ''"` → parser sees `'` as start of SQL string.
@@ -87,6 +88,7 @@ SELECT FROM Catalog_Item           →  SELECT FROM Catalog.Item
 If SQLCODE { "not found" }         →  If SQLCODE = 100 { "not found" }
 celsius * 9 / 5 + 32               →  (celsius * 1.8) + 32
 Set lst = $ListBuild()             →  Set lst = ""
+Set $NAMESPACE = "%SYS"            →  New $NAMESPACE  Set $NAMESPACE = "%SYS"
 
 // Storage / Operators:
 Add Property + map into Storage           →  leave Storage alone (compiler auto-maps)

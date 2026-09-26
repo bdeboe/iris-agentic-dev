@@ -114,6 +114,7 @@ echo "Done. $(ls $SKILLS_DIR | wc -l) skills installed."
 | `skills/objectscript-*`           | Validated pattern skills (see leaderboard above)               |
 | `skills/objectscript-guardrails/` | 268-word all-in-one hard gate (alternative to review)          |
 | `skills/iris-sql/`                | IRIS SQL quirks: reserved words, SQLCODE, table naming         |
+| `skills/iris-query-plans/`        | Query plans, stale indexes, `%BuildIndices`, `TUNE TABLE`      |
 | `kb/`                             | Reference knowledge: error codes, idioms, IPM authoring        |
 | `iris-dev.toml`                   | Package manifest for `iris-dev` CLI install                    |
 

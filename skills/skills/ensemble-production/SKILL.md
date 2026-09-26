@@ -112,12 +112,13 @@ status, response = svc.process_input(my_message)
 
 ### State values — get_production_status()
 
-| state value | meaning   | production_name              |
-| ----------- | --------- | ---------------------------- |
-| `"1"`       | running   | set to production class name |
-| `"2"`       | stopped   | `None`                       |
-| `"3"`       | suspended | set to production class name |
-| `"4"`       | troubled  | set to production class name |
+| state value | meaning        | production_name              |
+| ----------- | -------------- | ---------------------------- |
+| `"1"`       | running        | set to production class name |
+| `"2"`       | stopped        | `None`                       |
+| `"3"`       | suspended      | set to production class name |
+| `"4"`       | troubled       | set to production class name |
+| `"5"`       | NetworkStopped | not checked                  |
 
 State is always a **string** — compare with `== "1"`, not `== 1`.
 
@@ -179,9 +180,10 @@ When writing ObjectScript code to manage productions directly:
 Set sc = ##class(Ens.Director).StartProduction("MyApp.Productions.Main")
 If $$$ISERR(sc) { Quit sc }
 
-// Verify it started — GetProductionState returns $$$EnsProductionRunning etc.
-Set state = ##class(Ens.Director).GetProductionState(.sc)
-If state '= $$$EnsProductionRunning {
+// Verify it started: state 1 is running, 2 is stopped
+Set sc = ##class(Ens.Director).GetProductionStatus(.prodName, .state)
+If $$$ISERR(sc) { Quit sc }
+If state '= 1 {
     Quit $$$ERROR($$$GeneralError, "Production did not reach running state")
 }
 
@@ -195,13 +197,18 @@ Set sc = ##class(Ens.Director).UpdateProduction()
 ### Check running state
 
 ```objectscript
-// Current production name
-Set prodName = ##class(Ens.Director).GetActiveProductionName()
+// Name and state of the production in this namespace. When none runs, state is 2 and name is ""
+Set sc = ##class(Ens.Director).GetProductionStatus(.prodName, .state)
 
-// State constants: $$$EnsProductionRunning, $$$EnsProductionStopped,
-//                 $$$EnsProductionTroubled, $$$EnsProductionSuspended
-Set state = ##class(Ens.Director).GetProductionState(.sc)
+// Is this one running? Returns 1 or 0
+Set running = ##class(Ens.Director).IsProductionRunning("MyApp.Productions.Main")
 ```
+
+State values: 1 running, 2 stopped, 3 suspended, 4 troubled, 5 NetworkStopped. `EnsConstants.inc` names them `$$$eProductionStateRunning`, `$$$eProductionStateStopped` and so on. `Ens.Director` has no `GetProductionState` method; calling it fails with `<METHOD DOES NOT EXIST>`.
+
+`GetActiveProductionName()` is not a running check. It returns the production that was started last, and it still returns that name after the production stops.
+
+`StartProduction` on a production that already runs returns `ErrProductionAlreadyRunning`. To make a start idempotent, check `GetProductionStatus` first and start only when state is 2.
 
 ### Key rules for ObjectScript
 
@@ -369,7 +376,7 @@ Create, update, or delete Ensemble credentials. Write-gated **and destructive-ga
 - **Always run `iris_production(action="check")` before `iris_production(action="update")`** —
   calling update when not needed is a no-op, but it's good hygiene to confirm first.
 - **Namespace matters** — every tool accepts a `namespace` parameter. Default is `USER`.
-  Productions in `HSCUSTOM` or application-specific namespaces require the correct namespace.
+  A production in any namespace other than `USER` needs that namespace passed.
 - **Do not restart to fix a config change** — use `update` instead. A restart takes every host
   down to change one setting.
 

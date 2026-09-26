@@ -36,9 +36,10 @@ iris_compile(target="*.cls")   # every class in the namespace, on the server
 ### Run %UnitTest tests
 
 ```text
-iris_test(pattern="MyPackage.Tests.*")
-iris_test(pattern="MyPackage.Tests.MyClassTest")   # single class
+iris_test(pattern=":MyPackage.Tests.MyClassTest")   # one class; note the leading colon
 ```
+
+Only methods whose names start with `Test` run. A class with none reports NO_TESTS_FOUND.
 
 ### Discover classes
 
