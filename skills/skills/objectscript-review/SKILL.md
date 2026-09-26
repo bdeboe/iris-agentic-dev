@@ -21,8 +21,8 @@ For each item, check the generated code and flag any violations:
 - [ ] **Error handling**: Uses `$$$ThrowOnError` / `$$$ISERR` macros, not raw status checks
 - [ ] **THROW**: Never throws a `%Status` directly — uses `%Exception` objects
 - [ ] **Precedence**: Complex arithmetic has explicit parentheses
-- [ ] **Transactions**: TRollback checks `$TLevel > 0` first
-- [ ] **NEW**: No `New` command inside method/procedure blocks
+- [ ] **Transactions**: A method rolls back only its own level: `Set entry=$TLevel`, `TSTART`, then `TROLLBACK:$TLevel>entry 1`. A bare `TROLLBACK` rolls back every level, the caller's too (IRIS 2026.2)
+- [ ] **NEW**: No `New` on a plain variable inside a procedure block (ERROR #1038). `New $Namespace` is fine: it is how a method switches namespace and gets the caller's back on exit (IRIS 2026.2)
 - [ ] **%TimeStamp**: Uses `YYYY-MM-DD HH:MM:SS` format, not ISO 8601 with `T`
 - [ ] **%Status returns**: Methods returning %Status use `$$$OK` and check with `$$$ISOK`/`$$$ISERR`
 - [ ] **Globals**: No temporary data stored in globals when locals suffice

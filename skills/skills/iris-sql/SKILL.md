@@ -401,53 +401,33 @@ WHERE ? %INLIST $LISTFROMSTRING(Tags, ',')
 
 ---
 
-## EXAMPLE: IN clause chunking — %Execute does NOT accept arrays
+## EXAMPLE: IN clause chunking with `%Execute(args...)`
 
-When chunking IN clause queries, you CANNOT pass an array to `%Execute`.
-Pass individual positional arguments using a dynamically built call:
+`%Execute` takes a variable argument list, so a local array passed as `args...` binds one `?` per
+subscript. Verified on IRIS 2026.2: two placeholders and `args=2` returned both rows, no error.
+Put the placeholders in the SQL string, never the values. Concatenating values into SQL invites
+SQL injection.
 
 ```objectscript
-// WRONG: %Execute does not accept local arrays
-Set args = chunkCount
-For i=1:1:chunkCount { Set args(i) = ids.GetAt(start + i - 1) }
-Set rs = stmt.%Execute(args...)   // <STACK> error!
-
-// CORRECT: use %ExecDirect with positional params OR build the call dynamically
-// For small fixed chunks, pass args directly:
-Set stmt = ##class(%SQL.Statement).%New()
-
-// Option A: %ExecDirect with string SQL (simpler for chunked IN):
 Set chunkSize = 499
 Set start = 1
 While start <= ids.Count() {
     Set end = $Select((start+chunkSize-1)<=ids.Count(): start+chunkSize-1, 1: ids.Count())
+    Kill args
     Set placeholders = ""
-    Set execArgs = ""
     For i=start:1:end {
+        Set args($Increment(args)) = ids.GetAt(i)
         Set placeholders = placeholders _ $Select(i=start:"", 1:",") _ "?"
-        // Build comma-separated list for positional args — use %ExecDirect with array
     }
-    // Use %ExecDirect which accepts a variable-length arg list
-    Set rs = ##class(%SQL.Statement).%ExecDirect(
-        , "SELECT ID FROM Table WHERE ID IN (" _ placeholders _ ")"
-    )
-    // BUT %ExecDirect also doesn't take array! Solution: use dynamic method call
-    // BEST APPROACH for variable params: build quoted IN list directly
-    Set idList = ""
-    For i=start:1:end {
-        Set idList = idList _ $Select(i=start:"", 1:",") _ "'" _ ids.GetAt(i) _ "'"
-    }
-    Set rs = ##class(%SQL.Statement).%ExecDirect(
-        , "SELECT RefId, Status FROM SQL.Record WHERE RefId IN (" _ idList _ ")"
-    )
+    Set stmt = ##class(%SQL.Statement).%New()
+    $$$ThrowOnError(stmt.%Prepare("SELECT RefId, Status FROM SQL.Record WHERE RefId IN (" _ placeholders _ ")"))
+    Set rs = stmt.%Execute(args...)
     While rs.%Next() {
         Do results.Insert(rs.%Get("RefId") _ ":" _ rs.%Get("Status"))
     }
     Set start = end + 1
 }
 ```
-
-**Key rule**: For variable-count IN clause params, build the quoted values directly into the SQL string. Don't try to pass arrays to `%Execute` or `%ExecDirect` — they take positional args only, not arrays.
 
 ---
 

@@ -193,7 +193,7 @@ KEY RULE: Always `If '$IsObject(obj) { Return <default> }` immediately after `%O
 
 ## EXAMPLE 6: Postfix Quit Syntax Error
 
-BUGGY CODE (causes #5559 parse error):
+BUGGY CODE (causes ERROR #1054 Invalid expression):
 
 ```objectscript
 For {
@@ -204,7 +204,8 @@ For {
 ```
 
 BUG PATTERN: Spaces in postfix condition cause parse error.
-ROOT CAUSE: `Quit:key = ""` — the space before `=` causes IRIS UDL parser error #5559.
+ROOT CAUSE: `Quit:key = ""` — the space before `=` ends the postconditional, and the compiler
+reports ERROR #1054 Invalid expression (IRIS 2026.2).
 Postfix conditions must be written without any spaces.
 
 FIXED CODE:

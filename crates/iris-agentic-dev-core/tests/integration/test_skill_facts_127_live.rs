@@ -48,7 +48,10 @@ fn conn() -> Option<(IrisConnection, reqwest::Client)> {
 
 /// Save a document (`Test127.X.cls`, `ROU127.mac`) by Atelier PUT.
 async fn put_doc(c: &IrisConnection, client: &reqwest::Client, doc: &str, src: &str) {
-    let url = c.versioned_ns_url(NS, &format!("/doc/{}", urlencoding::encode(doc)));
+    let url = c.versioned_ns_url(
+        NS,
+        &format!("/doc/{}?ignoreConflict=1", urlencoding::encode(doc)),
+    );
     let lines: Vec<&str> = src.lines().collect();
     let resp = client
         .put(&url)
@@ -177,4 +180,326 @@ async fn e_flag_deletes_the_extent_and_recommended_flags_keep_rows() {
     );
 
     drop_classes(&c, &client, &["Test127.Ext"]).await;
+}
+
+/// All compile output in one string, for asserting on an error number.
+fn compile_text(r: &CompileResult) -> String {
+    format!("{}\n{}", r.errors.join("\n"), r.console.join("\n"))
+}
+
+async fn put_and_compile(
+    c: &IrisConnection,
+    client: &reqwest::Client,
+    doc: &str,
+    src: &str,
+) -> CompileResult {
+    put_doc(c, client, doc, src).await;
+    compile(c, client, doc).await
+}
+
+const PC: &str = r#"Class Test127.PC
+{
+
+ClassMethod Shared() As %Integer
+{
+    Set arr("a")="",arr("b")="",key="",n=0
+    For {
+        Set key=$Order(arr(key))  Quit:key=""
+        Set n=n+1
+    }
+    Quit n
+}
+
+ClassMethod RetShared() As %Integer
+{
+    Set arr("a")="",key="",n=0
+    For {
+        Set key=$Order(arr(key))
+        Return n  Quit:key=""
+    }
+    Quit -1
+}
+
+ClassMethod QuitInLoop() As %Integer
+{
+    For i=1:1:3 {
+        Quit 5
+    }
+    Quit 0
+}
+
+ClassMethod NewNs() As %String
+{
+    New $Namespace
+    Set $Namespace="%SYS"
+    Quit $Namespace
+}
+
+ClassMethod Inner()
+{
+    TROLLBACK
+}
+
+ClassMethod Outer() As %String
+{
+    TSTART
+    Set before=$TLevel
+    TSTART
+    Do ..Inner()
+    Set after=$TLevel
+    TROLLBACK:$TLevel
+    Quit before_","_after
+}
+
+ClassMethod InnerOneLevel()
+{
+    Set entry=$TLevel
+    TSTART
+    TROLLBACK:$TLevel>entry 1
+}
+
+ClassMethod OuterOneLevel() As %String
+{
+    TSTART
+    Set before=$TLevel
+    Do ..InnerOneLevel()
+    Set after=$TLevel
+    TROLLBACK:$TLevel
+    Quit before_","_after
+}
+
+ClassMethod Exec() As %String
+{
+    Set sql="SELECT Name FROM %Dictionary.ClassDefinition WHERE Name = ? OR Name = ?"
+    Set stmt=##class(%SQL.Statement).%New()
+    Set sc=stmt.%Prepare(sql) If $$$ISERR(sc) Quit "prepare failed"
+    Set args=2,args(1)="Test127.PC",args(2)="Test127.Ext"
+    Set rs=stmt.%Execute(args...)
+    Set n=0 While rs.%Next() { Set n=n+1 }
+    Quit n_":"_rs.%SQLCODE
+}
+
+}"#;
+
+/// US2.1. A postfix `Quit:key=""` sharing a line compiles and runs. The space form is the one that
+/// fails, and with #1054, not #5559.
+#[tokio::test]
+#[ignore]
+async fn postconditional_quit_shares_a_line_and_the_space_form_is_1054() {
+    let Some((c, client)) = conn() else { return };
+    let r = put_and_compile(&c, &client, "Test127.PC.cls", PC).await;
+    assert!(r.success(), "Test127.PC must compile: {}", compile_text(&r));
+    assert_eq!(
+        run(
+            &c,
+            &client,
+            " Write ##class(Test127.PC).Shared(),\",\",##class(Test127.PC).RetShared()"
+        )
+        .await,
+        "2,0"
+    );
+
+    let spaced = r#"Class Test127.PCSpace
+{
+
+ClassMethod Spaced() As %Integer
+{
+    Set arr("a")="",key="",n=0
+    For {
+        Set key=$Order(arr(key))
+        Quit:key = ""
+        Set n=n+1
+    }
+    Quit n
+}
+
+}"#;
+    let r = put_and_compile(&c, &client, "Test127.PCSpace.cls", spaced).await;
+    let text = compile_text(&r);
+    assert!(!r.success(), "the spaced postconditional must not compile");
+    assert!(text.contains("#1054"), "expected #1054, got: {text}");
+    assert!(
+        !text.contains("#5559"),
+        "the spaced form is not #5559: {text}"
+    );
+    drop_classes(&c, &client, &["Test127.PC", "Test127.PCSpace"]).await;
+}
+
+/// US2.2. `Quit 5` in a `For` block compiles and fails at runtime with `<COMMAND>`. Inside `Try` it
+/// is a compile error.
+#[tokio::test]
+#[ignore]
+async fn quit_value_in_loop_is_runtime_command_and_in_try_is_1043() {
+    let Some((c, client)) = conn() else { return };
+    let r = put_and_compile(&c, &client, "Test127.PC.cls", PC).await;
+    assert!(r.success(), "Test127.PC must compile: {}", compile_text(&r));
+    let out = run(
+        &c,
+        &client,
+        " Try { Write ##class(Test127.PC).QuitInLoop() } Catch e { Write e.Name }",
+    )
+    .await;
+    assert_eq!(out, "<COMMAND>");
+
+    let qtry = "Class Test127.QTry
+{
+
+ClassMethod T() As %Integer
+{
+    Try {
+        Quit 5
+    } Catch e { }
+    Quit 0
+}
+
+}";
+    let r = put_and_compile(&c, &client, "Test127.QTry.cls", qtry).await;
+    let text = compile_text(&r);
+    assert!(
+        !r.success(),
+        "Quit with a value inside Try must not compile"
+    );
+    assert!(text.contains("#1043"), "expected #1043, got: {text}");
+    drop_classes(&c, &client, &["Test127.PC", "Test127.QTry"]).await;
+}
+
+/// US2.3. A `.mac` routine can use `Try/Catch` and `Return`.
+#[tokio::test]
+#[ignore]
+async fn mac_routine_try_catch_and_return_work() {
+    let Some((c, client)) = conn() else { return };
+    let src = "ROUTINE ROU127
+ Quit
+Go() PUBLIC {
+    Try {
+        Set x=1/0
+    } Catch e {
+        Return \"caught:\"_e.Name
+    }
+    Return \"none\"
+}";
+    let r = put_and_compile(&c, &client, "ROU127.mac", src).await;
+    assert!(r.success(), "ROU127 must compile: {}", compile_text(&r));
+    assert_eq!(
+        run(&c, &client, " Write $$Go^ROU127()").await,
+        "caught:<DIVIDE>"
+    );
+    let _ = c
+        .execute_via_generator(" Do ##class(%Routine).Delete(\"ROU127.mac\")", NS, &client)
+        .await;
+}
+
+/// US2.4. Both list forms build the same list; appending with `_$LB()` is the fast one.
+#[tokio::test]
+#[ignore]
+async fn list_concat_is_fast_and_list_star_plus_one_is_slow() {
+    let Some((c, client)) = conn() else { return };
+    let out = run(
+        &c,
+        &client,
+        " Set n=20000\n \
+         Set t=$ZH,a=\"\" For i=1:1:n { Set a=a_$LB(i) } Set ta=$ZH-t\n \
+         Set t=$ZH,b=\"\" For i=1:1:n { Set $LIST(b,*+1)=i } Set tb=$ZH-t\n \
+         Write (a=b),\",\",$LL(a),\",\",(ta*5<tb)",
+    )
+    .await;
+    assert_eq!(
+        out, "1,20000,1",
+        "want same list, 20000 items, concat at least 5x faster"
+    );
+}
+
+/// US2.5. Two-level classes are queried by their dotted name; the underscore form is -30. Deeper
+/// packages turn the inner dots into underscores.
+#[tokio::test]
+#[ignore]
+async fn sql_table_names_follow_the_last_dot_rule() {
+    let Some((c, client)) = conn() else { return };
+    let r = put_and_compile(&c, &client, "Test127.Ext.cls", EXT).await;
+    assert!(r.success(), "{}", compile_text(&r));
+    let deep = "Class Test127.Sub.Deep Extends %Persistent
+{
+
+Property Name As %String;
+
+}";
+    let r = put_and_compile(&c, &client, "Test127.Sub.Deep.cls", deep).await;
+    assert!(r.success(), "{}", compile_text(&r));
+
+    assert_eq!(count(&c, &client, "Test127.Ext").await, "0");
+    assert_eq!(count(&c, &client, "Test127_Ext").await, "SQLCODE=-30");
+    assert_eq!(count(&c, &client, "Test127_Sub.Deep").await, "0");
+    assert_eq!(count(&c, &client, "Test127.Sub.Deep").await, "SQLCODE=-30");
+    drop_classes(&c, &client, &["Test127.Ext", "Test127.Sub.Deep"]).await;
+}
+
+/// US2.6. `%Execute(args...)` with an array of values returns rows and raises nothing.
+#[tokio::test]
+#[ignore]
+async fn execute_with_variadic_args_returns_rows() {
+    let Some((c, client)) = conn() else { return };
+    let r = put_and_compile(&c, &client, "Test127.Ext.cls", EXT).await;
+    assert!(r.success(), "{}", compile_text(&r));
+    let r = put_and_compile(&c, &client, "Test127.PC.cls", PC).await;
+    assert!(r.success(), "{}", compile_text(&r));
+    assert_eq!(
+        run(&c, &client, " Write ##class(Test127.PC).Exec()").await,
+        "2:100"
+    );
+    drop_classes(&c, &client, &["Test127.PC", "Test127.Ext"]).await;
+}
+
+/// US2.7. `New $Namespace` compiles and restores the caller's namespace. `New x` in a procedure
+/// block is #1038.
+#[tokio::test]
+#[ignore]
+async fn new_namespace_works_and_new_plain_variable_is_1038() {
+    let Some((c, client)) = conn() else { return };
+    let r = put_and_compile(&c, &client, "Test127.PC.cls", PC).await;
+    assert!(r.success(), "{}", compile_text(&r));
+    assert_eq!(
+        run(
+            &c,
+            &client,
+            " Write ##class(Test127.PC).NewNs(),\",\",$Namespace"
+        )
+        .await,
+        "%SYS,USER"
+    );
+
+    let newx = "Class Test127.NewX
+{
+
+ClassMethod T() As %Integer [ ProcedureBlock = 1 ]
+{
+    New x
+    Set x=1
+    Quit x
+}
+
+}";
+    let r = put_and_compile(&c, &client, "Test127.NewX.cls", newx).await;
+    let text = compile_text(&r);
+    assert!(!r.success(), "New x in a procedure block must not compile");
+    assert!(text.contains("#1038"), "expected #1038, got: {text}");
+    drop_classes(&c, &client, &["Test127.PC", "Test127.NewX"]).await;
+}
+
+/// US2.8. A callee's bare `TROLLBACK` ends the caller's transaction too. Rolling back one level,
+/// only when the callee opened one, leaves the caller's level alone.
+#[tokio::test]
+#[ignore]
+async fn bare_trollback_kills_callers_level_and_one_level_does_not() {
+    let Some((c, client)) = conn() else { return };
+    let r = put_and_compile(&c, &client, "Test127.PC.cls", PC).await;
+    assert!(r.success(), "{}", compile_text(&r));
+    assert_eq!(
+        run(&c, &client, " Write ##class(Test127.PC).Outer()").await,
+        "1,0"
+    );
+    assert_eq!(
+        run(&c, &client, " Write ##class(Test127.PC).OuterOneLevel()").await,
+        "1,1"
+    );
+    drop_classes(&c, &client, &["Test127.PC"]).await;
 }

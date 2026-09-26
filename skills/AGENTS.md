@@ -22,7 +22,7 @@ Load `skills/objectscript-review/SKILL.md` if available. Otherwise apply this ch
 - [ ] Arithmetic is left-to-right: use `1.8` not `9/5`, parenthesize everything
 - [ ] `$ListBuild()` creates a list of length 1, not 0 — use `""` for empty list
 - [ ] `%Status`: use `$$$ISERR(sc)` — never return `$$$OK` after catching an error
-- [ ] Transactions: `If $TLevel > 0 { TRollback }` — never `Return` inside `TStart` without rollback
+- [ ] Transactions: record `Set entry=$TLevel` before `TStart`, roll back one level with `TROLLBACK:$TLevel>entry 1` (a bare `TRollback` also ends the caller's transaction), and never `Return` inside `TStart` without rollback
 
 ---
 

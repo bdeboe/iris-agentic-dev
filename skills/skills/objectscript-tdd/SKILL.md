@@ -44,13 +44,14 @@ Never present code to the user that hasn't compiled. If you can't compile (no IR
 
 ## Common Compile Errors and Fixes
 
-| Error                         | Cause                                       | Fix                               |
-| ----------------------------- | ------------------------------------------- | --------------------------------- |
-| `QUIT argument not allowed`   | `Quit <val>` inside TRY/CATCH or loop       | Change to `Return <val>`          |
-| `Expected a compilable class` | Missing `Class` keyword or malformed header | Check class declaration line      |
-| `Method does not exist`       | Intra-class call without `..`               | Add `..` prefix                   |
-| `<UNDEFINED>` at runtime      | Variable used before SET                    | Initialize variable before use    |
-| `Expected white space`        | Missing space after command keyword         | Add space: `Set x=1` not `Setx=1` |
+| Error                              | Cause                                       | Fix                               |
+| ---------------------------------- | ------------------------------------------- | --------------------------------- |
+| `#1043: QUIT argument not allowed` | `Quit <val>` inside TRY/CATCH               | Change to `Return <val>`          |
+| `<COMMAND>` at runtime             | `Quit <val>` inside a For/While block       | Change to `Return <val>`          |
+| `Expected a compilable class`      | Missing `Class` keyword or malformed header | Check class declaration line      |
+| `Method does not exist`            | Intra-class call without `..`               | Add `..` prefix                   |
+| `<UNDEFINED>` at runtime           | Variable used before SET                    | Initialize variable before use    |
+| `Expected white space`             | Missing space after command keyword         | Add space: `Set x=1` not `Setx=1` |
 
 ## Related skills
 

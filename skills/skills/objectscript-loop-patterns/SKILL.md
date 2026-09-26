@@ -41,15 +41,16 @@ trigger: Any ObjectScript code with For, While, $Order, Quit, or loop iteration 
 ## 1. THE GOLDEN RULE: Return vs Quit in Loops
 
 ```objectscript
-// Quit with value inside a For/While loop → EXITS THE LOOP, not the method
-// The method continues after the loop and returns whatever Quit returned... actually ""
+// Quit with a value inside a For/While block is not allowed. The class compiles, and the
+// Quit fails at runtime with <COMMAND>. Inside Try/Catch the compiler rejects it:
+// ERROR #1043 QUIT argument not allowed. (Both verified on IRIS 2026.2.)
 
-// WRONG — Quit 0 inside For exits the loop, method returns "":
+// WRONG — Quit 0 inside For: <COMMAND> when a match is found:
 ClassMethod IsUnique(name As %String, lst As %ListOfDataTypes) As %Boolean
 {
     For i=1:1:lst.Count() {
         If (lst.GetAt(i) = name) {
-            Quit 0    // exits loop, NOT method — method returns ""!
+            Quit 0    // <COMMAND> at runtime, not a return value
         }
     }
     Quit 1            // only reached after loop completes
@@ -74,16 +75,15 @@ ClassMethod IsUnique(name As %String, lst As %ListOfDataTypes) As %Boolean
 Set key = ""
 For {
     Set key = $Order(arr(key))
-    Quit:key=""          // ← postfix Quit, ALONE on its own line, NO SPACES around =
+    Quit:key=""          // ← postfix Quit, NO SPACES around =
     // process arr(key)
 }
 
-// WRONG — spaces in postfix condition:
-Quit:key = ""            // ← #5559 parse error!
+// WRONG — spaces in the postfix condition:
+Quit:key = ""            // ← ERROR #1054 Invalid expression
 
-// WRONG — postfix Quit on same line as anything else:
-Set key = $Order(arr(key))  Quit:key=""   // ← #5559 parse error!
-Return value  Quit:key=""                  // ← #5559 parse error!
+// Fine — a postfix Quit can share a line (verified on IRIS 2026.2):
+Set key = $Order(arr(key))  Quit:key=""
 ```
 
 ## 3. Backwards Loop for Safe Removal

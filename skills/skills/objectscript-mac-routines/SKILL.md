@@ -9,16 +9,16 @@ managed_by: iris-agentic-dev
 
 Before generating any `.MAC` code, verify all 8 items:
 
-| #   | Check                  | Wrong                  | Right                                        |
-| --- | ---------------------- | ---------------------- | -------------------------------------------- |
-| 1   | Routine entry          | `MYROUTINE()` (parens) | `MYROUTINE` (no parens)                      |
-| 2   | Label indentation      | `LABEL {` (braces)     | `LABEL` then tab-indented body               |
-| 3   | Include syntax         | `Include %occStatus`   | `#include %occStatus`                        |
-| 4   | Extrinsic call         | `##class(X).Method()`  | `$$LABEL(args)` or `$$LABEL^RTN(args)`       |
-| 5   | Error trap             | `Try { } Catch e { }`  | `Set $ZTRAP="ERRHAN" ... ERRHAN Set err=$ZE` |
-| 6   | Cross-routine call     | `.Method()`            | `Do LABEL^ROUTINE` or `$$FUNC^ROUTINE(args)` |
-| 7   | Variable scope         | Method-scoped (class)  | `New var` to create local scope              |
-| 8   | Return from subroutine | `Return`               | `Quit` (no value) in a DO label              |
+| #   | Check                  | Wrong                  | Right                                          |
+| --- | ---------------------- | ---------------------- | ---------------------------------------------- |
+| 1   | Routine entry          | `MYROUTINE()` (parens) | `MYROUTINE` (no parens)                        |
+| 2   | Label indentation      | `LABEL {` (braces)     | `LABEL` then tab-indented body                 |
+| 3   | Include syntax         | `Include %occStatus`   | `#include %occStatus`                          |
+| 4   | Extrinsic call         | `##class(X).Method()`  | `$$LABEL(args)` or `$$LABEL^RTN(args)`         |
+| 5   | Error trap             | none                   | `Try { } Catch e { }` or `Set $ZTRAP="ERRHAN"` |
+| 6   | Cross-routine call     | `.Method()`            | `Do LABEL^ROUTINE` or `$$FUNC^ROUTINE(args)`   |
+| 7   | Variable scope         | Method-scoped (class)  | `New var` to create local scope                |
+| 8   | Return from subroutine | none                   | `Quit` or `Return`                             |
 
 ## Correct MAC Structure
 

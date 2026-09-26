@@ -102,14 +102,15 @@ else:
 
 Common error patterns and what they mean:
 
-| Error                                              | Meaning                                                     | Fix                                          |
-| -------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------- |
-| `ERROR #5659: 'Return' does not match return type` | Method declared `As %Status` but returns a non-status value | Return `$$$OK` or an error status            |
-| `ERROR #5002: <UNDEFINED>varname+N^Class.1`        | Variable `varname` used before being set at line N of INT   | Add `Set varname = ""` or check logic flow   |
-| `ERROR #5002: <NOLINE>`                            | Syntax error above the reported line                        | Check for missing braces, unbalanced quotes  |
-| `ERROR #5001: Class 'Foo.Bar' does not exist`      | Missing class — wrong namespace or typo                     | Run `/introspect` to verify the class name   |
-| `ERROR #6301: SAX XML error... expected '>'`       | Malformed class definition header                           | Check `Class ... Extends ...` line for typos |
-| `ERROR #5563: Illegal use of QUIT`                 | `Quit value` inside TRY/CATCH or loop                       | Replace with `Return value`                  |
+| Error                                              | Meaning                                                      | Fix                                          |
+| -------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------- |
+| `ERROR #5659: 'Return' does not match return type` | Method declared `As %Status` but returns a non-status value  | Return `$$$OK` or an error status            |
+| `ERROR #5002: <UNDEFINED>varname+N^Class.1`        | Variable `varname` used before being set at line N of INT    | Add `Set varname = ""` or check logic flow   |
+| `ERROR #5002: <NOLINE>`                            | Syntax error above the reported line                         | Check for missing braces, unbalanced quotes  |
+| `ERROR #5001: Class 'Foo.Bar' does not exist`      | Missing class — wrong namespace or typo                      | Run `/introspect` to verify the class name   |
+| `ERROR #6301: SAX XML error... expected '>'`       | Malformed class definition header                            | Check `Class ... Extends ...` line for typos |
+| `#1043: QUIT argument not allowed`                 | `Quit value` inside TRY/CATCH                                | Replace with `Return value`                  |
+| `<COMMAND>` at runtime                             | `Quit value` inside a For/While block (compiles, then fails) | Replace with `Return value`                  |
 
 ## Step 3 — Fix and re-compile loop
 

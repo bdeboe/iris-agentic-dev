@@ -47,7 +47,7 @@ trigger: Use for tdyar/iris-light-slim
 ## HARD GATE Checklist
 
 - [ ] **Quit/Return**: No `Quit value` inside For/While/Try — use `Return value`
-- [ ] **Postfix syntax**: `Quit:key=""` — NO spaces in condition, alone on its own line
+- [ ] **Postfix syntax**: `Quit:key=""` — NO spaces in the condition (`Quit:key = ""` is ERROR #1054). It may share a line
 - [ ] **$IsObject**: Check `'$IsObject(obj)`after every`%OpenId` before touching properties
 - [ ] **SQL table name**: Last dot = schema separator. `Catalog.Item` → SQL `Catalog.Item` (not `Catalog_Item`)
 - [ ] **SQLCODE**: `0` = success (falsy). Check `SQLCODE = 0` not just `SQLCODE`
@@ -55,7 +55,7 @@ trigger: Use for tdyar/iris-light-slim
 - [ ] **Arithmetic**: Left-to-right, no precedence. Use `1.8` not `9/5`. Parenthesize everything
 - [ ] **$ListBuild()**: Empty list is `""` not `$ListBuild()`—`$ListLength($ListBuild()) = 1`
 - [ ] **%Status**: Use `$$$ISERR(sc)` / `$$$ThrowOnError(sc)`. Never return `$$$OK` after catching an error
-- [ ] **Transactions**: `If $TLevel > 0 { TROLLBACK }` — never `Return` inside TSTART without rollback
+- [ ] **Transactions**: Record `Set entry=$TLevel` before `TSTART` and roll back one level with `TROLLBACK:$TLevel>entry 1`. A bare `TROLLBACK` also rolls back the caller's transaction (IRIS 2026.2). Never `Return` inside TSTART without rollback
 - [ ] **Storage blocks**: Never edit `Storage Default { ... }` — compiler auto-maps properties on compile, added or removed (orphans are fine). Rename exception: also rename its Storage entry. Reset needs explicit user confirmation.
 - [ ] **%INLIST in ObjectScript**: `%INLIST` is SQL-only. In ObjectScript method code use `$ListFind(list, value) > 0`. Writing `Return (x %INLIST list)` causes ERROR #1010.
 - [ ] **`'=` in SQL strings**: `'=` is the ObjectScript not-equal operator. Inside SQL string literals, use `<>`. `"WHERE Tags '= ''"` → parser sees `'` as start of SQL string.

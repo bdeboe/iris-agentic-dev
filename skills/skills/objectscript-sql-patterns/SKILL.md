@@ -61,6 +61,9 @@ My.Deep.Pkg.Widget   →  SQL table: My_Deep_Pkg.Widget
 
 Rule: **last dot = schema/table separator; all preceding dots → underscores**.
 
+Verified on IRIS 2026.2: `Test127.Ext` answers as `Test127.Ext` and gives SQLCODE -30 as
+`Test127_Ext`; `Test127.Sub.Deep` answers as `Test127_Sub.Deep`.
+
 ```objectscript
 // CORRECT for two-level class Catalog.Item:
 Set sc = stmt.%Prepare("SELECT Name FROM Catalog.Item WHERE Category = ?")
@@ -74,7 +77,7 @@ Set sc = stmt.%Prepare("SELECT Name FROM Catalog_Item WHERE Category = ?")
 ```objectscript
 // Filter records where ExpiryDate is null (never expires) or in the future:
 Set sc = stmt.%Prepare(
-    "SELECT Name FROM Catalog_Item " _
+    "SELECT Name FROM Catalog.Item " _
     "WHERE Category = ? " _
     "AND (ActiveUntil IS NULL OR ActiveUntil >= ?)"
 )
@@ -102,7 +105,7 @@ Return result                               // SQLCODE = 0 = found
 
 ```objectscript
 Set stmt = ##class(%SQL.Statement).%New()
-Set sc = stmt.%Prepare("SELECT Name, Value FROM Config_Setting WHERE Name = ?")
+Set sc = stmt.%Prepare("SELECT Name, Value FROM Config.Setting WHERE Name = ?")
 If $$$ISERR(sc) { Return $$$ERROR($$$GeneralError, "Prepare failed: "_$System.Status.GetErrorText(sc)) }
 
 Set rs = stmt.%Execute(name)
@@ -118,7 +121,7 @@ While rs.%Next() {
 
 ```objectscript
 // Embedded SQL — compiled into the method, faster but static:
-&sql(SELECT Name INTO :name FROM Config_Setting WHERE Name = :key)
+&sql(SELECT Name INTO :name FROM Config.Setting WHERE Name = :key)
 If SQLCODE = 100 { Return "" }    // not found
 If SQLCODE < 0   { Return "" }    // error
 
@@ -185,18 +188,18 @@ Set hDate   = $ZDATEH("2026-01-15", 3)  // back to $HOROLOG integer
 
 ```objectscript
 // WRONG — tCount stays empty if SELECT returns 0 rows or SQLCODE fires:
-&sql(SELECT COUNT(*) INTO :tCount FROM Bench_Patient)
+&sql(SELECT COUNT(*) INTO :tCount FROM Bench.Patient)
 write "count="_tCount  // outputs "count=" (empty)
 
 // CORRECT — initialize the variable first:
 Set tCount = 0
-&sql(SELECT COUNT(*) INTO :tCount FROM Bench_Patient)
+&sql(SELECT COUNT(*) INTO :tCount FROM Bench.Patient)
 If SQLCODE < 0 { write "SQL error: "_SQLMESSAGE quit }
 write "count="_tCount  // outputs "count=0" or actual count
 
 // CORRECT for %SQL.Statement path:
 Set stmt = ##class(%SQL.Statement).%New()
-Set sc = stmt.%Prepare("SELECT COUNT(*) AS cnt FROM Bench_Patient")
+Set sc = stmt.%Prepare("SELECT COUNT(*) AS cnt FROM Bench.Patient")
 Set rs = stmt.%Execute()
 If rs.%Next() { Set tCount = rs.%Get("cnt") } Else { Set tCount = 0 }
 ```

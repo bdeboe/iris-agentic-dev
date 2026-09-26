@@ -28,7 +28,10 @@ The `iris-embedded-python-wrapper` package adds:
 ClassMethod RunPython() As %Status
 {
     Set pyobj = ##class(%SYS.Python).Import("mymodule")
-    Set result = pyobj.my_function(42)
+    // Quote a Python name that contains _. Unquoted, _ is ObjectScript concatenation:
+    // an unquoted my_function asks Python for `my` and fails with <NOLINE> wrapping an
+    // AttributeError (seen on IRIS 2026.2).
+    Set result = pyobj."my_function"(42)
     Return $$$OK
 }
 ```
