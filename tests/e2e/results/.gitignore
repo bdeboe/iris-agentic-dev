@@ -11,3 +11,6 @@
 !ladder-121-tools-holdout.json
 !ladder-121-skills-pooled.json
 !skill-baseline.json
+
+# 128 optimiser runs: local evidence; results.md in the spec quotes the figures.
+optimize/

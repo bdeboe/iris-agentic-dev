@@ -1,0 +1,11 @@
+{
+  "recall_lo": 0.13252400918509044,
+  "recall_hi": 0.4210655899424448,
+  "recall": 0.25,
+  "n": 32,
+  "scorer_models": [
+    "anthropic.claude-haiku-4-5-20251001-v1:0"
+  ],
+  "measured": "2026-09-26",
+  "source": "tests/e2e/results/optimize/20260926T200007Z-measure"
+}

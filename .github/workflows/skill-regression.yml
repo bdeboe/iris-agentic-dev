@@ -52,6 +52,9 @@ jobs:
             pytest \
             'anthropic[bedrock]' \
             iris-devtester
+          # The routing loop's pinned gepa. Without it the adapter tests skip; IAD_REQUIRE_GEPA
+          # below turns that skip into a failure.
+          pip install -r tests/e2e/skill_eval/optimize/requirements.txt
 
       - name: Run unit tests for skill_eval harness
         # The cheapest breakage signal in the whole night, and it starts no session. If the
@@ -72,6 +75,18 @@ jobs:
             -q
         env:
           PYTHONPATH: ${{ github.workspace }}
+          IAD_REQUIRE_GEPA: "1"
+
+      - name: Routing drift
+        # 128 FR-012: re-score the shipped skill descriptions on the frozen routing holdout with
+        # the Haiku proxy, and fail when Recall@1 leaves the band committed in
+        # tests/e2e/tasks/routing/drift-interval.json. About 80 scorer calls, under $0.50, capped
+        # at $2 by the ledger. No optimiser runs here; `optimize run` is a manual job.
+        run: python -m tests.e2e.skill_eval.optimize drift --budget 2
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}
+          AWS_REGION: us-east-1
 
       - name: Install the released iris-agentic-dev binary
         # The canary's second question is answered by asking this binary what it advertises,
