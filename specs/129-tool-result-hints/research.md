@@ -83,3 +83,20 @@ I scanned Tom's Claude Code session logs (`~/.claude/projects/*/*.jsonl`) for `i
 - -29 on unquoted field names that do not exist (real typos or wrong table, no rule).
 
 Most of the 60 come from projects whose queries name customer tables. Only error text that names system tables or reserved words goes into the fixture; queries from those projects are not copied.
+
+## First `--surface hints` run (2026-09-26, SC-003)
+
+`optimize run --surface hints --budget 3 --max-metric-calls 200 --max-minutes 6`, scorer Haiku 4.5 on Bedrock, reflection Sonnet 5. Spend $0.82. Run directory `tests/e2e/results/optimize/20260926T223604Z-hints/` (git-ignored).
+
+| Arm       | n   | Unscored | Reach | Pass | Score |
+| --------- | --- | -------- | ----- | ---- | ----- |
+| Seed      | 10  | 0        | 0.20  | 1.00 | 0.60  |
+| Candidate | 10  | 0        | 0.20  | 1.00 | 0.60  |
+
+Verdict HOLD: the score interval's lower bound is 0, and there is no ladder run. Ten proposals passed the validator and none was rejected. Every one scored the same as the seed on its minibatch, so the finalist is the seed.
+
+What this says:
+
+- Pass is at the ceiling. With the seed hints, the scorer fixed every holdout call so it prepared or ran on live IRIS.
+- Reach is not something the hint text can move. The text may not name a skill, so which skill the scorer picks depends on the menu descriptions. Those are the 128 surface, not this one. An agent with the coding pack on gets the skill in `hint_ref` and does not need to infer it.
+- Running the loop again on this corpus will not produce a candidate that ships. The seeds stay as written. A useful next run needs harder items (errors whose fix the seed hint does not make obvious) or a reach metric that reads `hint_ref`.
