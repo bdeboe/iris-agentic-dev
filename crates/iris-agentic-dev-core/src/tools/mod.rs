@@ -1501,11 +1501,14 @@ fn err_json(code: &str, msg: &str) -> Result<CallToolResult, McpError> {
     err_result(serde_json::json!({"success": false, "error_code": code, "error": msg}))
 }
 
-/// `SQL_ERROR` with a `hint` when the message matches a row in `error_hints` (spec 125).
-fn sql_err(msg: &str) -> Result<CallToolResult, McpError> {
+/// `SQL_ERROR` with a `hint` and `hint_ref` when the message matches a rule in `error_hints`
+/// (specs 125, 129).
+/// `query` is the statement as the agent wrote it (or the table name, in count mode): several rules
+/// read the agent's own spelling from it (spec 129).
+fn sql_err(msg: &str, query: &str, namespace: &str) -> Result<CallToolResult, McpError> {
     let mut v = serde_json::json!({"success": false, "error_code": "SQL_ERROR", "error": msg});
-    if let Some(hint) = error_hints::sql_error_hint(msg) {
-        v["hint"] = serde_json::Value::String(hint);
+    if let Some(hint) = error_hints::sql_error_hint(msg, query, namespace) {
+        hint.apply(&mut v);
     }
     err_result(v)
 }
@@ -1889,7 +1892,7 @@ async fn iris_query_explain(
     if let Some(errors) = body["status"]["errors"].as_array() {
         if !errors.is_empty() {
             let msg = errors[0]["error"].as_str().unwrap_or("SQL error");
-            return sql_err(msg);
+            return sql_err(msg, &p.query, namespace);
         }
     }
 
@@ -1954,7 +1957,11 @@ async fn iris_query_count(
     if let Some(errors) = body["status"]["errors"].as_array() {
         if !errors.is_empty() {
             let msg = errors[0]["error"].as_str().unwrap_or("SQL error");
-            return sql_err(msg);
+            return sql_err(
+                msg,
+                &format!("{} {}", table.unwrap_or(""), query.unwrap_or("")),
+                namespace,
+            );
         }
     }
 
@@ -2070,7 +2077,7 @@ Write "OK:"_rs.%ROWCOUNT"#,
         Ok(out) => {
             let out = out.trim();
             if let Some(msg) = out.strip_prefix("ERROR:SQL_ERROR:") {
-                return sql_err(msg);
+                return sql_err(msg, &p.query, namespace);
             }
             let rows_affected: i64 = out
                 .strip_prefix("OK:")
@@ -4582,7 +4589,7 @@ impl IrisTools {
                                 serde_json::Value::String("IRIS_RUNTIME_ERROR".into());
                             if let Some(hint) = error_hints::runtime_error_hint(trimmed, &namespace)
                             {
-                                resp["hint"] = serde_json::Value::String(hint);
+                                hint.apply(&mut resp);
                             }
                         }
                         if let Some(ref tr) = translation {
@@ -4657,7 +4664,7 @@ impl IrisTools {
                 if is_runtime_error {
                     resp["error_code"] = serde_json::Value::String("IRIS_RUNTIME_ERROR".into());
                     if let Some(hint) = error_hints::runtime_error_hint(trimmed, &namespace) {
-                        resp["hint"] = serde_json::Value::String(hint);
+                        hint.apply(&mut resp);
                     }
                 }
                 if let Some(tok) = session_token {
@@ -4764,7 +4771,7 @@ impl IrisTools {
                 if is_runtime_error {
                     resp["error_code"] = serde_json::Value::String("IRIS_RUNTIME_ERROR".into());
                     if let Some(hint) = error_hints::runtime_error_hint(trimmed, &namespace) {
-                        resp["hint"] = serde_json::Value::String(hint);
+                        hint.apply(&mut resp);
                     }
                 }
                 if let Some(ref tr) = translation {
@@ -5016,7 +5023,7 @@ impl IrisTools {
             if !errors.is_empty() {
                 let msg = errors[0]["error"].as_str().unwrap_or("SQL error");
                 self.record_call("iris_query", false);
-                return sql_err(msg);
+                return sql_err(msg, &p.query, &namespace);
             }
         }
 

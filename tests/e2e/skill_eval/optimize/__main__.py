@@ -2,7 +2,8 @@
 
 measure  score the shipped descriptions on the holdout; `--write-interval` records the drift band
 run      optimise on train, gate on the holdout, write tests/e2e/results/optimize/<run_id>/
-apply    write a SHIP run's descriptions into skills/ (refuses HOLD)
+         (`--surface hints` needs iris-dev-iris: IRIS_HOST, IRIS_WEB_PORT, IRIS_USERNAME, IRIS_PASSWORD)
+apply    write a SHIP run's texts into skills/ or hints.toml (refuses HOLD)
 drift    nightly: fail when holdout Recall@1 leaves the committed band
 """
 
@@ -80,17 +81,30 @@ def _run(args) -> int:
         raise KeyboardInterrupt  # run_loop stops cleanly and the holdout is still scored
 
     signal.signal(signal.SIGTERM, _term)
-    run_dir = runner.run(
+    common = dict(
         client=client,
         model=scorer,
         reflect=runner.make_reflect(client, reflect_model, ledger),
         ledger=ledger,
-        surface=args.surface,
         max_metric_calls=args.max_metric_calls,
         ladder=ladder,
         workers=args.workers,
         max_seconds=args.max_minutes * 60 if args.max_minutes else None,
     )
+    if args.surface == "hints":
+        from tests.e2e.skill_eval.optimize import hints_proxy, hints_runner
+
+        binary = _iad_binary()
+        if not binary:
+            print(
+                "no iris-agentic-dev binary: set IAD_BINARY or cargo build",
+                file=sys.stderr,
+            )
+            return 1
+        checker = hints_proxy.Checker(hints_proxy.IadRunner(binary))
+        run_dir = hints_runner.run(checker=checker, **common)
+    else:
+        run_dir = runner.run(surface=args.surface, **common)
     c = json.loads((run_dir / "candidate.json").read_text())
     print(
         f"{c['verdict']}  spend ${ledger.total_usd:.2f}  stopped on {c['stopped']}  {run_dir}"
@@ -98,6 +112,20 @@ def _run(args) -> int:
     for f in c["failed"]:
         print(f"  failed {f}")
     return 0
+
+
+def _iad_binary():
+    """The binary the hints checker runs `iris_execute` through; IRIS_* come from the environment."""
+    import os
+    import shutil
+
+    for p in [
+        os.environ.get("IAD_BINARY"),
+        Path(runner.menu.REPO) / "target/debug/iris-agentic-dev",
+    ]:
+        if p and Path(p).exists():
+            return str(p)
+    return shutil.which("iris-agentic-dev")
 
 
 def _apply(args) -> int:

@@ -1995,7 +1995,33 @@ comes back as-is, so `redact` is not a safe default for XML or custom message bo
 | `SQL_ERROR`                           | `iris_query` statement failed; IRIS's message is in `error`                                                    |
 | `IRIS_RUNTIME_ERROR`                  | `iris_execute` code raised an ObjectScript error; IRIS's text is in `output`                                   |
 
-`SQL_ERROR` and `IRIS_RUNTIME_ERROR` responses carry a `hint` when iad recognises the error: an
-ObjectScript function such as `$ZDATETIME` inside SQL, or a `Security.*`, `Config.*` or `SYS.*`
-class called outside `%SYS`. Each hint names the fix and the skill section it came from. Any other
-error comes back without one.
+`SQL_ERROR` and `IRIS_RUNTIME_ERROR` responses carry a `hint` when iad recognises the error. Seven
+rules match, each reproduced on live IRIS first:
+
+| Rule                        | Error                                                                                   |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| `sql_objectscript_function` | SQLCODE -12 at a `$`: an ObjectScript function such as `$ZDATETIME` in SQL              |
+| `sys_only_class`            | `<CLASS DOES NOT EXIST>` for a `Security.*`, `Config.*` or `SYS.*` class outside `%SYS` |
+| `sys_only_table`            | SQLCODE -30 for a `Security.*` or `Config.*` table outside `%SYS`                       |
+| `deep_package_table`        | SQLCODE -30 for a class name with three or more parts used as a table                   |
+| `double_quoted_string`      | SQLCODE -29 for a string value in double quotes                                         |
+| `reserved_word`             | SQLCODE -1 for a reserved word used as a name, such as `AS count`                       |
+| `nonstandard_insert`        | `INSERT OR IGNORE`, `INSERT OR REPLACE`, `INSERT IGNORE` or `ON CONFLICT`               |
+
+Any other error comes back without a hint. A hinted response also carries `hint_ref`:
+
+```json
+{
+  "hint": "Security.Users is a %SYS table, so USER cannot see it. Rerun with namespace: \"%SYS\".",
+  "hint_ref": {
+    "skill": "iris-agentic-dev",
+    "section": "`<CLASS DOES NOT EXIST>` for a system class",
+    "why": "Security and Config tables belong to the same %SYS-only classes the section lists."
+  }
+}
+```
+
+`hint` never names a skill; `hint_ref` says which skill section has the fix, for an agent that can
+load it. Set `IAD_CODING_PACK=off` (or `0`, `false`, `no`) to drop `hint_ref` and keep `hint`, for a
+client that has no iad skills loaded. It is read on every call. The wording lives in
+`crates/iris-agentic-dev-core/src/tools/hints.toml`.

@@ -167,6 +167,13 @@ Set sql = "INSERT INTO Demo.Todo (Title, Created) VALUES (?, $ZDATETIME($HOROLOG
 
 // CORRECT — CURRENT_TIMESTAMP is the SQL spelling:
 Set sql = "INSERT INTO Demo.Todo (Title, Created) VALUES (?, CURRENT_TIMESTAMP)"
+
+// WRONG — double quotes delimit identifiers in SQL, so "hello" is read as a field name.
+// SQLCODE -29 "Field 'HELLO' not found in the applicable tables":
+Set sql = "SELECT Title FROM Demo.Todo WHERE Title = ""hello"""
+
+// CORRECT — a SQL string takes single quotes:
+Set sql = "SELECT Title FROM Demo.Todo WHERE Title = 'hello'"
 ```
 
 A column whose property has an `InitialExpression` can simply be left out of the INSERT; see

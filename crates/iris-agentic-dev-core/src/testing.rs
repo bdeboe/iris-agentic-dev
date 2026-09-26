@@ -163,6 +163,8 @@ pub const BEHAVIOR_ENV_VARS: &[&str] = &[
     // skill fetch
     "GITHUB_RAW_BASE_URL",
     "GITHUB_API_BASE_URL",
+    // hints
+    "IAD_CODING_PACK",
     // eval envelope identity
     "GAUNTLET_RUN_ID",
     "GAUNTLET_TASK_ID",

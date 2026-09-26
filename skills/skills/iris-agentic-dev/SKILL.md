@@ -113,6 +113,9 @@ Pass `namespace: "%SYS"` to `iris_execute`. `%SYS.*` and `%SYSTEM.*` are differe
 resolve in every namespace, so `##class(%SYSTEM.Security)` works from `USER`. `iris_execute` adds
 a `hint` to the error when it sees this case.
 
+Their SQL tables behave the same way. `SELECT Name FROM Security.Users` from `USER` fails with
+SQLCODE -30 `Table 'SECURITY.USERS' not found`; pass `namespace: "%SYS"` to `iris_query`.
+
 ## `.iris-agentic-dev.toml` key reference
 
 Generate a documented sample: `iris-agentic-dev init`

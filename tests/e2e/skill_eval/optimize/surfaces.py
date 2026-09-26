@@ -1,7 +1,7 @@
 """Surfaces the loop can optimise, by `--surface` name (spec 128 FR-005).
 
 A surface says how to load its seed texts and how to write a candidate back. 128 registers
-`skill-descriptions`; 129 and 130 add theirs here.
+`skill-descriptions`; 129 adds `hints`, the `text` of each rule in `hints.toml`.
 
 `set_description` rewrites only the front matter `description:` value, as a JSON-quoted string
 (valid YAML double-quoted scalar), and leaves every other byte of the file alone.
@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass
 from typing import Callable
 
-from tests.e2e.skill_eval.optimize import menu
+from tests.e2e.skill_eval.optimize import hints_surface, menu
 
 _FM = re.compile(r"\A---\n(.*?\n)---\n", re.S)
 _KEY = re.compile(r"^[A-Za-z_][\w-]*:")
@@ -67,4 +67,5 @@ SURFACES = {
     "skill-descriptions": Surface(
         "skill-descriptions", menu.load_skills, _apply_descriptions
     ),
+    "hints": Surface("hints", hints_surface.load_rules, hints_surface.apply_texts),
 }

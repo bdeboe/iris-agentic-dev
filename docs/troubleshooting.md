@@ -320,6 +320,13 @@ Cursor and other VS Code forks work the same way; `check-sm-credential` falls ba
 
 ---
 
+## An error response has `hint_ref` pointing at a skill you do not have
+
+iad adds `hint_ref: {skill, section, why}` next to `hint` on the errors it recognises (see
+`docs/tools.md`, error codes). A client without iad's skills cannot follow it. Set
+`IAD_CODING_PACK=off` in the server's environment: `hint_ref` goes, `hint` stays, and no restart
+is needed because the variable is read per call.
+
 ## Skill eval: every skill scores zero
 
 Symptom: `python -m tests.e2e.skill_eval` finishes, the table shows `0.00` in both arms for

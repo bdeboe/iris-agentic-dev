@@ -1,0 +1,56 @@
+# Wording for the hints iad adds to IRIS errors (specs 125, 129).
+#
+# Matching lives in error_hints.rs; a test fails if a rule here has no matcher there, or the
+# other way round. `text` is what the agent reads, with {placeholders} filled from the match;
+# it must not name a skill, because the reference goes in `hint_ref` and IAD_CODING_PACK=off
+# drops it. `skill` and `section` must name a real SKILL.md heading. The `--surface hints` loop
+# rewrites `text` and nothing else.
+
+[[rule]]
+id = "sql_objectscript_function"
+skill = "objectscript-sql-patterns"
+section = "7. ObjectScript Operators That Break Inside SQL Strings"
+why = "It shows $ZDATETIME failing with SQLCODE -12 at the $ and CURRENT_TIMESTAMP replacing it."
+text = "The parser stopped at `$`: an ObjectScript function such as $ZDATETIME is inside the SQL. Use the SQL spelling, e.g. CURRENT_TIMESTAMP for $ZDATETIME($HOROLOG,3), or pass the value as a ? parameter."
+
+[[rule]]
+id = "sys_only_class"
+skill = "iris-agentic-dev"
+section = "`<CLASS DOES NOT EXIST>` for a system class"
+why = "It lists the packages that resolve only in %SYS and how to run code there."
+text = "{class} exists only in %SYS. Rerun with namespace: \"%SYS\"."
+
+[[rule]]
+id = "sys_only_table"
+skill = "iris-agentic-dev"
+section = "`<CLASS DOES NOT EXIST>` for a system class"
+why = "Security and Config tables belong to the same %SYS-only classes the section lists."
+text = "{table} is a %SYS table, so {namespace} cannot see it. Rerun with namespace: \"%SYS\"."
+
+[[rule]]
+id = "deep_package_table"
+skill = "objectscript-sql-patterns"
+section = "1. Table Naming: IRIS SQL Schema Convention"
+why = "It gives the rule for turning a class name with three or more parts into its SQL table name."
+text = "IRIS read {name} as the table {reported}. In SQL every dot before the last becomes an underscore, so the table is {fixed}."
+
+[[rule]]
+id = "double_quoted_string"
+skill = "objectscript-sql-patterns"
+section = "7. ObjectScript Operators That Break Inside SQL Strings"
+why = "It shows double quotes around a string turning it into a field name, with SQLCODE -29."
+text = "Double quotes mark an identifier in IRIS SQL, so \"{literal}\" was read as a field name. Put the string in single quotes: '{literal}'."
+
+[[rule]]
+id = "reserved_word"
+skill = "iris-sql"
+section = "3. Reserved Words — Complete Reference"
+why = "It lists every reserved word and how to quote one used as a name."
+text = "{word} is a reserved word in IRIS SQL. Quote it as \"{word}\" or use another name."
+
+[[rule]]
+id = "nonstandard_insert"
+skill = "iris-sql"
+section = "INSERT Syntax — No SQLite/MySQL Shortcuts"
+why = "It lists the INSERT forms IRIS rejects and four ways to handle a duplicate instead."
+text = "IRIS SQL has no {form}. Use a plain INSERT and handle a duplicate yourself: check for the row first, catch SQLCODE -119, or DELETE and then INSERT."

@@ -8,6 +8,7 @@
 //! Add a file here and add its `mod` line below, or it will not run.
 
 mod cli_discovery;
+mod coding_pack_129;
 mod invalid_params;
 mod nopws_101;
 mod pool_reload_hint;
