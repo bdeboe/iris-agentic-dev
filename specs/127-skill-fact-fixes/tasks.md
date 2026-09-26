@@ -35,10 +35,10 @@ Tests before text, per item. Live command in `plan.md`.
 
 ## Phase 5: US4
 
-- [ ] T040 Unit: vendored aihub-eap hash equals fixture; line-148 patch marked
-- [ ] T041 Re-sync from upstream `72f9046`, apply the marked patch, write the fixture
-- [ ] T042 Draft `.iad-local/127-aihub-owner-note.txt` (not sent)
+- [X] T040 Unit: vendored aihub-eap hash equals fixture; line-148 patch marked
+- [X] T041 Re-sync from upstream `72f9046`, apply the marked patch, write the fixture
+- [X] T042 Draft `.iad-local/127-aihub-owner-note.txt` (not sent)
 
 ## Phase 6: gate
 
-- [ ] T050 `cargo fmt --all`, `cargo clippy -- -D warnings`, full `unit` target, live 127 file against iris-dev-iris
+- [X] T050 `cargo fmt --all`, `cargo clippy -- -D warnings`, full `unit` target, live 127 file against iris-dev-iris

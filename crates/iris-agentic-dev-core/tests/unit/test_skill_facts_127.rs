@@ -333,3 +333,58 @@ fn no_skill_passes_a_local_path_to_iris_compile() {
         bad.join("\n")
     );
 }
+
+const AIHUB_BUGGY: &str = "            If ..Provider = \"\" && ..#MODELCONFIGNAME '= \"\" {";
+const AIHUB_FIXED: &str = "            If (..Provider = \"\") && (..#MODELCONFIGNAME '= \"\") {";
+
+/// US4. The vendored `aihub-eap` is upstream `intersystems-community/ai-hub-eap` blob `72f9046`
+/// plus one marked patch. ObjectScript evaluates `&&` and `=` left to right with no precedence, so
+/// upstream's `%OnInit` condition overwrites a provider the caller set (live: `p="abc",c="X"` gives
+/// 1 unparenthesised, 0 parenthesised). Remove the markers and revert that line, and the file must
+/// equal the upstream fixture byte for byte.
+#[test]
+fn aihub_eap_is_upstream_plus_the_marked_patch() {
+    let vendored = skill("aihub-eap");
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/unit/fixtures/aihub_eap_upstream_72f9046.md");
+    let upstream = std::fs::read_to_string(&fixture).unwrap();
+
+    assert_eq!(
+        vendored.matches("<!-- iad-local-patch").count(),
+        1,
+        "exactly one opening iad-local-patch marker"
+    );
+    assert_eq!(
+        vendored.matches("<!-- /iad-local-patch -->").count(),
+        1,
+        "exactly one closing iad-local-patch marker"
+    );
+    assert!(
+        vendored.contains(AIHUB_FIXED),
+        "the parenthesised condition must be present"
+    );
+    assert!(
+        !vendored.contains(AIHUB_BUGGY),
+        "the unparenthesised condition must be gone"
+    );
+
+    let mut out = String::new();
+    let mut skip_blank = false;
+    for line in vendored.split_inclusive('\n') {
+        if line.starts_with("<!-- iad-local-patch") || line.starts_with("<!-- /iad-local-patch") {
+            skip_blank = true;
+            continue;
+        }
+        if skip_blank && line == "\n" {
+            skip_blank = false;
+            continue;
+        }
+        skip_blank = false;
+        out.push_str(line);
+    }
+    let reverted = out.replace(AIHUB_FIXED, AIHUB_BUGGY);
+    assert!(
+        reverted == upstream,
+        "aihub-eap differs from upstream 72f9046 outside the marked patch"
+    );
+}

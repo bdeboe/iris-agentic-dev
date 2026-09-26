@@ -136,8 +136,6 @@ Write response.Content
 
 ### Pattern C: ConfigStore integration (production pattern)
 
-<!-- iad-local-patch: parenthesised the %OnInit condition. ObjectScript has no operator precedence, so upstream 72f9046 overwrites a provider the caller set. -->
-
 ```objectscript
 Class MyApp.AI.ProdAgent Extends %AI.Agent
 {
@@ -147,7 +145,7 @@ Class MyApp.AI.ProdAgent Extends %AI.Agent
     {
         Set sc = $$$OK
         Try {
-            If (..Provider = "") && (..#MODELCONFIGNAME '= "") {
+            If ..Provider = "" && ..#MODELCONFIGNAME '= "" {
                 Set sc = ..GetProviderForConfig(..#MODELCONFIGNAME, .provider, .model)
                 Quit:$$$ISERR(sc)
                 Set ..Provider = provider
@@ -178,8 +176,6 @@ Class MyApp.AI.ProdAgent Extends %AI.Agent
     }
 }
 ```
-
-<!-- /iad-local-patch -->
 
 **ConfigStore entry for "opsreview":**
 

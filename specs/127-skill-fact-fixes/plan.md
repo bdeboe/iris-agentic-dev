@@ -13,11 +13,11 @@ No Rust source changes. No tool, server instruction or benchmark field changes (
 
 ## Test files
 
-| File                                             | Target        | Holds                                                         |
-| ------------------------------------------------ | ------------- | ------------------------------------------------------------- |
-| `tests/integration/test_skill_facts_127_live.rs` | `integration` | One live test per item, package `Test127`, cleanup at the end |
-| `tests/unit/test_skill_facts_127.rs`             | `unit`        | Wording guards, FR-005 scan, aihub-eap hash check             |
-| `tests/unit/fixtures/aihub_eap_127.sha256`       | fixture       | Hash of the vendored `aihub-eap/SKILL.md`                     |
+| File                                                | Target        | Holds                                                          |
+| --------------------------------------------------- | ------------- | -------------------------------------------------------------- |
+| `tests/integration/test_skill_facts_127_live.rs`    | `integration` | One live test per item, package `Test127`, cleanup at the end  |
+| `tests/unit/test_skill_facts_127.rs`                | `unit`        | Wording guards, FR-005 scan, aihub-eap hash check              |
+| `tests/unit/fixtures/aihub_eap_upstream_72f9046.md` | fixture       | Upstream `aihub-eap/SKILL.md` at blob `72f9046`, byte for byte |
 
 Both files get a `mod` line in their aggregator's `main.rs`.
 
@@ -55,6 +55,8 @@ Research row numbers follow the original item list. Spec numbering:
 | —        | US3.2  | `ensemble-production`                                                                            | #5477 at compile time for a hand-written Storage; long package name compiles and saves |
 | —        | US3.3  | `iris-docs`                                                                                      | Unit: one DocBook rule, no "never curl" beside a curl recipe                           |
 | —        | US4    | `aihub-eap`                                                                                      | Unit: vendored hash equals fixture; upstream-diff limited to the marked patch          |
+
+US4 uses an upstream copy as the fixture instead of a sha256: the core crate has no hash crate in its dev-dependencies, and comparing against the upstream text also proves the diff is limited to the marked patch, which a hash cannot.
 
 Item 9 deviates from FR-004: its live half cannot run safely on this instance. That is recorded here and in the test file, not silently skipped.
 
