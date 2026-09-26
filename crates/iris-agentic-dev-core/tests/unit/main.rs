@@ -87,6 +87,7 @@ mod test_server_entry_plaintext;
 mod test_server_manager;
 mod test_servers_json_web_prefix;
 mod test_skill_discovery_tools;
+mod test_skill_facts_127;
 mod test_skill_frontmatter;
 mod test_skill_install;
 mod test_skill_manifest_sync;

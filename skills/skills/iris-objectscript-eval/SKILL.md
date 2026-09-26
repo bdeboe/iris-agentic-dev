@@ -137,8 +137,9 @@ docker exec <container> iris session IRIS -U USER \
   'do $System.OBJ.LoadDir("/home/irisowner/dev/cls/","ck","*.cls",1)'
 ```
 
-Load/compile flags: `c` = compile, `k` = keep source, `e` = display errors only
-(useful in CI).
+Load/compile flags: `c` = compile, `k` = keep source, `-d` = no display. Leave out
+`e`: `$system.OBJ.ShowFlags()` lists it as "Delete extent", and with `$system.OBJ.Delete`
+it wipes the class's rows (verified on 2026.2.0L: 3 rows kept with `-d`, 0 with `e-d`).
 
 ### Run tests via docker exec
 
