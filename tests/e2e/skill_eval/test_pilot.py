@@ -504,7 +504,9 @@ def test_the_driver_configures_the_arm_and_spawns_the_session(monkeypatch, tmp_p
     assert [name for name, _, _ in driver.configured] == ["tools"]
     assert len(driver.collected) == 1
     prompt, env_vars, kwargs = driver.collected[0]
-    assert prompt == "do the thing"
+    from tests.e2e.skill_eval.pilot import AUTONOMY_PREAMBLE
+
+    assert prompt == AUTONOMY_PREAMBLE + "do the thing"
     assert kwargs["timeout"] == 42
     assert kwargs["model"] == "openai/gpt-4.1"
     # The environment the driver built is the environment the session got, and the same one the arm
@@ -625,14 +627,18 @@ def test_the_report_names_no_skills_for_a_ladder_that_installs_none():
 
 def test_an_arm_run_carries_the_calls_not_only_their_count():
     """Story 5 is a join over Story 1's sessions, so the sessions have to keep what the join reads.
-    `tool_calls: int` throws away every name, and a count cannot answer which tool was reached for."""
+    `tool_calls: int` throws away every name, and a count cannot answer which tool was reached for.
+    """
     from tests.e2e.skill_eval.driver import ToolCall
     from tests.e2e.skill_eval.pilot import ArmRun, call_records
 
     records = call_records(
         (
             ToolCall(
-                name="iris_doc", completed=True, server="iris_agentic_dev", status="completed"
+                name="iris_doc",
+                completed=True,
+                server="iris_agentic_dev",
+                status="completed",
             ),
             ToolCall(
                 name="iris_compile",

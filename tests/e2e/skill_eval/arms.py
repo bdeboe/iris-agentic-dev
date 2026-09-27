@@ -60,6 +60,10 @@ class Arm:
     #: call site passes", which is what the whole-pack arm wants and what a per-skill rung must not
     #: allow — see `skill_arm`.
     skill_names: tuple[str, ...] = ()
+    #: Tell the agent to load `skill_names` before the task, and leave unscored a session that does
+    #: not. Round 2 of 130: 0 of 12 skill-arm sessions opened the skill they were given, so the rung
+    #: measured the listing, not the content.
+    preload: bool = False
 
 
 BARE = Arm(name="bare", tools=False, skills=False)
@@ -91,7 +95,13 @@ def skill_arm(skill: str) -> Arm:
             f"{skill!r} is not in the shipped pack, so this rung would install nothing and publish "
             f"the result as that skill's own. Known: {', '.join(_pack_skills())}"
         )
-    return Arm(name=f"tools+{skill}", tools=True, skills=True, skill_names=(skill,))
+    return Arm(
+        name=f"tools+{skill}",
+        tools=True,
+        skills=True,
+        skill_names=(skill,),
+        preload=True,
+    )
 
 
 def skill_ladder(skill: str) -> tuple[Arm, Arm]:

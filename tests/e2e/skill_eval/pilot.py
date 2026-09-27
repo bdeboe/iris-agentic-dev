@@ -110,6 +110,42 @@ class ArmRun:
     #: cannot answer which tool was reached for, which is the whole of Story 5's join. Recorded here
     #: rather than re-derived later because the event stream exists only inside the session.
     calls: tuple[dict, ...] = ()
+    #: Whether the session loaded the arm's skill with the `skill` tool. None for an arm that does not
+    #: preload, where the question does not apply.
+    skill_loaded: bool | None = None
+
+
+#: In front of every session, every arm. Before 130 round 3 the harness leaked the operator's own
+#: instructions into sessions, and one of them was "execute all steps to completion". With it gone,
+#: gpt-4.1 under `opencode run` often ends its turn on a plan ("Next, I'll update the method") and
+#: the session is over. The line is the same in every arm, so it moves both sides of a comparison.
+AUTONOMY_PREAMBLE = (
+    "Work on this task until it is done. Do not stop to describe a plan or to ask for "
+    "confirmation; carry out each step yourself.\n\n"
+)
+
+
+def preload_preamble(skill_names: tuple[str, ...]) -> str:
+    """What a preloading arm puts in front of the task."""
+    names = ", ".join(f"`{n}`" for n in skill_names)
+    return (
+        f"Before you start, load the {names} skill with your skill tool, read it, and follow it "
+        "while you work.\n\n"
+    )
+
+
+def skill_loaded(events: list[dict], skill_names: tuple[str, ...]) -> bool:
+    """True if a completed opencode `skill` call named one of `skill_names`."""
+    for event in events:
+        if event.get("type") != "tool_use":
+            continue
+        part = event.get("part", {})
+        state = part.get("state", {})
+        if part.get("tool") != "skill" or state.get("status") != "completed":
+            continue
+        if (state.get("input") or {}).get("name") in skill_names:
+            return True
+    return False
 
 
 def call_records(tool_calls) -> tuple[dict, ...]:
@@ -295,8 +331,13 @@ def run_one(
             # `completed_tool_calls` read off the raw stream, which `test_opencode_driver.py` pins
             # because `pilot-121.json` is the only graded evidence this program has.
             try:
+                prompt = (
+                    AUTONOMY_PREAMBLE
+                    + (preload_preamble(arm.skill_names) if arm.preload else "")
+                    + task.prompt
+                )
                 events = driver.collect_events(
-                    task.prompt,
+                    prompt,
                     env_vars,
                     model=model,
                     timeout=timeout,
@@ -321,12 +362,20 @@ def run_one(
                 events, session_seconds=time.monotonic() - session_started
             )
             session_seconds = session.session_seconds
+            loaded = skill_loaded(events, arm.skill_names) if arm.preload else None
 
     try:
         passed = graded_task.run_check(task)
         reason = None
     except CheckBroken as exc:
         passed, reason = None, f"the check did not answer: {exc}"
+    if loaded is False:
+        # The check still ran, so IRIS is left as the agent left it, but the answer is not this
+        # arm's: a skill the agent never read cannot be credited or blamed.
+        passed, reason = None, (
+            f"the skill arm never loaded {', '.join(arm.skill_names)}, so the run says nothing "
+            "about the skill"
+        )
 
     # Constructed for its refusals, and for the harness swap: everything above this line is what a
     # `prime-agent` driver would hand back unchanged.
@@ -342,6 +391,7 @@ def run_one(
         calls=call_records(graded.tool_calls),
         seconds=time.monotonic() - started,
         session_seconds=session_seconds,
+        skill_loaded=loaded,
     )
 
 

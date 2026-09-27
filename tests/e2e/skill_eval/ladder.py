@@ -638,6 +638,7 @@ def run_ladder(
     # A session that could not be graded is not a failure, so it does not end up in a comparison — it
     # ends up as a hole, and the run keeps paying for more of them. Three in a row is the environment.
     unscored_streak: list = []
+    unloaded_streak: list = []
     for repeat in range(repeats):
         for task in tasks:
             for arm in arms_for_task(arms, task):
@@ -670,11 +671,30 @@ def run_ladder(
                     f"{'—' if run.passed is None else ('PASS' if run.passed else 'FAIL'):<5} "
                     f"{run.tool_calls:>3} calls {run.session_seconds:6.1f}s"
                     + ("  TIMEOUT" if run.timed_out else "")
+                    + (
+                        ""
+                        if run.skill_loaded is None
+                        else ("  skill loaded" if run.skill_loaded else "  NOT LOADED")
+                    )
                     + (f"  [{run.reason}]" if run.reason else ""),
                     flush=True,
                 )
                 if on_run is not None:
                     on_run(run)
+                if run.skill_loaded is not None:
+                    unloaded_streak = (
+                        unloaded_streak + [run] if run.skill_loaded is False else []
+                    )
+                    if len(unloaded_streak) >= UNSCORED_ABORT:
+                        raise LadderAborted(
+                            f"{len(unloaded_streak)} skill-arm sessions in a row never loaded their "
+                            "skill, even when told to, so the run stopped rather than paying for "
+                            "sessions that say nothing about the skill:\n"
+                            + "\n".join(
+                                f"  {other.task_id} {other.arm} r{other.run_index}"
+                                for other in unloaded_streak
+                            )
+                        )
                 if run.passed is None:
                     unscored_streak.append(run)
                     if len(unscored_streak) >= UNSCORED_ABORT:
