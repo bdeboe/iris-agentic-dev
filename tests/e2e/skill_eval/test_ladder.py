@@ -912,3 +912,35 @@ def test_the_pooled_rung_records_no_pack_because_no_list_describes_it():
     )
     assert written["skills_installed"][ladder.POOLED_ARM] == []
     assert "per_skill" in written
+
+
+# --- resuming a repeated run (130 round 3) ---------------------------------------------------------
+# A host that sleeps after repeat 0 owes repeats 1 and 2. Run again with `--repeats 2` they would be
+# labelled 0 and 1, and the merge would read them as a re-run of repeat 0.
+
+
+def test_start_repeat_labels_the_runs_from_that_repeat(monkeypatch):
+    from tests.e2e.skill_eval import ladder, pilot
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    calls = []
+    monkeypatch.setattr(pilot, "run_one", _fake_run_one([True] * 4, calls))
+    runs = ladder.run_ladder(
+        [FakeTask("CORPUS-01"), FakeTask("CORPUS-02")],
+        (TOOLS,),
+        repeats=2,
+        start_repeat=1,
+    )
+    assert [(r.task_id, r.run_index) for r in runs] == [
+        ("CORPUS-01", 1),
+        ("CORPUS-02", 1),
+        ("CORPUS-01", 2),
+        ("CORPUS-02", 2),
+    ]
+
+
+def test_start_repeat_is_a_cli_flag_defaulting_to_zero():
+    from tests.e2e.skill_eval import ladder
+
+    assert ladder.parse_args([]).start_repeat == 0
+    assert ladder.parse_args(["--start-repeat", "1"]).start_repeat == 1

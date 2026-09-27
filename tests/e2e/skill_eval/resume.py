@@ -75,7 +75,7 @@ def scored(record: dict) -> bool:
 
 
 def merge_sessions(paths, *, arms=LADDER_ARMS) -> list[dict]:
-    """Every session from every file, one per (task, arm), sorted task-major.
+    """Every session from every file, one per (task, arm, repeat), sorted task-major.
 
     Later paths win, except that an unscored record never displaces a scored one — see the module
     docstring.
@@ -85,10 +85,10 @@ def merge_sessions(paths, *, arms=LADDER_ARMS) -> list[dict]:
             "no session files to merge, and an empty report renders exactly like a run in which "
             "every arm failed every task"
         )
-    keep: dict[tuple[str, str], dict] = {}
+    keep: dict[tuple[str, str, int], dict] = {}
     for path in paths:
         for record in read_sessions(path):
-            key = (record["task_id"], record["arm"])
+            key = (record["task_id"], record["arm"], record["run_index"])
             held = keep.get(key)
             if held is not None and scored(held) and not scored(record):
                 continue
@@ -97,7 +97,12 @@ def merge_sessions(paths, *, arms=LADDER_ARMS) -> list[dict]:
     order = {name: index for index, name in enumerate(arms)}
     return sorted(
         keep.values(),
-        key=lambda row: (row["task_id"], order.get(row["arm"], len(order)), row["arm"]),
+        key=lambda row: (
+            row["task_id"],
+            order.get(row["arm"], len(order)),
+            row["arm"],
+            row["run_index"],
+        ),
     )
 
 
@@ -216,6 +221,7 @@ def main(argv=None) -> int:
         model=args.model,
         container=args.container,
         run_id=args.run_id or _run_id_from(args.sessions[-1]),
+        repeats=max(record["run_index"] for record in records) + 1,
         pooled=args.pooled,
         # Only read for the per-skill breakdown, and only the tasks that were actually merged: the
         # full corpus here would print a row of zero pairs for a skill this run never touched.

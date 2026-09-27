@@ -602,6 +602,7 @@ def run_ladder(
     arms=ARMS,
     *,
     repeats: int = 1,
+    start_repeat: int = 0,
     openai_api_key: str | None = None,
     model: str = LADDER_MODEL,
     timeout: int = SESSION_TIMEOUT,
@@ -618,6 +619,9 @@ def run_ladder(
 
     Serial for the same reason the pilot is: every session shares one BENCHMARK namespace, so two at
     once grade each other's work. Task-major, so an interrupted run leaves whole comparable pairs.
+
+    `start_repeat` labels the first repeat, so a run resumed after repeat 0 writes 1 and 2 rather than
+    a second 0 and 1 that the merge would read as re-runs.
 
     `on_run` is called with each `ArmRun` as it completes, which is how a long run gets written down
     incrementally instead of existing only in memory for ten hours. `on_events(task, arm, repeat,
@@ -639,7 +643,7 @@ def run_ladder(
     # ends up as a hole, and the run keeps paying for more of them. Three in a row is the environment.
     unscored_streak: list = []
     unloaded_streak: list = []
-    for repeat in range(repeats):
+    for repeat in range(start_repeat, start_repeat + repeats):
         for task in tasks:
             for arm in arms_for_task(arms, task):
                 run = run_one(
@@ -776,6 +780,12 @@ def parse_args(argv=None):
     parser.add_argument("--ladder", choices=("tools", "skill"), default="tools")
     parser.add_argument("--skill", default=None, help="required when --ladder skill")
     parser.add_argument("--repeats", type=int, default=1)
+    parser.add_argument(
+        "--start-repeat",
+        type=int,
+        default=0,
+        help="index of the first repeat, to resume a repeated run without relabelling it",
+    )
     parser.add_argument("--model", default=LADDER_MODEL)
     parser.add_argument("--timeout", type=int, default=SESSION_TIMEOUT)
     parser.add_argument("--container", default="iris-dev-iris")
@@ -867,6 +877,7 @@ def _main(argv=None) -> int:
             tasks,
             arms,
             repeats=args.repeats,
+            start_repeat=args.start_repeat,
             model=args.model,
             timeout=args.timeout,
             iris_container=args.container,

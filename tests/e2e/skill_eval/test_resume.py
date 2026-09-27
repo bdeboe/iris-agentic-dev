@@ -244,3 +244,48 @@ def test_a_pooled_merge_refuses_a_session_file_of_tools_ladder_arms(tmp_path):
     path = write(tmp_path, "a.runs.jsonl", triple("CORPUS-01"))
     with pytest.raises(resume.ResumeRefused):
         merged(tmp_path, path, "--pooled")
+
+
+# --- repeats (130 round 3) -------------------------------------------------------------------------
+# The skill ladder runs every task three times. The merge keyed on (task, arm), so three repeats
+# merged as one: the last file's run displaced the first two and strict-and saw a single session.
+
+
+def test_merge_keeps_every_repeat_of_the_same_task_and_arm(tmp_path):
+    first = write(tmp_path, "a.runs.jsonl", [record("SKILL-01", "tools", True)])
+    later = write(
+        tmp_path,
+        "b.runs.jsonl",
+        [
+            record("SKILL-01", "tools", False, run_index=1),
+            record("SKILL-01", "tools", True, run_index=2),
+        ],
+    )
+    rows = resume.merge_sessions([first, later])
+    assert [(row["run_index"], row["passed"]) for row in rows] == [
+        (0, True),
+        (1, False),
+        (2, True),
+    ]
+
+
+def test_a_rerun_of_the_same_repeat_still_replaces_it(tmp_path):
+    first = write(tmp_path, "a.runs.jsonl", [record("SKILL-01", "tools", None)])
+    later = write(tmp_path, "b.runs.jsonl", [record("SKILL-01", "tools", True)])
+    rows = resume.merge_sessions([first, later])
+    assert [row["passed"] for row in rows] == [True]
+
+
+def test_a_merged_report_counts_the_repeats_it_holds(tmp_path):
+    rows = []
+    for repeat in range(3):
+        for task, skill in (
+            ("SKILL-01", "objectscript-guardrails"),
+            ("SKILL-06", "objectscript-list-patterns"),
+        ):
+            rows += [
+                record(task, "tools", True, run_index=repeat),
+                record(task, f"tools+{skill}", True, run_index=repeat),
+            ]
+    written = merged(tmp_path, write(tmp_path, "r.runs.jsonl", rows), "--pooled")
+    assert written["provenance"]["runs"] == 3
