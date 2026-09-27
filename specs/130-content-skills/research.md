@@ -187,7 +187,7 @@ A one-session probe asked the agent to list its skills. It named about 60 skills
 - `~/.claude/skills`;
 - `~/.agents/skills`.
 
-`XDG_CONFIG_HOME`, which `IsolatedEnv` sets to block the global opencode config, stops none of them. So every harness session before this fix ran with the operator's global CLAUDE.md in its instructions and about 160 personal skills in its listing. That covers both ladder rounds, the 128 drift re-measure and the skill-eval baselines. The personal set includes a pre-127 copy of `ensemble-production`, so the round-1 and round-2 "tools" arms were never skill-free. A single installed skill in a list of 160 is a likely reason the skill arm never loaded one.
+`XDG_CONFIG_HOME`, which `IsolatedEnv` sets to block the global opencode config, stops none of them. So every harness session before this fix ran with the operator's global CLAUDE.md in its instructions and about 160 personal skills in its listing. That covers both ladder rounds and the skill-eval baselines. The 128 drift re-measure is not affected: it scores routing with the proxy model over the shipped descriptions and starts no opencode session. The personal set includes a pre-127 copy of `ensemble-production`, so the round-1 and round-2 "tools" arms were never skill-free. A single installed skill in a list of 160 is a likely reason the skill arm never loaded one.
 
 `OPENCODE_DISABLE_CLAUDE_CODE=1` turns off all three. `IsolatedEnv.env_vars()` now sets it. Two tests guard it:
 
@@ -222,3 +222,77 @@ The tools arm fell from 2 of 3 under contamination to 0 of 3 clean. One clean ru
 ### Round 2 spend
 
 About $2.07 of the $3 cap: $1.53 for the 18-session re-run, $0.51 for the clean SKILL-16 re-run, and about $0.03 for the probe and the live isolation tests.
+
+## Round 3: skill arm loads its skill, full re-baseline (2026-09-26 to 27, T021–T026)
+
+### What changed before the run
+
+- **The skill arm loads its skill.** A skill-arm prompt now opens with one line telling the agent to load its skill with the skill tool before it starts. A skill-arm session that never loads it is unscored, not failed, and three in a row stop the ladder (`test_skill_preload.py`). The 118 skill-eval asks the same way and unscores a with-skill run that never loaded (`test_lift_preload.py`).
+- **Every arm gets the same autonomy line.** It says to work until the task is done and names no tool and no skill. It stands in for the operator CLAUDE.md rule that the isolation fix removed, so the tools arm is not the only arm that lost it.
+- **`iris_macro` calls real routes.** Every action had posted to a route Atelier does not have and returned `{}` on the 404 (drafts #3). It now uses `getmacrolocation`/`getmacrodefinition`/`getmacroexpansion`/`getmacrosignature` and `/docnames/RTN/INC`, finds the defining include when none is named, and returns `MACRO_NOT_FOUND` instead of `{}` (`test_macro_130.rs` plus the live handler tests).
+- **Drift correction.** The 128 drift re-measure uses the routing proxy and starts no opencode session, so the isolation leak never touched it (see the leak section above).
+
+### The run
+
+`--ladder skill --skill all --repeats 3` over SKILL-01 to SKILL-19: 114 sessions in three files, because the host slept.
+
+- `ladder-20260926T230228.runs.jsonl`: r0, SKILL-01 to SKILL-16 plus three unscored runs on SKILL-17 and SKILL-18; aborted at 00:41 (exit 3).
+- `ladder-20260927T093806.runs.jsonl`: r0, SKILL-17 to SKILL-19.
+- `ladder-20260927T094542.runs.jsonl`: r1 and r2, all 19 tasks, run with the new `--start-repeat 1`.
+- Merged report: `ladder-r3-merged.json`, 0 unscored sessions. It is git-ignored like the other dumps; `resume --merge --pooled` over the three files rebuilds it.
+
+The merge needed a fix first. `resume` keyed sessions on (task, arm), so three repeats merged as one, and a rerun with `--repeats 2` would have labelled its runs 0 and 1. It now keys on the repeat too and stamps the repeat count on the report, and the ladder takes `--start-repeat` (`test_resume.py`, `test_ladder.py`).
+
+All 57 skill-arm sessions loaded their skill.
+
+| Task     | Skill                        | tools (r0 r1 r2) | tools+skill (r0 r1 r2) | Pair  | Triage |
+| -------- | ---------------------------- | ---------------- | ---------------------- | ----- | ------ |
+| SKILL-01 | `objectscript-guardrails`    | P P P            | P P P                  |       | keep   |
+| SKILL-02 | `objectscript-guardrails`    | P P P            | P P P                  |       | keep   |
+| SKILL-03 | `objectscript-guardrails`    | P P P            | P P P                  |       | keep   |
+| SKILL-04 | `objectscript-guardrails`    | P P P            | P P P                  |       | keep   |
+| SKILL-05 | `objectscript-guardrails`    | P P P            | P P P                  |       | keep   |
+| SKILL-06 | `objectscript-list-patterns` | P F P            | P P P                  | skill | keep   |
+| SKILL-07 | `objectscript-list-patterns` | F F P            | P F P                  |       | keep   |
+| SKILL-08 | `objectscript-sql-patterns`  | F F P            | P P P                  | skill | keep   |
+| SKILL-09 | `objectscript-sql-patterns`  | P F P            | P F F                  |       | fix    |
+| SKILL-10 | `objectscript-list-patterns` | F F F            | F F(T) F               |       | keep   |
+| SKILL-11 | `iris-sql`                   | F(T) F P         | P P P                  | skill | keep   |
+| SKILL-12 | `objectscript-sql-patterns`  | F F P            | P F(T) F               |       | keep   |
+| SKILL-13 | `iris-query-plans`           | P P P            | F F F                  | tools | fix    |
+| SKILL-14 | `objectscript-unit-test`     | F P P            | P P F                  |       | keep   |
+| SKILL-15 | `objectscript-sql-patterns`  | P P P            | P P P                  |       | keep   |
+| SKILL-16 | `ensemble-production`        | P P P(T)         | F(T) P(T) P            | tools | keep   |
+| SKILL-17 | `objectscript-guardrails`    | P P P            | P P P                  |       | keep   |
+| SKILL-18 | `iris-agentic-dev`           | P P P            | P P P                  |       | keep   |
+| SKILL-19 | `objectscript-tdd`           | P P P            | P P P                  |       | keep   |
+
+(T) marks a session that hit the 300 s clock. A timed-out session counts as a fail unless the check passed anyway, which it did for SKILL-16 tools r2 and skill r1.
+
+Strict-and over three repeats: tools passes 11 of 19, tools+skill 12 of 19. Pooled, b=3 (skill wins SKILL-06, 08, 11) and c=2 (tools wins SKILL-13, 16), lift +0.053, n=19, mde 0.310: underpowered, and the skills verdict is inconclusive. No single skill reaches `helps`. `objectscript-guardrails` (6 pairs) is "no effect" because both arms pass all six.
+
+### Pairs that hinge on the clock
+
+- **SKILL-16 (tools win).** Skill r0 timed out after 6 calls. Its last event is a `step_start` at 23:56:43. The host went into clamshell sleep at 00:00:53 and woke at 00:17:42, and the clock fired on wake. Without that session the skill arm passes 2 of 2 and the pair is a tie, so the pooled count is b=3, c=1.
+- **SKILL-11 (skill win).** Tools r0 timed out after 4 calls, again silent for about 290 s after a `step_start`: a provider stall, not the agent working. Tools r1 failed on its own, so the pair stands without it.
+- SKILL-10 and SKILL-12 have a timed-out skill session, but both arms fail those tasks anyway.
+
+### SKILL-13: `iris-query-plans` says the right thing in a way the agent reads as a one-off
+
+All three skill-arm sessions loaded the skill, found the stale index with `WHERE %NOINDEX`, and rebuilt it by hand with `%BuildIndices` through `iris_execute_method`. None edited the class. The check calls `Run()` again, which kills the extent and reloads it with `INSERT %NOINDEX`, so the index is empty again and the count is 0. All three tools-arm sessions edited the loader's source (`iris_doc` put, then compile) and passed.
+
+The skill says to run `%BuildIndices` after a `%NOINDEX` bulk load. That reads as an admin step. What the task needs is for the loader to call it, so the fix survives the next load. That is a wording fix in the skill, with a unit test for the new line and the SKILL-13 ladder task as its live check. Not made in round 3, because it would have changed the text between repeats.
+
+Two smaller things from the same transcripts. r0 first called `%BuildIndices("CustIdx")` and got `<LIST>`, because the argument is a `$ListBuild`; the skill shows that form on line 34, but the agent passed a string. And `TUNE TABLE` through an `iris_query` write returned `DDL_NOT_ALLOWED`, after which the agent tried `%SYSTEM.SQL.TUNE`, which does not exist. A hint on `DDL_NOT_ALLOWED` for `TUNE TABLE` that names `$SYSTEM.SQL.Stats.Table.GatherTableStats` is a candidate for the 129 hint surface.
+
+### SKILL-09: flagged, but the skill already says it
+
+The skill arm failed 2 of 3 and tools passed 2 of 3, so `needs_fix` flags `objectscript-sql-patterns`. Both failing sessions loaded the skill and still queried `Bench.Sub.Item`. The SQL table is `Bench_Sub.Item`, and §1 of the skill states the rule and gives a three-level example, and §10 repeats it. So this is the agent not applying text it read, not a wrong or missing line. r1's method returns -1 when the prepare fails, so the SQLCODE never reaches a tool result and the 129 `deep_package_table` hint cannot fire. I am not editing the skill for this. The one change worth trying is to lead §1 with a class name in the task's shape (`A.B.C` → `A_B.C`), and only if a second round flags it again.
+
+### The host slept
+
+The laptop went into clamshell sleep at 00:00:53 on 2026-09-27. After the 00:17 wake, OrbStack and the IRIS web port stopped answering, so the next tasks failed validation before their sessions started: `iad exec` fell back to docker-exec mode and refused block syntax (SKILL-17 tools), and writes failed `SCM_PROBE_FAILED` (SKILL-17 skill, SKILL-18 tools). Three unscored in a row stopped the run at 00:41 with exit 3, as designed. None of the three started a session, so none cost anything. The host stayed asleep until 09:34. The later runs held `caffeinate -s` on the ladder's pid.
+
+### Round 3 spend
+
+About $9.70 for the ladder: 114 sessions at about $0.085 each (32 + 6 + 76 across the three files; the r1–r2 run's 76 cost $6.46). The skill-eval re-baseline is below.

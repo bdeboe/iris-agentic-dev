@@ -37,3 +37,12 @@ Tests come first in every phase.
 - [x] T018 Per flagged skill (none flagged after T017a; no fix): transcript quote and live reproduction in research.md; hand fix; unit and live guard tests
 - [x] T019 Per flagged skill (none flagged; SKILL-16 stays on holdout, no SKILL-20): move the task to train, write a replacement holdout task, live before/after test, ladder it (3 repeats, with `--spent`)
 - [x] T020 research.md round 2 results and per-skill verdicts; CLAUDE.md entry; fmt, clippy, all suites; local commit
+
+## Phase 6: skill arm loads its skill, re-baseline (grill round 3)
+
+- [x] T021 Tests first in `tests/e2e/skill_eval/test_skill_preload.py`: a skill arm's prompt asks for its skill; a skill arm that never loads it is unscored; three in a row stop the ladder; every arm gets the same autonomy line, which names no tool and no skill
+- [x] T022 Same for the 118 skill-eval in `test_lift_preload.py`; `session_prompt`, `unloaded_skill_verdict`
+- [x] T023 `iris_macro` on the real `getmacro*` routes and `/docnames/RTN/INC`; `MACRO_NOT_FOUND` instead of `{}`; unit shapes in `test_macro_130.rs`, live handler tests (drafts #3)
+- [x] T024 `resume --merge` keys on the repeat; `ladder --start-repeat`; tests in `test_resume.py`, `test_ladder.py`
+- [x] T025 Billable: ladder `--skill all --repeats 3` over SKILL-01 to SKILL-19, resumed after the host slept; merge to `ladder-r3-merged.json`; `needs_fix` flags SKILL-13 and SKILL-09
+- [ ] T026 Billable: skill-eval `--update-baseline` on the clean harness; research.md round 3; CLAUDE.md entry; markdown lint; local commit
