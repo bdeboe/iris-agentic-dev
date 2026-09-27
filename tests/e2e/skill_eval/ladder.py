@@ -405,6 +405,78 @@ def skill_breakdown(runs, tasks) -> list[dict]:
     return rows
 
 
+TRIAGE_RULE = (
+    "A skill is marked for a fix on a task when its arm failed at least 2 scored runs and the tools "
+    "arm passed at least 2. Unscored runs count for neither; fewer than 2 scored runs on either arm "
+    "is `unmeasured`. Fixed in 130 plan.md (round 2, grill Q6) before the re-run."
+)
+TRIAGE_MAJORITY = 2
+
+
+def triage(runs) -> list[dict]:
+    """One row per task that ran a `tools+<skill>` arm: the counts and `fix`, `keep` or `unmeasured`.
+
+    Majority against majority. Strict-and (`arm_verdict`) is the right rule for a lift figure and the
+    wrong one here: it would flag a skill on one bad run in three, which is what round 2 exists to
+    tell apart from noise.
+    """
+    rows = []
+    for task_id in sorted({run.task_id for run in runs}):
+        mine = [run for run in runs if run.task_id == task_id]
+        tools = [
+            run for run in mine if run.arm == TOOLS.name and run.passed is not None
+        ]
+        for arm in sorted({run.arm for run in mine if run.arm.startswith("tools+")}):
+            skilled = [run for run in mine if run.arm == arm and run.passed is not None]
+            tools_passed = sum(bool(run.passed) for run in tools)
+            skill_failed = sum(not run.passed for run in skilled)
+            if len(tools) < TRIAGE_MAJORITY or len(skilled) < TRIAGE_MAJORITY:
+                status = "unmeasured"
+            elif tools_passed >= TRIAGE_MAJORITY and skill_failed >= TRIAGE_MAJORITY:
+                status = "fix"
+            else:
+                status = "keep"
+            rows.append(
+                {
+                    "task": task_id,
+                    "skill": arm.removeprefix("tools+"),
+                    "tools_passed": tools_passed,
+                    "tools_scored": len(tools),
+                    "skill_failed": skill_failed,
+                    "skill_scored": len(skilled),
+                    "status": status,
+                }
+            )
+    return rows
+
+
+def needs_fix(runs) -> dict[str, list[str]]:
+    """Skill name to the tasks that flagged it, from `triage`. Empty means every skill keeps "no lift
+    claim" and nothing moves."""
+    flagged: dict[str, list[str]] = {}
+    for row in triage(runs):
+        if row["status"] == "fix":
+            flagged.setdefault(row["skill"], []).append(row["task"])
+    return flagged
+
+
+def transcript_writer(directory: str):
+    """An `on_events` for `run_ladder` that writes `<task>__<arm>__r<repeat>.jsonl` under `directory`.
+
+    Git-ignored: a stream carries the prompt, the connection details and every tool payload. research.md
+    quotes the lines behind a fix and no more.
+    """
+
+    def write(task, arm, repeat, events) -> None:
+        os.makedirs(directory, exist_ok=True)
+        path = os.path.join(directory, f"{task.id}__{arm.name}__r{repeat}.jsonl")
+        with open(path, "w", encoding="utf-8") as handle:
+            for event in events:
+                handle.write(json.dumps(event, default=str) + "\n")
+
+    return write
+
+
 # --- the report ------------------------------------------------------------------------------------
 
 
@@ -430,6 +502,7 @@ def report(
     run_id: str | None = None,
     pooled: bool = False,
     tasks=None,
+    transcripts: str | None = None,
 ) -> dict:
     """The whole graded run in one shape, with everything a re-measurement needs (FR-020).
 
@@ -501,6 +574,7 @@ def report(
         "comparisons": [comparison.to_dict() for comparison in comparisons],
         "published": [comparison.summary() for comparison in published],
         "runs": [asdict(run) for run in runs],
+        "transcripts": transcripts,
         **(
             {
                 "skill_verdict": skill_verdict(b=comparisons[0].b, c=comparisons[0].c),
@@ -511,6 +585,8 @@ def report(
                     "plan.md and in `skill_verdict` before the first skill session ran."
                 ),
                 "per_skill": skill_breakdown(runs, tasks or ()),
+                "triage": triage(runs),
+                "triage_rule": TRIAGE_RULE,
             }
             if pooled
             else {}
@@ -536,6 +612,7 @@ def run_ladder(
     binary: str | None = None,
     driver=None,
     on_run=None,
+    on_events=None,
 ) -> list:
     """Every task in every arm, `repeats` times, one session at a time.
 
@@ -543,7 +620,8 @@ def run_ladder(
     once grade each other's work. Task-major, so an interrupted run leaves whole comparable pairs.
 
     `on_run` is called with each `ArmRun` as it completes, which is how a long run gets written down
-    incrementally instead of existing only in memory for ten hours.
+    incrementally instead of existing only in memory for ten hours. `on_events(task, arm, repeat,
+    events)` gets each session's raw stream, which is what `transcript_writer` puts on disk.
     """
     from tests.e2e.skill_eval.pilot import run_one
 
@@ -575,6 +653,15 @@ def run_ladder(
                     iris_container=iris_container,
                     binary=binary,
                     driver=driver,
+                    on_events=(
+                        None
+                        if on_events is None
+                        else (
+                            lambda events, t=task, a=arm, r=repeat: on_events(
+                                t, a, r, events
+                            )
+                        )
+                    ),
                 )
                 run = type(run)(**{**asdict(run), "run_index": repeat})
                 runs.append(run)
@@ -752,6 +839,8 @@ def _main(argv=None) -> int:
         with open(incremental, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(asdict(run)) + "\n")
 
+    transcripts = os.path.join(RESULTS_DIR, f"{run_id}.transcripts")
+
     driver = None
     try:
         runs = run_ladder(
@@ -764,6 +853,7 @@ def _main(argv=None) -> int:
             binary=os.environ.get("IAD_BINARY"),
             driver=driver,
             on_run=record,
+            on_events=transcript_writer(transcripts),
         )
     except LadderAborted as aborted:
         # No report. A report over a run that stopped early would print a lift whose denominator is an
@@ -786,6 +876,7 @@ def _main(argv=None) -> int:
         run_id=run_id,
         pooled=pooled,
         tasks=tasks,
+        transcripts=os.path.relpath(transcripts),
     )
     for record_ in written["comparisons"]:
         print(
@@ -803,9 +894,20 @@ def _main(argv=None) -> int:
                 f"  {row['skill']:<30} {row['pairs']:>2} pairs  b={row['b']} c={row['c']}  "
                 f"{row['verdict']}{reach}"
             )
+        flagged = needs_fix(runs)
+        print(
+            f"needs_fix: {flagged or 'nothing flagged, every skill keeps no lift claim'}"
+        )
+        for row in written["triage"]:
+            print(
+                f"  {row['task']:<10} {row['skill']:<28} tools {row['tools_passed']}/"
+                f"{row['tools_scored']} pass, skill {row['skill_failed']}/{row['skill_scored']} "
+                f"fail  {row['status']}"
+            )
     path = write_report(written, out=args.out)
     print(f"written to {path}")
     print(f"sessions written incrementally to {incremental}")
+    print(f"transcripts in {transcripts}")
     return 0
 
 

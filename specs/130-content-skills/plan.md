@@ -52,7 +52,18 @@ The checks run through `iad exec`, so they may use no `%Dictionary.*Definition` 
 
 Anything over $3 in total is skipped and reported.
 
+## Round 2: skill-arm triage (US4)
+
+Grilled 2026-09-26 after the first ladder run.
+
+- **Transcripts.** `run_ladder` gains `on_events(task, arm, repeat, events)`, passed through to `run_one`, which calls it after `collect_events`. `ladder._main` writes each stream as JSONL to `RESULTS_DIR/<run_id>.transcripts/<task>__<arm>__r<repeat>.jsonl`. `tests/e2e/results/.gitignore` gets `*.transcripts/`. The report records the directory under `transcripts`.
+- **Triage rule.** `ladder.needs_fix(runs) -> dict[skill, list[task]]`: for each task, the skill arm is flagged when the tools arm passed at least 2 of its scored runs and the skill arm failed at least 2 of its scored runs (majority against majority, grill Q6). Unscored runs (`passed=None`) count for neither side; a task with fewer than 2 scored runs on either arm is reported `unmeasured` and never flagged. Unit-tested on scripted `ArmRun` records.
+- **Re-run.** `--ladder skill --skill all --task SKILL-13 --task SKILL-14 --task SKILL-16 --repeats 3 --spent 2.47`: 18 sessions, about $1.53.
+- **Fix, per flagged skill.** Quote the misleading lines from a transcript in research.md, reproduce the fact live, edit the skill by hand, and add a forbidden-string test to `test_content_skills_130.rs` plus a live test. Move the task to train in `split.toml`. Write a replacement holdout task (SKILL-20 and up) with the before/after live check, and run the ladder on it: 2 arms, 3 repeats, about $0.51.
+- **Nothing flagged.** Record the re-run in research.md and keep "no lift claim". Nothing moves.
+
 ## Out of scope
 
 - Fixing the iad bugs drafted in R3, R6 and R7.
+- A content-descriptions loop in round 2 (waits for mined prompts).
 - HL7 and embedded Python (blocked).

@@ -53,6 +53,19 @@ Each content gap gets a graded ladder task, SKILL-13 to SKILL-19, on the holdout
 
 **Independent Test**: Offline tests with a scripted scorer show that a proposal for an untouched skill is never made, the apply step refuses one, and no holdout item reaches the train scorer.
 
+### User Story 4 - A skill arm that loses is triaged, not guessed at (Priority: P1)
+
+The first ladder run found tools alone passing 7 of 7 and tools+skill 4 of 7, with SKILL-13, SKILL-14 and SKILL-16 lost with the skill loaded. One run per arm cannot tell a misleading skill from noise, and the ladder kept no transcripts to look at. Round 2 of the grill (2026-09-26) settled what happens next.
+
+**Independent Test**: An offline test drives `run_ladder` with a scripted driver and asserts one transcript file per session, named by task, arm and repeat. A unit test applies the triage rule to scripted run records.
+
+**Acceptance Scenarios**:
+
+1. **Given** any ladder run, **Then** every session's raw event stream is written under `tests/e2e/results/<run_id>.transcripts/`, which git ignores.
+2. **Given** SKILL-13, SKILL-14 and SKILL-16 at three runs per arm, **When** a skill arm fails at least 2 of its scored runs on a task where the tools arm passed at least 2 (unscored runs count for neither), **Then** that skill is marked for a fix. Any other outcome keeps "no lift claim".
+3. **Given** a skill marked for a fix, **Then** the sentence that misled the agent is quoted from a transcript in research.md, reproduced live, rewritten by hand, and guarded by a unit test that fails if the old wording returns.
+4. **Given** a task whose transcript drove a fix, **Then** it moves to the train side of `split.toml`, and a new holdout task tests the same fact another way, failing before the fix and passing after, live. Only the new task's ladder result can carry a lift claim.
+
 ### Edge Cases
 
 - A ladder check that starts a production must stop it, even when the check fails.
@@ -69,6 +82,10 @@ Each content gap gets a graded ladder task, SKILL-13 to SKILL-19, on the holdout
 - **FR-006**: The ladder figure is reported per skill, and a skill without lift is labelled "no lift claim", not dropped.
 - **FR-007**: No text from Pierre Abdelsayed's pack, and nothing HealthShare-specific.
 - **FR-008**: Scratch objects from the probes are removed from iris-dev-iris.
+- **FR-009**: The ladder writes each session's event stream to a transcript file, and the run's report names the directory.
+- **FR-010**: The triage rule (skill arm fails at least 2 scored runs where tools passes at least 2; unscored runs count for neither) is code with a unit test, applied to the re-run's records, not judged by hand.
+- **FR-011**: A task used to fix a skill leaves the holdout. The `split.toml` change and the replacement holdout task land in the same commit as the fix.
+- **FR-012**: Round 2 runs no content-descriptions loop. That waits for mined prompts in the content corpus.
 
 ## Success Criteria
 
@@ -76,6 +93,7 @@ Each content gap gets a graded ladder task, SKILL-13 to SKILL-19, on the holdout
 - **SC-002**: Every new ladder task goes from fail to pass on iris-dev-iris.
 - **SC-003**: The unit, Rust live and Python offline suites pass.
 - **SC-004**: One billable content-descriptions run and one 128 drift re-measure together cost $3 or less.
+- **SC-005**: Round 2 costs $3 or less: $1.50 for the 18-session re-run and about $0.50 per replacement holdout task.
 
 ## Assumptions
 

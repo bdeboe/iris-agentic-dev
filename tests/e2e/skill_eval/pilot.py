@@ -230,8 +230,12 @@ def run_one(
     iris_container: str,
     binary: str | None = None,
     driver=None,
+    on_events=None,
 ) -> ArmRun:
     """One task, one arm, one session, one check.
+
+    `on_events` gets the session's raw event stream as soon as it exists, before grading, so a
+    transcript survives a check that raises.
 
     Order is the whole of the method. Validate live (free), put the fixture back, assert the arm both
     ways, run the session, read the check. A step that raises makes the run unscored rather than
@@ -311,6 +315,8 @@ def run_one(
                     seconds=time.monotonic() - started,
                     session_seconds=time.monotonic() - session_started,
                 )
+            if on_events is not None:
+                on_events(events)
             session = driver.session_from_events(
                 events, session_seconds=time.monotonic() - session_started
             )

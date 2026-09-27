@@ -23,7 +23,16 @@ Tests come first in every phase.
 
 ## Phase 4: runs, docs, cleanup
 
-- [X] T011 Billable: loop run, 128 drift re-measure, ladder (capped at $3)
-- [X] T012 `docs/skills.md`, CLAUDE.md Recent Changes, markdown lint
-- [X] T013 Drop the `IadProbe130` scratch objects
-- [X] T014 fmt, clippy, all suites; local commit
+- [x] T011 Billable: loop run, 128 drift re-measure, ladder (capped at $3)
+- [x] T012 `docs/skills.md`, CLAUDE.md Recent Changes, markdown lint
+- [x] T013 Drop the `IadProbe130` scratch objects
+- [x] T014 fmt, clippy, all suites; local commit
+
+## Phase 5: skill-arm triage (US4, grill round 2)
+
+- [X] T015 Offline tests in `tests/e2e/skill_eval/test_ladder_transcripts.py`: one transcript file per session named by task/arm/repeat; `needs_fix` flags a skill only when its arm fails ≥2 scored runs and tools pass ≥2, unscored runs count for neither; report names the transcript dir; `.gitignore` covers `*.transcripts/`
+- [X] T016 `on_events` through `run_ladder` and `run_one`; `ladder._main` writes transcripts; `needs_fix`; ignore rule
+- [ ] T017 Billable: re-run SKILL-13/14/16, 3 repeats per arm (cap $1.53; `--spent` makes `assert_within_budget` refuse past the cap, which guards SC-005), and print `needs_fix`
+- [ ] T018 Per flagged skill: transcript quote and live reproduction in research.md; hand fix; unit and live guard tests
+- [ ] T019 Per flagged skill: move the task to train, write a replacement holdout task, live before/after test, ladder it (3 repeats, with `--spent`)
+- [ ] T020 research.md round 2 results and per-skill verdicts; CLAUDE.md entry; fmt, clippy, all suites; local commit

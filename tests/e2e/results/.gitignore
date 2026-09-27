@@ -14,3 +14,7 @@
 
 # 128 optimiser runs: local evidence; results.md in the spec quotes the figures.
 optimize/
+
+# 130 round 2: raw session event streams. They carry prompts, connection details and tool
+# payloads; research.md quotes the few lines behind a fix.
+*.transcripts/
