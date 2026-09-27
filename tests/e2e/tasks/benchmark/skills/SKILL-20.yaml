@@ -1,0 +1,82 @@
+id: SKILL-20
+prompt: |
+  In the BENCHMARK namespace, Bench.Plan2.Feed.Append(pRegion, pCount) adds pCount sales rows for a
+  region to Bench.Plan2.Sales. The rows it adds never reach the RegionIdx index, so lookups by region
+  through the index miss them. Fix it so that RegionIdx holds every row after each Append call, and keep
+  the index. Leave the classes compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: iris-query-plans
+fixtures:
+- name: Bench.Plan2.Sales
+  content: |
+    Class Bench.Plan2.Sales Extends %Persistent
+    {
+
+    Property Region As %String;
+
+    Property Amount As %Numeric;
+
+    Index RegionIdx On Region;
+
+    }
+- name: Bench.Plan2.Feed
+  content: |
+    Class Bench.Plan2.Feed Extends %RegisteredObject
+    {
+
+    /// Adds pCount rows for pRegion.
+    ClassMethod Append(pRegion As %String, pCount As %Integer) As %Status
+    {
+        Set tSC = $$$OK
+        Set tStmt = ##class(%SQL.Statement).%New()
+        Set tSC = tStmt.%Prepare("INSERT %NOINDEX INTO Bench_Plan2.Sales (Region, Amount) VALUES (?, ?)")
+        If $$$ISERR(tSC) { Quit tSC }
+        For i = 1:1:pCount {
+            Set tRs = tStmt.%Execute(pRegion, i * 10)
+            If tRs.%SQLCODE < 0 { Return $$$ERROR($$$SQLError, tRs.%SQLCODE, tRs.%Message) }
+        }
+        Quit tSC
+    }
+
+    }
+check: |
+  try { set ok=0 do ##class(Bench.Plan2.Sales).%KillExtent() set s1=##class(Bench.Plan2.Feed).Append("EU",7), s2=##class(Bench.Plan2.Feed).Append("US",3), s3=##class(Bench.Plan2.Feed).Append("EU",5) if $system.Status.IsOK(s1)&&$system.Status.IsOK(s2)&&$system.Status.IsOK(s3), ##class(%Dictionary.CompiledIndex).%ExistsId("Bench.Plan2.Sales||RegionIdx") { set g=##class(%Dictionary.CompiledStorage).%OpenId("Bench.Plan2.Sales||Default").IndexLocation, (eu,us)=0, id="" for { set id=$order(@g@("RegionIdx"," EU",id)) quit:id=""  set eu=eu+1 } for { set id=$order(@g@("RegionIdx"," US",id)) quit:id=""  set us=us+1 } set ok=((eu=12)&&(us=3)) } } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+- name: Bench.Plan2.Sales
+  content: |
+    Class Bench.Plan2.Sales Extends %Persistent
+    {
+
+    Property Region As %String;
+
+    Property Amount As %Numeric;
+
+    Index RegionIdx On Region;
+
+    }
+- name: Bench.Plan2.Feed
+  content: |
+    Class Bench.Plan2.Feed Extends %RegisteredObject
+    {
+
+    /// Adds pCount rows for pRegion.
+    ClassMethod Append(pRegion As %String, pCount As %Integer) As %Status
+    {
+        Set tSC = $$$OK
+        Set tStmt = ##class(%SQL.Statement).%New()
+        Set tSC = tStmt.%Prepare("INSERT %NOINDEX INTO Bench_Plan2.Sales (Region, Amount) VALUES (?, ?)")
+        If $$$ISERR(tSC) { Quit tSC }
+        For i = 1:1:pCount {
+            Set tRs = tStmt.%Execute(pRegion, i * 10)
+            If tRs.%SQLCODE < 0 { Return $$$ERROR($$$SQLError, tRs.%SQLCODE, tRs.%Message) }
+        }
+        Quit ##class(Bench.Plan2.Sales).%BuildIndices($ListBuild("RegionIdx"))
+    }
+
+    }
+tags:
+- index
+- buildindices
+- noindex

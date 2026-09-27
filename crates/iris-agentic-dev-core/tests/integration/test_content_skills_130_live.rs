@@ -543,6 +543,101 @@ async fn class_added_index_is_empty_until_built() {
     drop_classes(&c, &client, &["IadLive130.Orders"]).await;
 }
 
+const LOADER_SALES: &str = "Class IadLive130.Sales Extends %Persistent
+{
+
+Property Region As %String;
+
+Index RegionIdx On Region;
+
+}";
+
+/// A loader in SKILL-13's shape: empty the extent, then `INSERT %NOINDEX` 500 rows over 50 regions.
+/// `build` adds the `%BuildIndices` call the corrected skill says belongs in the loader. The shape
+/// matters: with 40 rows over 2 values, the statistics gathered at the build make a master-map scan
+/// cheaper, so `COUNT(*)` reads the data and hides the empty index.
+fn loader_class(build: bool) -> String {
+    let tail = if build {
+        "Quit ##class(IadLive130.Sales).%BuildIndices($ListBuild(\"RegionIdx\"))"
+    } else {
+        "Quit $$$OK"
+    };
+    format!(
+        "Class IadLive130.SalesLoad Extends %RegisteredObject
+{{
+
+ClassMethod Run() As %Status
+{{
+    Do ##class(IadLive130.Sales).%KillExtent()
+    Set tStmt = ##class(%SQL.Statement).%New()
+    Set tSC = tStmt.%Prepare(\"INSERT %NOINDEX INTO IadLive130.Sales (Region) VALUES (?)\")
+    If $$$ISERR(tSC) {{ Quit tSC }}
+    For i = 1:1:500 {{
+        Set tRs = tStmt.%Execute(\"R\"_(i#50))
+        If tRs.%SQLCODE < 0 {{ Quit }}
+    }}
+    {tail}
+}}
+
+}}"
+    )
+}
+
+/// Round 3, SKILL-13. A `%BuildIndices` run by hand fixes the count only until the loader runs
+/// again; a loader that calls it after its `INSERT %NOINDEX` stays right on every run.
+#[tokio::test]
+#[ignore]
+async fn a_rebuild_by_hand_lasts_until_the_next_noindex_load() {
+    let Some((c, client)) = conn() else { return };
+    let classes = ["IadLive130.SalesLoad", "IadLive130.Sales"];
+    drop_classes(&c, &client, &classes).await;
+    let r = put_and_compile(&c, &client, "IadLive130.Sales.cls", LOADER_SALES).await;
+    assert!(r.success(), "Sales: {}", compile_text(&r));
+    let r = put_and_compile(
+        &c,
+        &client,
+        "IadLive130.SalesLoad.cls",
+        &loader_class(false),
+    )
+    .await;
+    assert!(r.success(), "SalesLoad: {}", compile_text(&r));
+
+    let load = " Set sc=##class(IadLive130.SalesLoad).Run() Write \"~[\",+sc,\"]~\"";
+    // The index entries for R1, read from the index global. Not a query: once a build has left
+    // statistics behind, the planner may read the master map, and then both `COUNT(*)` and a row
+    // fetch report 10 over an empty index. The test is about what the index holds.
+    let eu = " Set n=0,id=\"\" For { Set id=$Order(^IadLive130.SalesI(\"RegionIdx\",\" R1\",id)) Quit:id=\"\"  Set n=n+1 } Write \"~[\",n,\"]~\"";
+    assert_eq!(marked(&run(&c, &client, load).await), "1");
+    assert_eq!(marked(&run(&c, &client, eu).await), "0", "%NOINDEX load");
+
+    let built = run(
+        &c,
+        &client,
+        " Set sc=##class(IadLive130.Sales).%BuildIndices($ListBuild(\"RegionIdx\")) Write \"~[\",+sc,\"]~\"",
+    )
+    .await;
+    assert_eq!(marked(&built), "1");
+    assert_eq!(marked(&run(&c, &client, eu).await), "10", "rebuilt by hand");
+    assert_eq!(marked(&run(&c, &client, load).await), "1");
+    assert_eq!(
+        marked(&run(&c, &client, eu).await),
+        "0",
+        "the next load undoes a rebuild by hand"
+    );
+
+    let r = put_and_compile(&c, &client, "IadLive130.SalesLoad.cls", &loader_class(true)).await;
+    assert!(r.success(), "SalesLoad with build: {}", compile_text(&r));
+    for pass in 1..=2 {
+        assert_eq!(marked(&run(&c, &client, load).await), "1");
+        assert_eq!(
+            marked(&run(&c, &client, eu).await),
+            "10",
+            "loader that builds, run {pass}"
+        );
+    }
+    drop_classes(&c, &client, &classes).await;
+}
+
 // ── R6 ───────────────────────────────────────────────────────────────────────────────────────
 
 const EMPTY_PROD: &str = "Class IadLive130.EmptyProd Extends Ens.Production

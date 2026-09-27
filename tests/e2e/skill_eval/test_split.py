@@ -196,7 +196,27 @@ def test_every_skill_ladder_task_is_on_the_holdout_side():
     assert skill_ids, (
         "no skill tasks yet — this test is vacuous until Goal 2 writes them"
     )
-    assert_holdout_only(split, skill_ids)
+    assert_holdout_only(
+        split, [task_id for task_id in skill_ids if task_id not in TUNED_SKILL_TASKS]
+    )
+
+
+#: Skill tasks moved to train because a skill was edited while reading their transcripts. Each one
+#: has a replacement on the holdout for the same skill.
+TUNED_SKILL_TASKS = {"SKILL-13": "SKILL-20"}
+
+
+def test_a_tuned_skill_task_is_on_train_and_its_replacement_on_the_holdout():
+    """130 round 3 rewrote `iris-query-plans` from the SKILL-13 transcripts. A figure from SKILL-13
+    after that is measured on the task the skill was fitted to."""
+    split = default_split()
+    tasks = {task.id: task for task in skill_corpus()}
+    for tuned, replacement in TUNED_SKILL_TASKS.items():
+        assert tuned in split.train, f"{tuned} was tuned against and must be on train"
+        assert replacement in split.holdout, f"{replacement} must be on the holdout"
+        assert tasks[replacement].skill == tasks[tuned].skill, (
+            f"{replacement} must measure the same skill as {tuned}"
+        )
 
 
 def test_the_gate_task_is_on_the_train_side():

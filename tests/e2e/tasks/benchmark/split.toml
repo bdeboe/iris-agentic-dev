@@ -23,6 +23,9 @@
 #   a commit with a reason.
 # - **The skills tasks are all holdout.** They were written for one question and nothing is fitted to
 #   them; `test_every_skill_ladder_task_is_on_the_holdout_side` keeps it that way.
+# - **SKILL-13 moved to train in 130 round 3.** The ladder flagged `iris-query-plans` on it, and I
+#   rewrote the skill's `%NOINDEX` section while reading its transcripts. SKILL-20 replaces it on the
+#   holdout for the same skill (`TUNED_SKILL_TASKS` in `test_split.py`).
 #
 # One caveat that the split cannot fix and the report has to carry instead: I wrote the 42 corpus
 # tasks knowing what iad's 81 tools can do. Authoring is not tuning — no description, prompt or skill
@@ -39,6 +42,7 @@ train = [
   "CORPUS-28",
   "CORPUS-35",
   "CORPUS-42",
+  "SKILL-13",
 ]
 
 holdout = [
@@ -95,11 +99,11 @@ holdout = [
   "SKILL-10",
   "SKILL-11",
   "SKILL-12",
-  "SKILL-13",
   "SKILL-14",
   "SKILL-15",
   "SKILL-16",
   "SKILL-17",
   "SKILL-18",
   "SKILL-19",
+  "SKILL-20",
 ]

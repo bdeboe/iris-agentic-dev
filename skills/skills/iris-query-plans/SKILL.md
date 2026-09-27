@@ -41,7 +41,17 @@ DDL is different. `CREATE INDEX` on a table that already has rows builds the ind
 
 ## `INSERT %NOINDEX` leaves the index behind
 
-`INSERT %NOINDEX INTO Pkg.Orders ...` writes the row but skips index maintenance. A count through the index then misses the new row (0), and the same count with `WHERE %NOINDEX` finds it (1). Run `%BuildIndices` after a `%NOINDEX` bulk load.
+`INSERT %NOINDEX INTO Pkg.Orders ...` writes the row but skips index maintenance. A count through the index then misses the new row (0), and the same count with `WHERE %NOINDEX` finds it (1). So the method that does the `INSERT %NOINDEX` has to call `%BuildIndices` when its inserts are done:
+
+```objectscript
+For i = 1:1:tCount {
+    Set tRs = tStmt.%Execute(...)
+    If tRs.%SQLCODE < 0 { Return $$$ERROR($$$SQLError, tRs.%SQLCODE, tRs.%Message) }
+}
+Quit ##class(Pkg.Orders).%BuildIndices($ListBuild("CustIdx"))
+```
+
+A rebuild by hand lasts until the next load. If the loader clears the extent and inserts with `%NOINDEX` again, the index is empty again, and a fix that only ran `%BuildIndices` once is gone. Change the loader, or drop `%NOINDEX` from it.
 
 ## `TUNE TABLE`
 
@@ -55,7 +65,7 @@ If one value covers most of the rows, the planner skips the index for that value
 
 1. Explain the query and read which map it uses.
 2. If a count looks low, run it again with `WHERE %NOINDEX`. Different counts mean a stale index.
-3. After adding an `Index` to a class that already has data, or after `INSERT %NOINDEX`, run `%BuildIndices`.
+3. After adding an `Index` to a class that already has data, run `%BuildIndices`. A loader that uses `INSERT %NOINDEX` calls it itself, after its last insert.
 4. After a large load, run `TUNE TABLE`.
 5. A master-map plan for a common value is expected (outlier selectivity).
 

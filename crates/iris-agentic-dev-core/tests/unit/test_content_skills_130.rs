@@ -168,6 +168,27 @@ fn query_plans_skill_exists_with_its_facts() {
     );
 }
 
+/// Round 3, SKILL-13. "Run `%BuildIndices` after a `%NOINDEX` bulk load" read as a one-off admin
+/// step: all three skill-arm sessions rebuilt the index by hand, and the loader's next run emptied it
+/// again. The skill now says the loader has to call it, and that a rebuild by hand does not last.
+#[test]
+fn query_plans_puts_the_rebuild_in_the_loader() {
+    let t = skill("iris-query-plans");
+    lacks(
+        "iris-query-plans",
+        &t,
+        &["Run `%BuildIndices` after a `%NOINDEX` bulk load."],
+    );
+    has(
+        "iris-query-plans",
+        &t,
+        &[
+            "the method that does the `INSERT %NOINDEX` has to call `%BuildIndices`",
+            "A rebuild by hand lasts until the next load",
+        ],
+    );
+}
+
 /// FR-003. Every list of bundled skills names the new one.
 #[test]
 fn query_plans_skill_is_registered_everywhere() {
