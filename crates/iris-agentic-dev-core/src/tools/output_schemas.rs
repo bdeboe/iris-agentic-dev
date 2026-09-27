@@ -1484,8 +1484,21 @@ pub struct IrisMacroActionOk {
     pub success: bool,
     pub name: String,
     pub action: String,
-    /// Raw Atelier `/action/getmacro` response body — free-form JSON.
-    pub result: serde_json::Value,
+    pub namespace: String,
+    /// Includes the macro was resolved in; empty for system macros.
+    pub includes: Vec<String>,
+    /// Include file that defines the macro, e.g. `EnsConstants.inc`.
+    pub document: String,
+    pub line: i64,
+    /// action=definition: the `#define` text, one entry per line.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub definition: Option<Vec<String>>,
+    /// action=signature: parameter list, e.g. `(x)`; empty for a macro with none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    /// action=expand: the expansion, one entry per line.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expansion: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

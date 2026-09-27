@@ -16,6 +16,8 @@ Embedded `&sql(INSERT INTO ...)` inside a `For` loop, run through `iris_execute`
 
 ## 3. `iris_macro expand` returns `{}` for a defined macro
 
+**Fixed locally in 130 round 3; not filed.** Every action called a route Atelier does not have (`/action/getmacro` answers 404, `/docnames/INC` 400). The handler now uses `getmacrolocation`/`getmacrodefinition`/`getmacroexpansion`/`getmacrosignature` and `/docnames/RTN/INC`. It finds the defining include when none is named, and it returns `MACRO_NOT_FOUND` rather than `{}`. The body below is the report as found.
+
 `iris_macro(action="expand", name="eProductionStateRunning")` returns `result: {}`. `EnsConstants.inc` defines it as 1. The call should return the expansion, or an error naming the include it searched.
 
 This is what failed SKILL-16 in the 130 round-2 ladder, in both arms. Agents asked `iris_macro` for `eProductionStateRunning` (`definition` and `expand`, in BENCHMARK and ENSLIB) and got `{}` or `null`. `action="list"` said "No include files found in this namespace". `iris_search(category="INC")` found nothing. The agents then guessed the value as 2 and wrote `If state = 2 { Quit $$$OK }` for "already running". Stopped is 2, so the check fails. A `success: true` with an empty result reads as "exists, value empty". An error such as "macro not found in any include this namespace can see" would at least stop the guess.

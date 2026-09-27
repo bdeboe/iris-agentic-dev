@@ -130,12 +130,180 @@ pub struct MacroParams {
     pub name: Option<String>,
     #[serde(default)]
     pub args: Vec<String>,
+    /// Include files to resolve the macro in, e.g. ["EnsConstants"]. If omitted, iad finds the
+    /// include that defines it. With action=list, lists the macros these includes define.
+    #[serde(default)]
+    pub includes: Option<Vec<String>>,
     /// IRIS namespace. Defaults to the connection namespace (IRIS_NAMESPACE).
     #[serde(default)]
     pub namespace: Option<String>,
     /// Route this call to a named registered IRIS instance. If omitted, uses the default connection.
     #[serde(default)]
     pub server: Option<String>,
+}
+
+/// Atelier route for a macro action. `list` has none: it reads `/docnames/RTN/INC` or
+/// `/action/getmacrolist`.
+pub fn macro_route(action: &str) -> Option<&'static str> {
+    match action {
+        "signature" => Some("/action/getmacrosignature"),
+        "location" => Some("/action/getmacrolocation"),
+        "definition" => Some("/action/getmacrodefinition"),
+        "expand" => Some("/action/getmacroexpansion"),
+        _ => None,
+    }
+}
+
+/// Atelier URL for a macro call. The `getmacro*` actions arrived in API v2, so a connection still
+/// on v1 (never probed, or the probe failed) asks v2 rather than a v1 route that is always 404.
+pub fn macro_url(iris: &IrisConnection, ns: &str, path: &str) -> String {
+    if iris.atelier_version == crate::iris::connection::AtelierVersion::V1 {
+        iris.atelier_url(&format!("/v2/{}{}", urlencoding::encode(ns), path))
+    } else {
+        iris.versioned_ns_url(ns, path)
+    }
+}
+
+/// Atelier wants the arguments as one string, `(a,b)`. An array answers `expansion: []`.
+pub fn macro_arguments(args: &[String]) -> String {
+    if args.is_empty() {
+        String::new()
+    } else {
+        format!("({})", args.join(","))
+    }
+}
+
+fn strip_inc(name: &str) -> String {
+    name.strip_suffix(".inc")
+        .or_else(|| name.strip_suffix(".INC"))
+        .unwrap_or(name)
+        .to_string()
+}
+
+/// Request body for every `getmacro*` action. Atelier requires a `docname` but does not resolve
+/// includes from it (`Ens.Director.cls` alone gives `definition: []`), so the includes carry the
+/// lookup and the docname is a placeholder.
+pub fn macro_request_body(name: &str, includes: &[String], args: &[String]) -> serde_json::Value {
+    let includes: Vec<String> = includes.iter().map(|i| strip_inc(i)).collect();
+    serde_json::json!({
+        "docname": "%IadMacroLookup.cls",
+        "macroname": name,
+        "includes": includes,
+        "arguments": macro_arguments(args),
+    })
+}
+
+/// `(document, line)` from a `getmacrolocation` answer, or `None` when the macro is not defined in
+/// the includes searched (Atelier answers `document: ""`).
+pub fn macro_location(body: &serde_json::Value) -> Option<(String, i64)> {
+    let c = &body["result"]["content"];
+    let doc = c["document"].as_str().filter(|d| !d.is_empty())?;
+    Some((doc.to_string(), c["line"].as_i64().unwrap_or(0)))
+}
+
+/// The Atelier error text, if the answer carries one. `status.errors` and `console` are joined so
+/// the cause (e.g. "Failure to compile include files") is not lost behind "Utility failed".
+pub fn macro_atelier_error(body: &serde_json::Value) -> Option<String> {
+    let errors = body["status"]["errors"].as_array()?;
+    if errors.is_empty() {
+        return None;
+    }
+    let mut parts: Vec<String> = errors
+        .iter()
+        .filter_map(|e| e["error"].as_str().map(str::to_string))
+        .collect();
+    if let Some(console) = body["console"].as_array() {
+        parts.extend(
+            console
+                .iter()
+                .filter_map(|l| l.as_str().map(str::to_string)),
+        );
+    }
+    Some(parts.join("; "))
+}
+
+/// Include names (without `.inc`) from a `/docnames/RTN/INC` answer.
+pub fn macro_include_names(body: &serde_json::Value) -> Vec<String> {
+    body["result"]["content"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|d| d["name"].as_str().or_else(|| d.as_str()))
+                .map(strip_inc)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Macro names an include defines, read from its source lines. `getmacrolist` cannot do this: it
+/// ignores `includes` and always answers the same system list. A trailing `(` marks a macro that
+/// takes arguments, as `getmacrolist` writes it.
+pub fn macro_defines(lines: &[String]) -> Vec<String> {
+    lines
+        .iter()
+        .filter_map(|l| {
+            let l = l.trim_start();
+            let rest = l
+                .strip_prefix("#define")
+                .or_else(|| l.strip_prefix("#def1arg"))
+                .or_else(|| l.strip_prefix("#DEFINE"))
+                .or_else(|| l.strip_prefix("#DEF1ARG"))?;
+            if !rest.starts_with([' ', '\t']) {
+                return None;
+            }
+            let token = rest.split_whitespace().next()?;
+            match token.split_once('(') {
+                Some((name, _)) => Some(format!("{name}(")),
+                None => Some(token.to_string()),
+            }
+        })
+        .collect()
+}
+
+async fn macro_get(
+    iris: &IrisConnection,
+    client: &reqwest::Client,
+    url: &str,
+) -> Result<serde_json::Value, String> {
+    let resp = client
+        .get(url)
+        .basic_auth(&iris.username, Some(&iris.password))
+        .send()
+        .await
+        .map_err(|e| format!("HTTP error: {e}"))?;
+    let status = resp.status();
+    let body: serde_json::Value = resp.json().await.unwrap_or_default();
+    if !status.is_success() {
+        return Err(format!("HTTP {status} from {url}"));
+    }
+    match macro_atelier_error(&body) {
+        Some(e) => Err(e),
+        None => Ok(body),
+    }
+}
+
+async fn macro_post(
+    iris: &IrisConnection,
+    client: &reqwest::Client,
+    url: &str,
+    body: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let resp = client
+        .post(url)
+        .basic_auth(&iris.username, Some(&iris.password))
+        .json(body)
+        .send()
+        .await
+        .map_err(|e| format!("HTTP error: {e}"))?;
+    let status = resp.status();
+    let answer: serde_json::Value = resp.json().await.unwrap_or_default();
+    if !status.is_success() {
+        return Err(format!("HTTP {status} from {url}"));
+    }
+    match macro_atelier_error(&answer) {
+        Some(e) => Err(e),
+        None => Ok(answer),
+    }
 }
 
 pub async fn handle_iris_macro(
@@ -146,53 +314,133 @@ pub async fn handle_iris_macro(
     let ns = crate::tools::resolve_namespace(p.namespace.as_deref(), &iris.namespace);
     match p.action.as_str() {
         "list" => {
-            // Bug 14: use versioned_ns_url instead of hardcoded /v1/.
-            let url = iris.versioned_ns_url(ns, "/docnames/INC");
-            let resp = client
-                .get(&url)
-                .basic_auth(&iris.username, Some(&iris.password))
-                .send()
-                .await
-                .map_err(|e| rmcp::ErrorData::internal_error(format!("HTTP error: {e}"), None))?;
-            if !resp.status().is_success() {
+            if let Some(includes) = p.includes.as_deref().filter(|i| !i.is_empty()) {
+                let mut macros = Vec::new();
+                for inc in includes {
+                    let path = format!("/doc/{}.inc", strip_inc(inc));
+                    let body = match macro_get(iris, client, &macro_url(iris, ns, &path)).await {
+                        Ok(b) => b,
+                        Err(e) => {
+                            return err_json(
+                                "ATELIER_ERROR",
+                                &format!("could not read include {}: {e}", strip_inc(inc)),
+                            )
+                        }
+                    };
+                    let lines: Vec<String> = body["result"]["content"]
+                        .as_array()
+                        .map(|a| {
+                            a.iter()
+                                .filter_map(|l| l.as_str().map(str::to_string))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    macros.extend(macro_defines(&lines));
+                }
                 return ok_json(serde_json::json!({
                     "success": true,
-                    "macros": [],
-                    "note": "No include files found in this namespace"
+                    "macros": macros,
+                    "note": "Macros these includes define themselves (not the ones they #include). A trailing '(' marks one that takes arguments."
                 }));
             }
-            let body: serde_json::Value = resp.json().await.unwrap_or_default();
-            let inc_files: Vec<String> = body["result"]["content"]
-                .as_array()
-                .unwrap_or(&vec![])
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect();
-            ok_json(serde_json::json!({
-                "success": true,
-                "macros": inc_files,
-                "note": "Lists .inc include files — macro definitions are found within these files"
-            }))
+            let url = macro_url(iris, ns, "/docnames/RTN/INC");
+            match macro_get(iris, client, &url).await {
+                Ok(body) => ok_json(serde_json::json!({
+                    "success": true,
+                    "macros": macro_include_names(&body),
+                    "note": "Include files in this namespace. Pass includes=[...] to list the macros one defines."
+                })),
+                Err(e) => err_json("ATELIER_ERROR", &e),
+            }
         }
         action @ ("signature" | "location" | "definition" | "expand") => {
-            let name = p.name.as_deref().unwrap_or("");
-            let url = iris.versioned_ns_url(ns, "/action/getmacro");
-            let arg_count = p.args.len();
-            let resp = client
-                .post(&url)
-                .basic_auth(&iris.username, Some(&iris.password))
-                .json(&serde_json::json!({
-                    "macros": [{"name": name, "arguments": arg_count}],
-                    "action": action,
-                    "args": p.args,
-                }))
-                .send()
-                .await
-                .map_err(|e| rmcp::ErrorData::internal_error(format!("HTTP error: {e}"), None))?;
-            let body: serde_json::Value = resp.json().await.unwrap_or_default();
-            ok_json(
-                serde_json::json!({"success": true, "name": name, "action": action, "result": body["result"]}),
-            )
+            let Some(name) = p.name.as_deref().filter(|n| !n.is_empty()) else {
+                return err_json(
+                    "INVALID_PARAM",
+                    &format!("action='{action}' needs name, e.g. name=\"ISERR\" (without $$$)"),
+                );
+            };
+            let name = name.trim_start_matches("$$$");
+            let loc_url = macro_url(iris, ns, "/action/getmacrolocation");
+
+            // Find the include that defines the macro. System macros resolve with none; others
+            // need theirs named. Given every include, getmacrolocation still answers, while
+            // getmacrodefinition fails compiling them — so locate first, then ask in that one.
+            let given: Vec<String> = p.includes.clone().unwrap_or_default();
+            let mut includes = given.clone();
+            let loc_body = macro_request_body(name, &includes, &[]);
+            let mut location = match macro_post(iris, client, &loc_url, &loc_body).await {
+                Ok(a) => macro_location(&a),
+                Err(e) => return err_json("ATELIER_ERROR", &e),
+            };
+            let mut searched = if given.is_empty() {
+                "system includes".to_string()
+            } else {
+                given.join(", ")
+            };
+            if location.is_none() && p.includes.is_none() {
+                let inc_url = macro_url(iris, ns, "/docnames/RTN/INC");
+                let all = match macro_get(iris, client, &inc_url).await {
+                    Ok(body) => macro_include_names(&body),
+                    Err(e) => return err_json("ATELIER_ERROR", &e),
+                };
+                let body = macro_request_body(name, &all, &[]);
+                location = match macro_post(iris, client, &loc_url, &body).await {
+                    Ok(a) => macro_location(&a),
+                    Err(e) => return err_json("ATELIER_ERROR", &e),
+                };
+                searched = format!("all {} include files in {ns}", all.len());
+                if let Some((doc, _)) = &location {
+                    includes = vec![strip_inc(doc)];
+                }
+            }
+            let Some((document, line)) = location else {
+                return err_json(
+                    "MACRO_NOT_FOUND",
+                    &format!(
+                        "$$${name} is not defined in {searched}. Check the spelling, or pass the \
+                         include that defines it as includes=[\"Name\"]."
+                    ),
+                );
+            };
+
+            let mut out = serde_json::json!({
+                "success": true,
+                "name": name,
+                "action": action,
+                "namespace": ns,
+                "includes": includes,
+                "document": document,
+                "line": line,
+            });
+            if action != "location" {
+                let url = macro_url(iris, ns, macro_route(action).unwrap_or_default());
+                let body = macro_request_body(name, &includes, &p.args);
+                let answer = match macro_post(iris, client, &url, &body).await {
+                    Ok(a) => a,
+                    Err(e) => return err_json("ATELIER_ERROR", &e),
+                };
+                let content = &answer["result"]["content"];
+                match action {
+                    "definition" => out["definition"] = content["definition"].clone(),
+                    "signature" => out["signature"] = content["signature"].clone(),
+                    _ => {
+                        let expansion = content["expansion"].clone();
+                        if expansion.as_array().is_some_and(|a| a.is_empty()) {
+                            return err_json(
+                                "MACRO_EXPANSION_EMPTY",
+                                &format!(
+                                    "$$${name} (defined in {document}:{line}) expanded to nothing \
+                                     with args {:?}. Check its parameters with action=signature.",
+                                    p.args
+                                ),
+                            );
+                        }
+                        out["expansion"] = expansion;
+                    }
+                }
+            }
+            ok_json(out)
         }
         other => err_json(
             "INVALID_PARAM",

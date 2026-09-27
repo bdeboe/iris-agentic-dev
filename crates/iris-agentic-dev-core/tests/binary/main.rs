@@ -10,6 +10,7 @@
 mod cli_discovery;
 mod coding_pack_129;
 mod invalid_params;
+mod macro_130;
 mod nopws_101;
 mod pool_reload_hint;
 mod rejection_message;

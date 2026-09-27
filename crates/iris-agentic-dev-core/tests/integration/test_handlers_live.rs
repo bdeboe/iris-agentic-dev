@@ -510,6 +510,7 @@ fn test_handle_iris_macro_list() {
             action: "list".to_string(),
             name: None,
             args: vec![],
+            includes: None,
             namespace: Some("USER".to_string()),
             server: None,
         };
@@ -525,6 +526,116 @@ fn test_handle_iris_macro_list() {
             "macro list response should include 'macros' field, got: {v}"
         );
     });
+}
+
+// ── 130 round 3: iris_macro against the real getmacro* routes ─────────────────
+//
+// Round 2 of the 130 ladder lost SKILL-16 because every iris_macro action answered `{}`. These
+// check the values an agent needs, in BENCHMARK, which has the interoperability includes.
+
+fn macro_call(
+    action: &str,
+    name: Option<&str>,
+    args: Vec<String>,
+    includes: Option<Vec<String>>,
+) -> serde_json::Value {
+    rt().block_on(async {
+        let (conn, client) = make_conn().expect("IRIS_HOST must be set for live macro tests");
+        let p = MacroParams {
+            action: action.to_string(),
+            name: name.map(str::to_string),
+            args,
+            includes,
+            namespace: Some("BENCHMARK".to_string()),
+            server: None,
+        };
+        result_json(handle_iris_macro(&conn, &client, p).await)
+    })
+}
+
+#[test]
+#[ignore = "needs live IRIS"]
+fn macro_definition_finds_the_include_itself() {
+    let v = macro_call("definition", Some("eProductionStateRunning"), vec![], None);
+    assert_eq!(v["success"], true, "{v}");
+    assert_eq!(v["document"], "EnsConstants.inc", "{v}");
+    assert_eq!(v["includes"], serde_json::json!(["EnsConstants"]), "{v}");
+    assert_eq!(
+        v["definition"],
+        serde_json::json!(["eProductionStateRunning 1"]),
+        "{v}"
+    );
+}
+
+#[test]
+#[ignore = "needs live IRIS"]
+fn macro_expand_and_location_answer_values() {
+    let v = macro_call("expand", Some("eProductionStateStopped"), vec![], None);
+    assert_eq!(v["expansion"], serde_json::json!(["2"]), "{v}");
+    let v = macro_call("location", Some("$$$OK"), vec![], None);
+    assert_eq!(v["document"], "%sySystem.inc", "{v}");
+    assert!(v["line"].as_i64().unwrap_or(0) > 0, "{v}");
+}
+
+#[test]
+#[ignore = "needs live IRIS"]
+fn macro_expand_passes_arguments() {
+    let v = macro_call("expand", Some("ISERR"), vec!["sc".into()], None);
+    assert_eq!(v["success"], true, "{v}");
+    let text = v["expansion"].to_string();
+    assert!(
+        text.contains("sc"),
+        "the argument must reach the expansion: {v}"
+    );
+    let v = macro_call("signature", Some("ISERR"), vec![], None);
+    assert_eq!(v["signature"], "(x)", "{v}");
+}
+
+#[test]
+#[ignore = "needs live IRIS"]
+fn an_unknown_macro_is_an_error_not_an_empty_success() {
+    let v = macro_call("definition", Some("NoSuchMacroIad130"), vec![], None);
+    assert_eq!(v["success"], false, "{v}");
+    assert_eq!(v["error_code"], "MACRO_NOT_FOUND", "{v}");
+    assert!(
+        v["error"].as_str().unwrap_or("").contains("include files"),
+        "{v}"
+    );
+}
+
+#[test]
+#[ignore = "needs live IRIS"]
+fn named_includes_that_lack_the_macro_do_not_fall_back() {
+    let v = macro_call(
+        "definition",
+        Some("eProductionStateRunning"),
+        vec![],
+        Some(vec!["%occStatus".into()]),
+    );
+    assert_eq!(v["error_code"], "MACRO_NOT_FOUND", "{v}");
+    assert!(
+        v["error"].as_str().unwrap_or("").contains("%occStatus"),
+        "{v}"
+    );
+}
+
+#[test]
+#[ignore = "needs live IRIS"]
+fn macro_list_names_include_files_and_their_macros() {
+    let v = macro_call("list", None, vec![], None);
+    assert_eq!(v["success"], true, "{v}");
+    let names: Vec<&str> = v["macros"]
+        .as_array()
+        .map(|a| a.iter().filter_map(|m| m.as_str()).collect())
+        .unwrap_or_default();
+    assert!(names.contains(&"EnsConstants"), "{v}");
+
+    let v = macro_call("list", None, vec![], Some(vec!["EnsConstants".into()]));
+    let names: Vec<&str> = v["macros"]
+        .as_array()
+        .map(|a| a.iter().filter_map(|m| m.as_str()).collect())
+        .unwrap_or_default();
+    assert!(names.contains(&"eProductionStateRunning"), "{v}");
 }
 
 // ── Test N: handle_iris_table_info INFORMATION_SCHEMA.TABLES ─────────────────
@@ -14823,10 +14934,13 @@ async fn test_iris_macro_list_success_via_wiremock() {
     let server = MockServer::start().await;
 
     Mock::given(method("GET"))
-        .and(path_regex("/docnames/INC"))
+        .and(path_regex("/docnames/RTN/INC"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "status": {"errors": [], "summary": ""},
-            "result": {"content": ["%occSystemInclude.inc", "Ensemble.inc"]}
+            "result": {"content": [
+                {"name": "%occSystemInclude.inc", "cat": "RTN"},
+                {"name": "Ensemble.inc", "cat": "RTN"}
+            ]}
         })))
         .mount(&server)
         .await;

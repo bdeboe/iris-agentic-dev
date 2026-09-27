@@ -6632,7 +6632,7 @@ Methods:
     }
 
     #[tool(
-        description = "Inspect IRIS macros. action=list returns all macros, action=signature returns parameters, action=location finds definition file/line, action=definition returns text, action=expand expands with arguments. `server` (optional): name of a registered IRIS instance. If omitted, uses the default connection. Use `iris_servers` to list available instances.",
+        description = "Inspect IRIS macros. action=list returns the include files, or with `includes` the macros they define; action=signature returns parameters, action=location finds definition file/line, action=definition returns text, action=expand expands with arguments. `includes` (optional) names the include files to look in, e.g. [\"EnsConstants\"]; if omitted, the include that defines the macro is found for you. `server` (optional): name of a registered IRIS instance. If omitted, uses the default connection. Use `iris_servers` to list available instances.",
         output_schema = output_schemas::oneof_output_schema::<IrisMacroResponse>(),
         annotations(read_only_hint = true)
     )]

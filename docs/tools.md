@@ -774,14 +774,23 @@ Inspect `$$$` macros: list, signature, location, definition, expand.
 | Parameter   | Type     | Default  | Notes                                                                                   |
 | ----------- | -------- | -------- | --------------------------------------------------------------------------------------- |
 | `action`    | string   | —        | **Required.** `"list"` \| `"signature"` \| `"location"` \| `"definition"` \| `"expand"` |
-| `name`      | string   | —        | Macro name                                                                              |
+| `name`      | string   | —        | Macro name, with or without `$$$`. Required for every action but `list`                 |
 | `args`      | string[] | `[]`     | Arguments for `expand`                                                                  |
+| `includes`  | string[] | —        | Include files to look in, e.g. `["EnsConstants"]`. See below                            |
 | `namespace` | string   | `"USER"` |                                                                                         |
+
+System macros such as `$$$OK` resolve without an include. Other macros need the include that defines them. If you leave `includes` out, iad searches every include file in the namespace and answers from the one that defines the macro. The answer names that file in `document` and `line`. If you pass `includes`, iad looks only there.
+
+A macro that no include defines returns `MACRO_NOT_FOUND`. It does not come back as a success with an empty result.
+
+`action="list"` with no `includes` lists the namespace's include files. With `includes`, it lists the macros those files define themselves; a trailing `(` marks a macro that takes arguments.
 
 ```text
 iris_macro(action="list")
-iris_macro(action="signature", name="ThrowOnError")
-iris_macro(action="expand", name="ThrowOnError", args=["sc"])
+iris_macro(action="list", includes=["EnsConstants"])
+iris_macro(action="expand", name="eProductionStateRunning")      # → expansion ["1"], document EnsConstants.inc
+iris_macro(action="signature", name="ISERR")                     # → signature "(x)"
+iris_macro(action="expand", name="ISERR", args=["sc"])
 ```
 
 ---
