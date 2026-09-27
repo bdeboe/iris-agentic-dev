@@ -266,11 +266,21 @@ def _reached_idle(events: list[dict]) -> bool:
     `opencode_runner.run_opencode` stops reading on exactly this event, and kills the process tree
     on a 300 s timer otherwise. So its presence is the one signal that separates a session that
     ended from a session that was killed — both come back as the same list of events.
+
+    `opencode run --format json` (1.14.17) never emits `session.status`. What it does emit at a
+    natural end is a last `step_finish` with `part.reason == "stop"`; a killed session ends on
+    "tool-calls" or mid-step. Either signal counts.
     """
-    return any(
+    if any(
         event.get("type") == "session.status"
         and event.get("properties", {}).get("status", {}).get("type") == "idle"
         for event in events
+    ):
+        return True
+    steps = [e for e in events if e.get("type") in ("step_start", "step_finish")]
+    return bool(steps) and (
+        steps[-1].get("type") == "step_finish"
+        and steps[-1].get("part", {}).get("reason") == "stop"
     )
 
 

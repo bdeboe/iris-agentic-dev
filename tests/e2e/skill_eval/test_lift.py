@@ -269,6 +269,65 @@ def test_an_empty_event_stream_is_a_gap():
     assert session_evidence_gap([]) is not None
 
 
+# 130 round 3. `opencode run --format json` (1.14.17) never emits `session.status`. The stream is
+# `step_start` / `text` / `tool_use` / `step_finish`, and a session that ended on its own closes with
+# a `step_finish` whose `part.reason` is "stop". A killed one closes on "tool-calls" or mid-step. The
+# test above builds an idle event by hand, so it passed while no real session ever reached "idle":
+# every baseline session that answered in text, or whose tool calls all failed, went unscored. The
+# skill arm always completes its `skill` call, so it never did — 11 of 18 iris-ai-hub baseline items
+# unscored, 0 of 18 skill items. The shapes below are from a captured AI-HUB-WORKFLOW-SUSPEND session.
+
+
+def _step(reason):
+    return [
+        {"type": "step_start", "part": {"type": "step-start"}},
+        {"type": "step_finish", "part": {"type": "step-finish", "reason": reason}},
+    ]
+
+
+def _failed_call(tool):
+    return {
+        "type": "tool_use",
+        "part": {"tool": tool, "state": {"status": "error", "input": {}}},
+    }
+
+
+def test_a_session_that_stopped_on_its_own_reached_idle():
+    from tests.e2e.skill_eval.lift import _reached_idle
+
+    assert _reached_idle(_step("tool-calls") + _step("stop"))
+
+
+def test_a_text_only_answer_that_stopped_is_scored():
+    from tests.e2e.skill_eval.lift import session_evidence_gap
+
+    events = (
+        [_failed_call("glob"), _failed_call("write")]
+        + _step("tool-calls")
+        + make_events(text="Here is the class you need: ...")
+        + _step("stop")
+    )
+    assert session_evidence_gap(events) is None
+
+
+def test_a_session_cut_after_a_tool_step_did_not_reach_idle():
+    from tests.e2e.skill_eval.lift import _reached_idle, session_evidence_gap
+
+    events = _step("tool-calls") + [
+        {"type": "step_start", "part": {"type": "step-start"}}
+    ]
+    assert not _reached_idle(events)
+    assert not _reached_idle(_step("tool-calls"))
+    assert session_evidence_gap(events) is not None
+
+
+def test_an_earlier_stop_does_not_count_when_the_stream_goes_on():
+    from tests.e2e.skill_eval.lift import _reached_idle
+
+    events = _step("stop") + [{"type": "step_start", "part": {"type": "step-start"}}]
+    assert not _reached_idle(events)
+
+
 def test_a_killed_session_that_did_real_work_is_still_scored():
     """Conservative on purpose — a truncated session with tool calls has evidence in it."""
     from tests.e2e.skill_eval.lift import session_evidence_gap
