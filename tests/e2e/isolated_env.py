@@ -101,6 +101,9 @@ class IsolatedEnv:
                 }
             },
             "skills": {"paths": [self.skills_dir]},
+            # `--dangerously-skip-permissions` approves every ask, so a grep on `/` walks the disk
+            # until the timeout kills the session. Deny is a rule, not an ask, and still holds.
+            "permission": {"external_directory": "deny"},
             # MCP: only present when with_mcp() was called.
             # Global MCP isolation is handled via XDG_CONFIG_HOME override in env_vars().
             **({} if not self._mcp_config else {"mcp": self._mcp_config}),

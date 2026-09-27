@@ -44,9 +44,9 @@ def test_teardown_on_clean_exit():
     env.__enter__()
     skills_dir = env.skills_dir
     env.__exit__(None, None, None)
-    assert not os.path.isdir(
-        skills_dir
-    ), "Should be torn down on clean exit even with keep_on_failure"
+    assert not os.path.isdir(skills_dir), (
+        "Should be torn down on clean exit even with keep_on_failure"
+    )
 
 
 def test_config_content_has_options_apikey():
@@ -54,9 +54,9 @@ def test_config_content_has_options_apikey():
         cfg = json.loads(env.config_content)
         # Must use options.apiKey, not direct apiKey (I1 fix)
         assert cfg["provider"]["openai"]["options"]["apiKey"] == "sk-test-key"
-        assert (
-            "apiKey" not in cfg["provider"]["openai"]
-        ), "apiKey must be nested under options"
+        assert "apiKey" not in cfg["provider"]["openai"], (
+            "apiKey must be nested under options"
+        )
 
 
 def test_config_content_has_skills_path():
@@ -169,6 +169,20 @@ def test_env_vars_dict():
             "XDG_DATA_HOME" not in ev
         )  # intentionally NOT overridden — see isolated_env.py
         assert os.path.isdir(env.xdg_config)
+
+
+def test_config_content_denies_external_directories():
+    """A session may not reach outside its own working directory — 130 round 3.
+
+    gpt-4.1 baseline sessions opened with opencode's `grep` on path `/`. `--dangerously-skip-permissions`
+    approves the `external_directory` ask, the grep walks the whole disk, and the 300 s timeout kills
+    the session with no completed tool call, so the item goes unscored. Four skills went over the
+    unscored limit that way. The same walk can read the repo's SKILL.md files, so a baseline arm could
+    read the skill it is measured without.
+    """
+    with IsolatedEnv(openai_api_key="sk-test") as env:
+        cfg = json.loads(env.config_content)
+        assert cfg["permission"]["external_directory"] == "deny"
 
 
 def test_env_vars_turn_off_claude_code_compat():
@@ -352,6 +366,6 @@ def test_isolated_env_offers_only_installed_skills():
     )
     assert "iris-query-plans" in text, text[:500]
     for personal in ("grill-me", "grilling", "handoff", "eli5", "archify"):
-        assert (
-            personal not in text
-        ), f"{personal} leaked into the session:\n{text[:800]}"
+        assert personal not in text, (
+            f"{personal} leaked into the session:\n{text[:800]}"
+        )
