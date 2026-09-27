@@ -46,3 +46,5 @@ Tests come first in every phase.
 - [x] T024 `resume --merge` keys on the repeat; `ladder --start-repeat`; tests in `test_resume.py`, `test_ladder.py`
 - [x] T025 Billable: ladder `--skill all --repeats 3` over SKILL-01 to SKILL-19, resumed after the host slept; merge to `ladder-r3-merged.json`; `needs_fix` flags SKILL-13 and SKILL-09
 - [ ] T026 Billable: skill-eval `--update-baseline` on the clean harness; research.md round 3; CLAUDE.md entry; markdown lint; local commit
+- [x] T027 SKILL-13 fix in `iris-query-plans` (the `%NOINDEX` loader calls `%BuildIndices`), unit + live test; SKILL-13 to train, SKILL-20 on the holdout, validated live; billable ladder `--task SKILL-20 --repeats 3`
+- [x] T028 Tests first in `test_isolated_env.py`: isolated sessions deny `external_directory`, so a baseline grep on `/` no longer runs into the 300 s clock

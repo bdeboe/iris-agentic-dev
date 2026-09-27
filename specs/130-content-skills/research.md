@@ -293,6 +293,30 @@ The skill arm failed 2 of 3 and tools passed 2 of 3, so `needs_fix` flags `objec
 
 The laptop went into clamshell sleep at 00:00:53 on 2026-09-27. After the 00:17 wake, OrbStack and the IRIS web port stopped answering, so the next tasks failed validation before their sessions started: `iad exec` fell back to docker-exec mode and refused block syntax (SKILL-17 tools), and writes failed `SCM_PROBE_FAILED` (SKILL-17 skill, SKILL-18 tools). Three unscored in a row stopped the run at 00:41 with exit 3, as designed. None of the three started a session, so none cost anything. The host stayed asleep until 09:34. The later runs held `caffeinate -s` on the ladder's pid.
 
+### The SKILL-13 fix, and SKILL-20 (T027)
+
+Commit `e2224f8` changes the `INSERT %NOINDEX` section of `iris-query-plans`. It now says the method doing the `%NOINDEX` insert has to call `%BuildIndices` when its inserts are done, and that a rebuild by hand lasts only until the next load. The unit test `query_plans_puts_the_rebuild_in_the_loader` guards the line. The live test `a_rebuild_by_hand_lasts_until_the_next_noindex_load` runs the sequence on IRIS: load 0, build by hand 10, reload 0, and a loader that builds gives 10 twice.
+
+The live test reads the index global (`^IadLive130.SalesI("RegionIdx"," R1",id)`), not a `COUNT(*)`. Once a build has left statistics behind, the planner can choose the master map. Then `COUNT(*)` and a row fetch both report 10 over an empty index. A count test would pass on a broken loader. The SKILL-20 check reads the global for the same reason.
+
+I wrote the fix while reading SKILL-13's transcripts, so SKILL-13 is fitted to it. It moves to train in `split.toml`. SKILL-20 takes its holdout slot for the same skill with a fresh fixture: `Bench.Plan2.Feed.Append` adds rows with `INSERT %NOINDEX`, and the check calls it three times and counts the `RegionIdx` entries per region. `TUNED_SKILL_TASKS` in `test_split.py` records the swap. SKILL-20 validated live on iris-dev-iris: the check fails on the fixture and passes on the reference solution, twice.
+
+Ladder on SKILL-20 alone, 3 repeats (`ladder-20260927T153202.runs.jsonl`): tools passes 3 of 3 and tools+`iris-query-plans` passes 3 of 3, with the skill loaded in all three. b=0, c=0, so on pass/fail there is no effect, and one pair can never reach `helps`. The difference shows in the work each arm did. The skill arm used 6, 8 and 8 tool calls in 20 to 26 s. The tools arm used 18, 25 and 34 calls in 47 to 82 s. After the fix the skill arm puts the build in the loader first time, which SKILL-13's skill arm never did. This is one task, so I read it as the fix working, not as a lift claim. Cost about $0.51.
+
+### The 14:48 re-baseline was invalid: baseline sessions grepped the whole disk
+
+The first round-3 skill-eval run (`skill-eval-2026-09-27T155250.json`) came back `run_valid: false`. Four skills went over the 10% unscored limit (`UNSCORED_LIMIT`, `scoring.py:20`): `iris-ai-hub` 7 of 36 unscored, `objectscript-list-patterns` 2 of 6, `objectscript-review` 1 of 6, `objectscript-sql-patterns` 3 of 6. An invalid skill gets no comparison and no baseline write, so the run wrote none.
+
+Every unscored item was on the baseline arm, and every one had the same reason, `session_evidence_gap`: the session never went idle and made no completed tool call. The skill arm had none. I re-ran one baseline item with the event stream and the opencode log kept. The agent's first call was opencode's built-in `grep` with path `/`. opencode asks for `external_directory` on a path outside the working directory, `--dangerously-skip-permissions` approves the ask, and the grep walks the whole disk until the 300 s clock kills the session. The skill arm opens by loading its skill, so it never starts with a blind grep.
+
+The same walk is a contamination risk. A grep over `/` can read this repo's `SKILL.md` files and anything under `~/.claude`, so a baseline session could read the skill it is measured without.
+
+Commit `50a0804` sets `permission.external_directory = "deny"` in the isolated opencode config. A deny is a rule, not an ask, so skip-permissions leaves it in place. The same probe now gets a grep error in 9 s and the session carries on. opencode's own tool-output directory stays allowed.
+
+Separately, three probe sessions in a row at 15:11, 15:19 and 15:21 produced no events at all. Their opencode logs stop after the server-proxy start line. The next probes ran normally. I have not found the cause and I am not fixing it here; a session like that is unscored by the same evidence-gap rule.
+
+That run's scored figures do not stand: its baseline arm is the arm that changed. For the record, `objectscript-guardrails` had no lift line because it was withdrawn as `too_easy` (skill arm at the ceiling, 0.20 against an MDE of 0.4334), not because it failed.
+
 ### Round 3 spend
 
 About $9.70 for the ladder: 114 sessions at about $0.085 each (32 + 6 + 76 across the three files; the r1–r2 run's 76 cost $6.46). The skill-eval re-baseline is below.
