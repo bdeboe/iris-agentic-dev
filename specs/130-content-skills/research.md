@@ -156,3 +156,69 @@ The ladder keeps no transcripts, so I cannot tell from these records whether the
 | candidate | 0.519 [0.389, 0.646]  | 0.608 (n=51)    | 1.000 (n=8)         |
 
 Verdict HOLD. The recall interval's lower bound is 0, the false-hint rate went up, and there is no ladder run. The budget ran out after the base valset (40 items) and the holdout scoring, so gepa made no proposals and the candidate is the seed. The two rows score the same descriptions, so their difference (+0.019, one item) is scorer noise, and the gate held on it as it should. A run that proposes anything needs about $3 on its own.
+
+## Round 2: triage re-run (2026-09-26, T017)
+
+`--skill all --task SKILL-13 --task SKILL-14 --task SKILL-16 --repeats 3`, 18 sessions, about $1.53. Records are in `tests/e2e/results/ladder-20260926T210712.runs.jsonl`, and transcripts are in the git-ignored `ladder-20260926T210712.transcripts/`.
+
+| Task     | Skill                    | tools (r0 r1 r2) | tools+skill (r0 r1 r2) | Triage |
+| -------- | ------------------------ | ---------------- | ---------------------- | ------ |
+| SKILL-13 | `iris-query-plans`       | P F F            | P P P                  | keep   |
+| SKILL-14 | `objectscript-unit-test` | P P P            | F P P                  | keep   |
+| SKILL-16 | `ensemble-production`    | F P P            | F P F                  | fix    |
+
+Pooled across the three tasks: b=1, c=1, lift 0.0, n=3, underpowered. The round-1 losses on SKILL-13 and SKILL-14 did not come back. SKILL-13 went the other way, with the skill arm passing 3 of 3 and tools passing 1 of 3.
+
+### No skill-arm session loaded its skill
+
+None of the 9 skill-arm sessions called the `skill` tool, so none of them read a skill body. Both SKILL-16 failures came from the agent's own reasoning:
+
+- r0 wrote `If (prodName = pName) && (state = 2) { Quit OK }`.
+- r2 wrote the comment `$$$eProductionStateRunning = 2` and then tested `state = 2`.
+- Both read the `%Status` error return of `iris_execute_method` (`"0 \u0000\u0003"`) as success.
+
+`GetProductionStatus` returns 1 for running and 2 for stopped, and the skill's state table says the same. The skill text could not have misled a session that never read it.
+
+### The harness leaked the operator's Claude Code setup into every session
+
+A one-session probe asked the agent to list its skills. It named about 60 skills from `~/.claude/skills`, the operator's personal set. opencode 1.14.17 reads three Claude Code locations unless it is told not to:
+
+- `~/.claude/CLAUDE.md`, as instructions;
+- `~/.claude/skills`;
+- `~/.agents/skills`.
+
+`XDG_CONFIG_HOME`, which `IsolatedEnv` sets to block the global opencode config, stops none of them. So every harness session before this fix ran with the operator's global CLAUDE.md in its instructions and about 160 personal skills in its listing. That covers both ladder rounds, the 128 drift re-measure and the skill-eval baselines. The personal set includes a pre-127 copy of `ensemble-production`, so the round-1 and round-2 "tools" arms were never skill-free. A single installed skill in a list of 160 is a likely reason the skill arm never loaded one.
+
+`OPENCODE_DISABLE_CLAUDE_CODE=1` turns off all three. `IsolatedEnv.env_vars()` now sets it. Two tests guard it:
+
+- `test_env_vars_turn_off_claude_code_compat` (unit);
+- `test_isolated_env_offers_only_installed_skills` (billable live). It failed before the fix with `grill-me leaked into the session` and passes after it.
+
+Every skill-arm and tools-arm figure recorded before this fix measured a contaminated session, and I treat them all as void. That includes 130's round-1 ladder and the triage table above.
+
+### SKILL-16 on clean isolation (T017a)
+
+After the fix I re-ran only the flagged task, SKILL-16, at 3 runs per arm: 6 sessions, about $0.51. The record is `tests/e2e/results/ladder-20260926T214358.runs.jsonl`.
+
+| Task     | Skill                 | tools (r0 r1 r2) | tools+skill (r0 r1 r2) | Triage |
+| -------- | --------------------- | ---------------- | ---------------------- | ------ |
+| SKILL-16 | `ensemble-production` | F F F            | P F P                  | keep   |
+
+Nothing is flagged, so T018 and T019 do not run. No skill text changes, SKILL-16 stays on the holdout, and there is no SKILL-20. `ensemble-production` keeps "no lift claim": one task at n=3 cannot carry one.
+
+The skill arm still made 0 `skill` calls in 3 sessions, now with one skill listed instead of 160. gpt-4.1 does not load a skill for this task on its own. So on this harness the skill arm measures the one listing line, and a skill body cannot help or hurt until something makes the agent load it.
+
+"State 2 = running" turned up in both arms: tools r1 and r2, and skill r1. It is not from skill text. Every lookup the agents tried came back empty:
+
+- `iris_macro(action="definition", name="eProductionStateRunning")` answered `result: {}` in BENCHMARK and `result: null` in ENSLIB (drafts #3).
+- `iris_macro(action="list")` answered "No include files found in this namespace".
+- `iris_search(category="INC", query="eProductionStateRunning")` found 0 hits, in BENCHMARK and in %SYS.
+- webfetch of the Documatic class page got the "JavaScript is disabled" shell.
+
+With nothing to read, the agent guessed, and guessed 2. The fix that would move SKILL-16 is in iad's `iris_macro`, not in the skill.
+
+The tools arm fell from 2 of 3 under contamination to 0 of 3 clean. One clean run (r0) announced its next step after one call and stopped. The operator's CLAUDE.md, which says to execute every step to completion, may have kept earlier sessions going. n=3 cannot separate that from noise.
+
+### Round 2 spend
+
+About $2.07 of the $3 cap: $1.53 for the 18-session re-run, $0.51 for the clean SKILL-16 re-run, and about $0.03 for the probe and the live isolation tests.

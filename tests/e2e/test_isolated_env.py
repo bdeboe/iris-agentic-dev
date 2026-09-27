@@ -171,6 +171,18 @@ def test_env_vars_dict():
         assert os.path.isdir(env.xdg_config)
 
 
+def test_env_vars_turn_off_claude_code_compat():
+    """opencode reads `~/.claude/CLAUDE.md`, `~/.claude/skills` and `~/.agents/skills` unless told not to.
+
+    `XDG_CONFIG_HOME` blocks none of them. Until 130 round 2 every harness session, both arms, ran
+    with the operator's global CLAUDE.md as instructions and ~160 personal skills in the listing,
+    one of them a personal copy of `ensemble-production`. `OPENCODE_DISABLE_CLAUDE_CODE` turns off
+    the prompt, the Claude skill dirs and the external skill dirs together (opencode 1.14.17).
+    """
+    with IsolatedEnv(openai_api_key="sk-test") as env:
+        assert env.env_vars()["OPENCODE_DISABLE_CLAUDE_CODE"] == "1"
+
+
 # ---------------------------------------------------------------------------
 # 118 T007 — the assertion whose absence let six skills run toolless for a month
 # ---------------------------------------------------------------------------
@@ -303,3 +315,43 @@ def test_isolated_env_has_tools():
         "the session called no iad tool, so it had none — every score from a session in "
         "this state measures the harness, not the skill"
     )
+
+
+@pytest.mark.skipif(
+    os.environ.get("IAD_EVAL_LIVE_AGENT") != "1",
+    reason=(
+        "needs a real opencode session and an OpenAI key — set IAD_EVAL_LIVE_AGENT=1 to run. "
+        "Skipped, NOT passed: nothing here has verified what skills a session is offered."
+    ),
+)
+@pytest.mark.billable  # spawns a real agent session
+def test_isolated_env_offers_only_installed_skills():
+    """The session's skill listing holds the installed skill and none of the operator's own.
+
+    The 130 round-2 probe asked a session to list its skills and got ~60 names from
+    `~/.claude/skills`. A tools arm that can load a personal skill is not a tools arm.
+    """
+    from tests.e2e.opencode_runner import collect_events
+    from tests.e2e.skill_eval import fire_rate
+
+    key = os.environ.get("OPENAI_API_KEY", "")
+    assert key, "IAD_EVAL_LIVE_AGENT=1 needs OPENAI_API_KEY"
+
+    with IsolatedEnv(openai_api_key=key) as env:
+        fire_rate._install_skill_local("iris-query-plans", env.skills_dir)
+        events = collect_events(
+            "List, one per line, the name of every skill your skill tool can load. "
+            "Print only the names. Load none of them.",
+            env.env_vars(),
+            model=os.environ.get("IAD_EVAL_MODEL", "openai/gpt-4.1"),
+            timeout=180,
+            working_dir=env.skills_dir,
+        )
+    text = "\n".join(
+        e.get("part", {}).get("text", "") for e in events if e.get("type") == "text"
+    )
+    assert "iris-query-plans" in text, text[:500]
+    for personal in ("grill-me", "grilling", "handoff", "eli5", "archify"):
+        assert (
+            personal not in text
+        ), f"{personal} leaked into the session:\n{text[:800]}"

@@ -114,4 +114,7 @@ class IsolatedEnv:
             # XDG_CONFIG_HOME blocks ~/.config/opencode/config.json (global MCP servers).
             # XDG_DATA_HOME intentionally not overridden — opencode hangs with empty data dir.
             "XDG_CONFIG_HOME": self.xdg_config,
+            # XDG_CONFIG_HOME does not stop opencode reading ~/.claude/CLAUDE.md as instructions
+            # or listing ~/.claude/skills and ~/.agents/skills. This one flag turns off all three.
+            "OPENCODE_DISABLE_CLAUDE_CODE": "1",
         }
