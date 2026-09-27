@@ -307,6 +307,38 @@ def unscored_session(task_id: str, condition: str, reason: str) -> dict:
     return {**unscored(reason), "task_id": task_id, "condition": condition}
 
 
+def session_prompt(description: str, skill_name_or_none) -> str:
+    """The prompt a skill-eval session gets: the ladder's two lines, then the task.
+
+    130 round 3. The autonomy line goes in front of every session; a with-skill session also asks
+    for its skill, because installed-but-unrequested skills were not being opened.
+    """
+    from tests.e2e.skill_eval.pilot import AUTONOMY_PREAMBLE, preload_preamble
+
+    preload = preload_preamble((skill_name_or_none,)) if skill_name_or_none else ""
+    return AUTONOMY_PREAMBLE + preload + description
+
+
+def unloaded_skill_verdict(
+    task_id: str, skill_name_or_none, events: list
+) -> dict | None:
+    """Unscored when a with-skill session never loaded its skill; None otherwise.
+
+    Such a session says nothing about the skill, so scoring it under the skill's name would credit
+    or blame text nobody read.
+    """
+    from tests.e2e.skill_eval.pilot import skill_loaded
+
+    if not skill_name_or_none or skill_loaded(events, (skill_name_or_none,)):
+        return None
+    return unscored_session(
+        task_id,
+        skill_name_or_none,
+        f"the with-skill session never loaded {skill_name_or_none}, "
+        "so the run says nothing about the skill",
+    )
+
+
 def _apply_global_fixture(fx: dict, iris_host: str, iris_web_port: str) -> None:
     """Set a global subscript via Atelier execute."""
     import requests
@@ -387,7 +419,7 @@ def run_task_and_score(
         if fx.get("type") == "global":
             _apply_global_fixture(fx, iris_host=iris_host, iris_web_port=iris_web_port)
 
-    prompt = task_dict["description"]
+    prompt = session_prompt(task_dict["description"], skill_name_or_none)
 
     with IsolatedEnv(openai_api_key=openai_api_key) as env:
         # Light-skills scenario: no MCP tools at all, skill knowledge is the only signal
@@ -427,6 +459,11 @@ def run_task_and_score(
         with contextlib.suppress(Exception):
             workdir_obj.cleanup()
         return unscored_session(task_id, skill_name_or_none or "baseline", gap)
+    unloaded = unloaded_skill_verdict(task_id, skill_name_or_none, events)
+    if unloaded:
+        with contextlib.suppress(Exception):
+            workdir_obj.cleanup()
+        return unloaded
 
     # Check for tool_assertions in task — bypasses LLM judge, scores by tool calls
     tool_assertions = task_dict.get("tool_assertions", [])
