@@ -317,6 +317,48 @@ Separately, three probe sessions in a row at 15:11, 15:19 and 15:21 produced no 
 
 That run's scored figures do not stand: its baseline arm is the arm that changed. For the record, `objectscript-guardrails` had no lift line because it was withdrawn as `too_easy` (skill arm at the ceiling, 0.20 against an MDE of 0.4334), not because it failed.
 
+### The 15:47 re-baseline was invalid too: no session ever read as idle
+
+The second run (`skill-eval-2026-09-27T193913.json`, on the `external_directory` deny) came back `run_valid: false` as well: 14 of 84 unscored. Two skills were over the limit, `iris-ai-hub` with 11 of 36 and `iris-vector-ai` with 2 of 12, so again no baseline was written. The other seven do not get written either, because an invalid run writes nothing. All 14 unscored items were on the baseline arm. The results file gives only counts and holes per skill, no per-item reason, so I re-ran one baseline item, AI-HUB-WORKFLOW-SUSPEND (3 of 3 unscored), with its events kept.
+
+The deny works: the agent's globs on `/` failed at once, it tried to write `/EHR/Workflow/PatientUnwellProcessBPL.cls`, that failed too, and it gave the class as text. The session ended on its own in 32 s, and `session_evidence_gap` still called it "never reached idle". `_reached_idle` looks for a `session.status` event with `type: idle`. `opencode run --format json` (1.14.17) never emits one. Its stream is only `step_start`, `text`, `tool_use` and `step_finish`, and a session that ends on its own closes with a `step_finish` whose `reason` is `stop`. The unit test for the rule built the idle event by hand, so it passed while no real session had ever reached idle.
+
+So the rule has, since 121 T021, unscored every session with no completed tool call, whether it was killed or answered in text. The skill arm always completes its `skill` call, so it is never caught; the baseline arm is, whenever its tool calls all fail or it answers from memory. Those sessions mostly fail, so dropping them made the baseline look better than it is, and lift figures since 121 T021 are biased down by an unknown amount. Before the deny, the grep on `/` hid this: those sessions really were killed.
+
+Commit `d05fb33` counts a last `step_finish` with `reason: stop` as the end, and keeps the `session.status` check in case a later opencode sends it. A session cut after a tool step, or one that starts a new step after a `stop`, is still a gap. The four new unit tests use the event shapes from the captured session. The ladder is not affected: `pilot.py` infers a timeout from the clock, not from an idle event.
+
+Scored figures from this run, for the record only (the baseline arm is the arm the fix changes):
+
+| Skill                      | Scored | Lift  | Pairs | Note                                |
+| -------------------------- | ------ | ----- | ----- | ----------------------------------- |
+| ensemble-production        | 11/12  | +0.40 | 5     | underpowered                        |
+| iris-ai-hub                | 25/36  | +0.14 | 7     | invalid, 11 baseline items unscored |
+| iris-connectivity          | 6/6    | 0.00  | 3     | underpowered                        |
+| iris-vector-ai             | 10/12  | +0.75 | 4     | invalid, 2 baseline items unscored  |
+| objectscript-list-patterns | 6/6    | −0.33 | 3     | underpowered                        |
+| objectscript-review        | 6/6    | +0.33 | 3     | underpowered                        |
+| objectscript-sql-patterns  | 6/6    | 0.00  | 3     | underpowered                        |
+
+`objectscript-guardrails` and `objectscript-unit-test` are withdrawn (`too_easy`, `broken_check`) and give no lift line, as in the first run. Cost about $2.90 for sessions and $0.38 for the scorer.
+
+### Skill-eval re-baseline, valid
+
+The third run (`skill-eval-2026-09-27T204612.json`, on both fixes) is valid: 0 of 84 unscored, and it wrote the baseline. Nine skills ran; seven give a lift line.
+
+| Skill                      | Mode    | Scored | Base → skill | Lift  | Pairs | Outcome      |
+| -------------------------- | ------- | ------ | ------------ | ----- | ----- | ------------ |
+| iris-vector-ai             | pattern | 12/12  | 0.17 → 0.67  | +0.50 | 6     | underpowered |
+| iris-connectivity          | judge   | 6/6    | 0.33 → 0.67  | +0.33 | 3     | underpowered |
+| objectscript-list-patterns | judge   | 6/6    | 0.33 → 0.67  | +0.33 | 3     | underpowered |
+| ensemble-production        | pattern | 12/12  | 0.33 → 0.50  | +0.17 | 6     | underpowered |
+| iris-ai-hub                | pattern | 36/36  | 0.44 → 0.61  | +0.17 | 18    | underpowered |
+| objectscript-review        | judge   | 6/6    | 0.67 → 0.67  | 0.00  | 3     | underpowered |
+| objectscript-sql-patterns  | judge   | 6/6    | 0.00 → 0.00  | 0.00  | 3     | underpowered |
+
+`objectscript-guardrails` is withdrawn as `too_easy` and `objectscript-unit-test` as `broken_check` (GEN-01 and GEN-02 are retired), so neither has a lift line. Every lift is below its MDE, so nothing here is a lift claim: at 3 to 18 pairs per skill the run cannot tell +0.17 from zero. No skill regressed. Sessions cost $2.90 and the scorer $0.32.
+
+Against the committed baseline (re-baselined 2026-09-12 from run 34707534110), `iris-vector-ai` goes from +0.20 to +0.50 and `objectscript-review` from +0.20 to 0.00. `ensemble-production` (−0.10 before), `iris-ai-hub` (−0.10), `iris-connectivity`, `objectscript-list-patterns` and `objectscript-sql-patterns` (all 0 before) now carry this run's figures and its provenance. The old figures predate both harness fixes: that baseline arm dropped every text-answer session and every session killed by a disk-wide grep, so they are not comparable, and the deltas above are not changes in the skills. The two withdrawn skills keep their old entries.
+
 ### Round 3 spend
 
-About $9.70 for the ladder: 114 sessions at about $0.085 each (32 + 6 + 76 across the three files; the r1–r2 run's 76 cost $6.46). The skill-eval re-baseline is below.
+About $9.70 for the ladder: 114 sessions at about $0.085 each (32 + 6 + 76 across the three files; the r1–r2 run's 76 cost $6.46). The skill-eval took three runs: $2.90 for the invalid 14:48 run, $3.28 for the invalid 15:47 run and about $3.22 for the valid one. Diagnostic probes came to about $0.60 and the SKILL-20 ladder to $0.51. Round 3 total: about $20.20, against the $80 cap.
