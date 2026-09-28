@@ -11,6 +11,7 @@ reachable printed the same as one that had been measured and held.
 import dataclasses
 import json
 import os
+import re
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
@@ -42,6 +43,61 @@ _VERDICT_TEXT = {
 #: rather than printing a bare number the reader would take for a finding.
 _WITHHELD = "—"
 _NO_COMPARISON = "lift withheld: no comparison recorded, so neither the item count nor the MDE is known"
+
+# 130 round 3. A withdrawal verdict is triage vocabulary; the table says what it means. The full
+# evidence stays in `triage_records.py` and the result JSON.
+_WITHDRAWN_TEXT = {
+    "too_easy": "tasks too easy: the agent passes them without the skill",
+    "broken_check": "no working tasks here: the old tasks could not register what the skill does",
+    "too_hard": "tasks too hard: neither arm passes them",
+    "not_helped": "the skill's earlier lift was inside the noise",
+}
+
+_WITHDRAWN = re.compile(r"^withdrawn(?: \((?P<verdict>[a-z_]+)\))?:")
+
+
+def _withdrawn_verdict(reason) -> Optional[str]:
+    """`too_easy` from `withdrawn (too_easy): …`, `""` for a bare `withdrawn:`, else `None`."""
+    match = _WITHDRAWN.match(reason or "")
+    if not match:
+        return None
+    return match.group("verdict") or ""
+
+
+def ladder_coverage(task_dir: Optional[str] = None) -> dict:
+    """skill → the sorted ids of the ladder tasks that name it, read off each task's `skill:` field.
+
+    File reads only, no IRIS. The ladder grades some skills the skill-eval does not, and a report
+    that calls those "no coverage" sends someone to write tasks that already exist.
+    """
+    from tests.e2e.skill_eval import graded_task
+
+    coverage: dict = {}
+    for task in graded_task.load_dir(task_dir or graded_task.SKILL_TASK_DIR):
+        if task.skill:
+            coverage.setdefault(task.skill, []).append(task.id)
+    return {skill: sorted(ids) for skill, ids in coverage.items()}
+
+
+def _task_ranges(ids) -> str:
+    """`SKILL-01–05, SKILL-17` for SKILL-01 … SKILL-05 and SKILL-17."""
+    groups: list = []
+    for task_id in sorted(ids):
+        prefix, _, number = task_id.rpartition("-")
+        if (
+            groups
+            and number.isdigit()
+            and groups[-1][0] == prefix
+            and int(number) == int(groups[-1][2]) + 1
+            and len(number) == len(groups[-1][2])
+        ):
+            groups[-1][2] = number
+        else:
+            groups.append([prefix, number, number])
+    return ", ".join(
+        f"{prefix}-{first}" if first == last else f"{prefix}-{first}–{last}"
+        for prefix, first, last in groups
+    )
 
 
 @dataclasses.dataclass
@@ -122,19 +178,69 @@ def _lift_cells(result: "SkillResult") -> tuple:
 def _outcome_cell(result: "SkillResult") -> str:
     """The outcome against the stored entry, qualified by what this run's arms can support.
 
-    `underpowered` replaces the outcome rather than annotating it. `held` on eight task-pairs is
+    Underpowered replaces the outcome rather than annotating it. `held` on eight task-pairs is
     the reading that failed three consecutive nightly runs, and printing both words would leave
-    the wrong one first.
+    the wrong one first. It prints as the pairs it had against the pairs it needed, so the verdict
+    is checkable from the row.
     """
+    comparison = _comparison(result)
+    if result.lift is not None:
+        base, skill = result.pass_rate_baseline, result.pass_rate_skill
+        if base == skill == 0:
+            return "both arms fail every task"
+        if base == skill == 1:
+            return "both arms pass every task"
+    if (
+        result.lift is None
+        and _withdrawn_verdict(getattr(result, "outcome_reason", None)) is not None
+    ):
+        return "not run here"
     outcome = _OUTCOME_TEXT.get(
         getattr(result, "outcome", ""), getattr(result, "outcome", "—")
     )
-    verdict = _comparison(result).get("verdict")
+    verdict = comparison.get("verdict")
     if verdict == "underpowered" or outcome == "underpowered":
-        return "underpowered"
+        n_pairs, floor = comparison.get("n_pairs"), comparison.get("floor")
+        if n_pairs is not None and floor:
+            return f"too few runs to tell ({n_pairs} of {floor} pairs needed)"
+        return "too few runs to tell"
+    if _withdrawn_verdict(getattr(result, "outcome_reason", None)) is not None:
+        return "first measurement"
     if verdict in _VERDICT_TEXT:
         return f"{outcome} ({_VERDICT_TEXT[verdict]})"
     return outcome
+
+
+def _row_notes(result: "SkillResult", withheld, ladder: dict, shared_surface) -> list:
+    """The lines under a row, each said once and in words."""
+    reason = getattr(result, "outcome_reason", None)
+    withdrawn = _withdrawn_verdict(reason)
+    underpowered = bool(_comparison(result).get("underpowered")) or (
+        getattr(result, "outcome", None) == "underpowered"
+    )
+    notes = [withheld]
+    if withdrawn is not None and result.lift is None:
+        # The skill-eval did not run it. Say why, and where it is graded instead.
+        notes.append(_WITHDRAWN_TEXT.get(withdrawn, "its task set was withdrawn"))
+        tasks = ladder.get(result.skill)
+        notes.append(
+            f"graded by the ladder: {_task_ranges(tasks)}"
+            if tasks
+            else "not graded by the ladder either"
+        )
+    elif withdrawn is not None:
+        # About the stored entry, not this measurement: it is why there is no Δ.
+        notes.append(
+            "first figure that stands: the old baseline figure was withdrawn, so there is no Δ"
+        )
+    elif reason and not underpowered:
+        # The underpowered reason restates the verdict cell.
+        notes.append(reason)
+    surface = getattr(result, "surface_note", None)
+    if surface != shared_surface:
+        notes.append(surface)
+    notes.append(getattr(result, "driver_note", None))
+    return [note for note in notes if note]
 
 
 def progress_line(skill: str, lift_data: dict) -> str:
@@ -168,22 +274,43 @@ def progress_line(skill: str, lift_data: dict) -> str:
     )
 
 
-def print_summary(run: EvalRun) -> None:
-    """Print the table and footer of contracts/eval-run.md to stdout."""
-    header = f"\nSkill Evaluation Results — {run.timestamp}"
+def print_summary(run: EvalRun, ladder_tasks: Optional[dict] = None) -> None:
+    """Print the table and footer of contracts/eval-run.md to stdout.
+
+    `ladder_tasks` is skill → ladder task ids; `None` reads them off the task files.
+    """
+    ladder = ladder_coverage() if ladder_tasks is None else ladder_tasks
+    scored_all, total_all = _item_counts(run.skills)
+    validity = (
+        f"valid, {total_all - scored_all} of {total_all} items unscored"
+        if run.run_valid
+        else f"NOT valid, {total_all - scored_all} of {total_all} items unscored"
+    )
+    header = f"\nSkill Evaluation Results — {run.timestamp} — {validity}"
     print(header)
     print("=" * len(header.strip()))
+
+    measured = [r for r in run.skills if not r.no_task_coverage]
+    uncovered = sorted(r.skill for r in run.skills if r.no_task_coverage)
+    surfaces = {getattr(r, "surface_note", None) for r in measured}
+    shared_surface = (
+        surfaces.pop() if len(surfaces) == 1 and len(measured) > 1 else None
+    )
+    if shared_surface:
+        print(f"{shared_surface}, for every skill below")
+
+    width = max([len("skill")] + [len(r.skill) for r in measured]) + 1
     print(
-        f"{'skill':<31}{'mode':<10}{'scored':<9}{'base':>6}{'skill':>7}"
+        f"{'skill':<{width}}{'mode':<10}{'scored':<9}{'base':>6}{'skill':>7}"
         f"{'lift':>7}{'pairs':>7}{'mde':>6}{'Δ base':>8}  {'outcome'}"
     )
     print(
-        f"{'-' * 30} {'-' * 9} {'-' * 8} {'-' * 5} {'-' * 6} {'-' * 6} {'-' * 6} "
+        f"{'-' * (width - 1)} {'-' * 9} {'-' * 8} {'-' * 5} {'-' * 6} {'-' * 6} {'-' * 6} "
         f"{'-' * 5} {'-' * 7} {'-' * 20}"
     )
 
     for r in sorted(
-        run.skills, key=lambda x: x.lift if x.lift is not None else -9, reverse=True
+        measured, key=lambda x: x.lift if x.lift is not None else -9, reverse=True
     ):
         base_arm, skill_arm = _arm(r, "baseline"), _arm(r, "skill")
         scored = (base_arm.get("items_scored") or 0) + (
@@ -191,33 +318,29 @@ def print_summary(run: EvalRun) -> None:
         )
         total = (base_arm.get("items_total") or 0) + (skill_arm.get("items_total") or 0)
         mode = (getattr(r, "provenance", None) or {}).get("scoring_mode") or "—"
-        outcome = _outcome_cell(r)
-        if r.no_task_coverage:
-            mode, outcome = "—", "no coverage"
         lift, pairs, mde, withheld = _lift_cells(r)
         print(
-            f"{r.skill:<31}{mode:<10}{f'{scored}/{total}' if total else '—':<9}"
+            f"{r.skill:<{width}}{mode:<10}{f'{scored}/{total}' if total else '—':<9}"
             f"{_fmt_rate(r.pass_rate_baseline):>6}{_fmt_rate(r.pass_rate_skill):>7}"
-            f"{lift:>7}{pairs:>7}{mde:>6}{_fmt_signed(r.lift_delta):>8}  {outcome}"
+            f"{lift:>7}{pairs:>7}{mde:>6}{_fmt_signed(r.lift_delta):>8}  {_outcome_cell(r)}"
         )
-        # Why the lift was withheld, why a comparison was refused, and the binary or harness
-        # change that did not refuse it. The floor rides along on an underpowered row so the verdict is checkable
-        # from the report rather than only from the JSON.
-        floor = _comparison(r).get("floor")
-        underpowered = _comparison(r).get("underpowered")
-        for note in (
-            withheld,
-            (
-                f"{_comparison(r).get('n_pairs')} task-pairs against a floor of {floor} (FR-008)"
-                if underpowered and floor
-                else None
-            ),
-            getattr(r, "outcome_reason", None),
-            getattr(r, "surface_note", None),
-            getattr(r, "driver_note", None),
-        ):
-            if note:
-                print(f"{'':<31}↳ {note}")
+        for note in _row_notes(r, withheld, ladder, shared_surface):
+            print(f"{'':<{width}}↳ {note}")
+
+    print()
+    print(
+        "pairs = task runs compared across both arms; mde = the smallest lift that many pairs can "
+        "detect, so a lift below it is not a finding"
+    )
+    on_ladder = [s for s in uncovered if ladder.get(s)]
+    nowhere = [s for s in uncovered if not ladder.get(s)]
+    if on_ladder:
+        print(
+            f"graded only by the ladder ({len(on_ladder)}): "
+            + ", ".join(f"{s} ({', '.join(ladder[s])})" for s in on_ladder)
+        )
+    if nowhere:
+        print(f"not graded anywhere ({len(nowhere)}): {', '.join(nowhere)}")
 
     print()
     scored, total = _item_counts(run.skills)
@@ -255,14 +378,9 @@ def print_summary(run: EvalRun) -> None:
 
     regressions = run.summary.get("regressions", [])
     improvements = run.summary.get("improvements", [])
-    uncovered = run.summary.get("uncovered", [])
     print(f"regressions: {len(regressions)}", end="")
     print(f"  [{', '.join(regressions)}]" if regressions else "")
     print(f"improvements: {len(improvements)}")
-    if uncovered:
-        print(
-            f"no task coverage: {len(uncovered)} skills (add eval.yaml to cover them)"
-        )
 
 
 def write_result(run: EvalRun, output_dir: str) -> str:

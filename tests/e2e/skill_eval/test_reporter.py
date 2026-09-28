@@ -361,12 +361,12 @@ def test_the_reruns_line_prints_only_when_there_was_a_rerun(capsys):
     assert "2026-09-12T034002Z" in out, "the discarded run_id is the point of the line"
 
 
-def test_a_skill_with_no_coverage_still_gets_a_row(capsys):
+def test_a_skill_with_no_coverage_is_still_named(capsys):
+    """It moved from a row of dashes to the footer list, but it is never dropped."""
     run = make_eval_run([make_result("iris-docs", no_coverage=True)])
-    print_summary(run)
+    print_summary(run, ladder_tasks={})
     out = capsys.readouterr().out
-    assert "iris-docs" in out
-    assert "no coverage" in out
+    assert "not graded anywhere (1): iris-docs" in out
 
 
 # ---------------------------------------------------------------------------
@@ -425,10 +425,10 @@ def test_an_underpowered_comparison_prints_as_underpowered_and_never_as_a_pass(c
     )
     print_summary(run)
     row = row_for(capsys.readouterr().out, "iris-connectivity")
-    assert "underpowered" in row
-    assert "held" not in row, (
-        f"underpowered replaces the pass, it does not annotate it: {row!r}"
-    )
+    assert "too few runs to tell" in row
+    assert (
+        "held" not in row
+    ), f"underpowered replaces the pass, it does not annotate it: {row!r}"
 
 
 def test_an_underpowered_row_still_shows_the_pairs_it_had(capsys):
@@ -458,7 +458,7 @@ def test_an_underpowered_regression_is_not_counted_as_a_regression(capsys):
     )
     print_summary(run)
     row = row_for(capsys.readouterr().out, "iris-connectivity")
-    assert "underpowered" in row
+    assert "too few runs to tell" in row
     assert "regress" not in row.lower()
 
 
@@ -574,3 +574,144 @@ def test_the_json_result_carries_the_comparison(tmp_path):
     assert comparison["n_pairs"] == POWERED["n_pairs"]
     assert comparison["mde"] == pytest.approx(POWERED["mde"])
     assert comparison["verdict"] == POWERED["verdict"]
+
+
+# ---------------------------------------------------------------------------
+# 130 round 3 — a report a person can read
+# ---------------------------------------------------------------------------
+#
+# The first valid re-baseline (2026-09-27T204612) printed "withdrawn (broken_check): graded through
+# lift.format_transcript's 500-character cap" under five skills that had just been measured cleanly.
+# The note was about the old baseline entry, which is why there was no Δ, but it sat under a fresh
+# figure and read as a verdict on it. The same table said "FR-008" twice on some rows, printed one
+# tool-surface line nine times, and listed 26 skills as "no coverage" when some are graded by the
+# ladder. The fixture is that run's result file, unedited.
+
+FIXTURE_RUN = os.path.join(
+    os.path.dirname(__file__), "fixtures", "skill-eval-2026-09-27T204612.json"
+)
+
+#: What `ladder_coverage()` read off `tests/e2e/tasks/benchmark/skills` on 2026-09-28.
+LADDER = {
+    "objectscript-guardrails": [
+        "SKILL-01",
+        "SKILL-02",
+        "SKILL-03",
+        "SKILL-04",
+        "SKILL-05",
+        "SKILL-17",
+    ],
+    "objectscript-unit-test": ["SKILL-14"],
+    "iris-query-plans": ["SKILL-13", "SKILL-20"],
+    "objectscript-list-patterns": ["SKILL-06", "SKILL-07", "SKILL-10"],
+}
+
+
+def load_fixture_run() -> EvalRun:
+    with open(FIXTURE_RUN) as f:
+        data = json.load(f)
+    skills = [SkillResult(**entry) for entry in data.pop("skills")]
+    return EvalRun(skills=skills, **data)
+
+
+def fixture_report(capsys, ladder=LADDER) -> str:
+    print_summary(load_fixture_run(), ladder_tasks=ladder)
+    return capsys.readouterr().out
+
+
+def test_the_real_run_prints_no_triage_jargon(capsys):
+    out = fixture_report(capsys)
+    for word in (
+        "FR-008",
+        "broken_check",
+        "too_easy",
+        "not_helped",
+        "mde_paired",
+        "discordant",
+        "harness's own resolution",
+    ):
+        assert word not in out, f"{word!r} is in the report:\n{out}"
+
+
+def test_a_measured_row_does_not_carry_the_old_entrys_withdrawal(capsys):
+    """The five measured rows get one plain line saying why there is no Δ, not the old verdict."""
+    out = fixture_report(capsys)
+    assert "withdrawn (" not in out
+    assert "graded through" not in out
+    assert "first figure that stands: the old baseline figure was withdrawn" in out
+
+
+def test_an_underpowered_row_names_its_pairs_and_floor_once_in_words(capsys):
+    out = fixture_report(capsys)
+    row = row_for(out, "iris-vector-ai")
+    assert "too few runs to tell (6 of 96 pairs needed)" in row, row
+    assert out.count("floor of 96") == 0
+    assert out.count("6 of 96") == 1
+
+
+def test_a_tool_surface_change_shared_by_every_row_prints_once(capsys):
+    out = fixture_report(capsys)
+    assert out.count("1.4.1+fa0b694f8725 → 1.4.2+fa0b694f8725") == 1, out
+
+
+def test_both_arms_at_zero_says_so(capsys):
+    row = row_for(fixture_report(capsys), "objectscript-sql-patterns")
+    assert "both arms fail every task" in row, row
+
+
+def test_a_withdrawn_skill_that_did_not_run_names_its_ladder_tasks(capsys):
+    out = fixture_report(capsys)
+    row = row_for(out, "objectscript-guardrails")
+    assert "not run here" in row, row
+    assert "tasks too easy: the agent passes them without the skill" in out
+    assert "graded by the ladder: SKILL-01–05, SKILL-17" in out
+    assert "graded by the ladder: SKILL-14" in out
+    assert "no working tasks here" in out
+
+
+def test_a_withdrawn_skill_with_no_ladder_task_says_so(capsys):
+    out = fixture_report(capsys, ladder={})
+    assert "not graded by the ladder either" in out
+
+
+def test_uncovered_skills_are_split_by_ladder_coverage(capsys):
+    out = fixture_report(capsys)
+    assert not any(line.startswith("iris-docs") for line in out.splitlines())
+    ladder_line = next(
+        line
+        for line in out.splitlines()
+        if line.startswith("graded only by the ladder")
+    )
+    assert "iris-query-plans (SKILL-13, SKILL-20)" in ladder_line
+    nowhere = next(
+        line for line in out.splitlines() if line.startswith("not graded anywhere")
+    )
+    assert "iris-docs" in nowhere and "iris-query-plans" not in nowhere
+
+
+def test_a_long_skill_name_does_not_run_into_the_next_column(capsys):
+    name = "iris-container-graceful-shutdown-and-more"
+    print_summary(make_eval_run([make_result(name, lift=0.28)]), ladder_tasks={})
+    row = row_for(capsys.readouterr().out, name)
+    assert row.startswith(name + " "), row
+
+
+def test_the_header_says_whether_the_run_is_valid(capsys):
+    out = fixture_report(capsys)
+    header = out.strip().splitlines()[0]
+    assert "valid, 0 of 84 items unscored" in header, header
+
+
+def test_the_report_explains_pairs_and_mde(capsys):
+    out = fixture_report(capsys)
+    assert "pairs = task runs compared across both arms" in out
+    assert "mde = the smallest lift that many pairs can detect" in out
+
+
+def test_ladder_coverage_reads_the_skill_field_of_the_ladder_tasks():
+    from tests.e2e.skill_eval.reporter import ladder_coverage
+
+    coverage = ladder_coverage()
+    assert "SKILL-14" in coverage["objectscript-unit-test"]
+    assert {"SKILL-01", "SKILL-17"} <= set(coverage["objectscript-guardrails"])
+    assert all(ids == sorted(ids) for ids in coverage.values())
