@@ -345,7 +345,7 @@ def test_the_four_floor_skills_are_all_verdicted_broken_check():
     Reference solutions score 3/3/3 through the real judge on every one of these checks, and two of
     the recorded 0.00 items scored a pass on a single live re-run.
     """
-    from tests.e2e.skill_eval.triage_records import RECORDS
+    from tests.e2e.skill_eval.triage_records import ALL_RECORDS as RECORDS
 
     for skill in (
         "iris-connectivity",
@@ -414,14 +414,97 @@ def test_the_real_baseline_file_triages_without_crashing():
     sets = task_sets_from_baseline(baseline)
     assert len(sets) == 9
     saturated = {s.skill: s.saturation for s in sets if s.needs_verdict}
+    # The 2026-09-27 re-baseline, both harness fixes in. Three sets are still saturated: the two
+    # retired ones keep their 2026-09-12 entries, and SQLCODE-SILENT floors again with every item
+    # scored.
     assert set(saturated) == {
-        "iris-connectivity",
-        "objectscript-list-patterns",
         "objectscript-sql-patterns",
         "objectscript-unit-test",
         "objectscript-guardrails",
-        "ensemble-production",
     }
     assert saturated["objectscript-guardrails"] is Saturation.CEILING_CENSORED
-    assert saturated["iris-connectivity"] is Saturation.FLOOR
-    assert saturated["ensemble-production"] is Saturation.FLOOR_CENSORED
+    assert saturated["objectscript-sql-patterns"] is Saturation.FLOOR
+
+
+# --- a verdict a later run has re-measured past — 130 round 3 --------------------------------
+#
+# The verdicts here were reached on the 2026-09-12 baseline. The 2026-09-27 re-baseline ran seven
+# of those skills again with both harness fixes in place and wrote fresh entries with no withdrawn
+# block, which is correct: the withdrawn figure is gone and a figure that stands replaced it. The
+# baseline guard still demanded the withdrawn block, so it failed on the one run that did what the
+# verdicts asked for.
+
+
+def test_an_entry_re_measured_after_the_verdict_supersedes_it():
+    from tests.e2e.skill_eval.triage import verdict_superseded
+
+    entry = {"provenance": {"run_id": "2026-09-27T204612"}}
+    assert verdict_superseded(entry, "2026-09-12T171550")
+
+
+def test_an_entry_from_the_verdicts_own_run_does_not_supersede_it():
+    from tests.e2e.skill_eval.triage import verdict_superseded
+
+    entry = {"provenance": {"run_id": "2026-09-12T171550"}}
+    assert not verdict_superseded(entry, "2026-09-12T171550")
+
+
+def test_an_entry_with_no_provenance_does_not_supersede_a_verdict():
+    """Unknown age is not newer. Schema 1 entries carry no run id."""
+    from tests.e2e.skill_eval.triage import verdict_superseded
+
+    assert not verdict_superseded({}, "2026-09-12T171550")
+    assert not verdict_superseded({"provenance": {}}, "2026-09-12T171550")
+
+
+def test_a_withdrawn_entry_is_never_superseded():
+    """A later run that still withdrew the figure has not replaced it with one that stands."""
+    from tests.e2e.skill_eval.triage import verdict_superseded
+
+    entry = {
+        "provenance": {"run_id": "2026-09-27T204612"},
+        "withdrawn": {"verdict": "too_easy", "reason": "x"},
+    }
+    assert not verdict_superseded(entry, "2026-09-12T171550")
+
+
+def test_the_verdicts_name_the_run_they_were_reached_on():
+    from tests.e2e.skill_eval.triage_records import VERDICTS_REACHED_ON
+
+    assert VERDICTS_REACHED_ON == "2026-09-12T171550"
+
+
+def test_a_verdict_the_re_baseline_cured_leaves_the_live_records():
+    """A cured set that still carried its verdict would trip the stale-verdict rule, and rightly.
+
+    iris-connectivity and objectscript-list-patterns read 0.00 against 0.00 before the transcript
+    fix. The 2026-09-27 run reads both at 0.33 against 0.67, so the check registers the agent now.
+    """
+    from tests.e2e.skill_eval.triage_records import ALL_RECORDS, RECORDS, SUPERSEDED
+
+    assert set(SUPERSEDED) == {"iris-connectivity", "objectscript-list-patterns"}
+    for skill, run_id in SUPERSEDED.items():
+        assert skill not in RECORDS, skill
+        assert skill in ALL_RECORDS, skill
+        assert run_id == "2026-09-27T204612", skill
+
+
+def test_every_superseded_verdict_was_superseded_by_the_committed_baseline():
+    """The history has to match the artifact: the named run wrote the entry, and it discriminates."""
+    import json
+    import os
+
+    from tests.e2e.skill_eval.triage import verdict_superseded
+    from tests.e2e.skill_eval.triage_records import SUPERSEDED, VERDICTS_REACHED_ON
+
+    path = os.path.join(
+        os.path.dirname(__file__), "..", "results", "skill-baseline.json"
+    )
+    with open(path) as handle:
+        baseline = json.load(handle)
+    sets = {s.skill: s for s in task_sets_from_baseline(baseline)}
+    for skill, run_id in SUPERSEDED.items():
+        entry = baseline["skills"][skill]
+        assert entry["provenance"]["run_id"] == run_id, skill
+        assert verdict_superseded(entry, VERDICTS_REACHED_ON), skill
+        assert sets[skill].saturation is None, skill

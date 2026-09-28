@@ -366,9 +366,9 @@ def test_baseline_merge_preserves_other_skills(tmp_path, tasks_dir):
 
     assert set(after["skills"]) == set(before["skills"])
     for untouched in ("objectscript-review", "objectscript-guardrails"):
-        assert after["skills"][untouched] == before["skills"][untouched], (
-            f"{untouched} changed on a write that did not measure it"
-        )
+        assert (
+            after["skills"][untouched] == before["skills"][untouched]
+        ), f"{untouched} changed on a write that did not measure it"
     assert after["skills"]["iris-connectivity"]["lift"] == pytest.approx(0.40)
 
 
@@ -389,9 +389,9 @@ def test_the_written_file_declares_its_schema(tmp_path, tasks_dir):
     data = json.loads(open(path).read())
     assert data["schema"] == SCHEMA_VERSION
     assert set(data) == {"schema", "skills", "ungated_skills"}
-    assert open(path).read().endswith("\n"), (
-        "no trailing newline — every commit re-diffs it"
-    )
+    assert (
+        open(path).read().endswith("\n")
+    ), "no trailing newline — every commit re-diffs it"
 
 
 def test_non_ascii_text_survives_a_write_unescaped(tmp_path, tasks_dir):
@@ -717,13 +717,19 @@ def test_every_verdicted_skill_is_withdrawn_in_the_committed_baseline():
 
     Without this, retiring a task set in `triage_records.py` leaves its −0.10 sitting in the
     baseline as a live comparison basis, and the next night reports a Δ against it.
+
+    A later run that re-measured the skill supersedes the verdict: its entry has no withdrawn block
+    because the figure it withdrew has been replaced by one that stands.
     """
-    from tests.e2e.skill_eval.triage_records import RECORDS
+    from tests.e2e.skill_eval.triage import verdict_superseded
+    from tests.e2e.skill_eval.triage_records import RECORDS, VERDICTS_REACHED_ON
 
     with open(_SHIPPED_BASELINE) as handle:
         skills = json.load(handle)["skills"]
 
     for name in RECORDS:
+        if verdict_superseded(skills[name], VERDICTS_REACHED_ON):
+            continue
         block = skills[name].get("withdrawn")
         assert block, f"{name} has a verdict but its baseline entry is not withdrawn"
         assert block["verdict"] == RECORDS[name].verdict.value, name

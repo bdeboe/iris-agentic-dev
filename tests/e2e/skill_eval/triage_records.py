@@ -156,8 +156,25 @@ _CEILING_AND_NOISE = [
     ),
 ]
 
-RECORDS: dict[str, TriageRecord] = {
+# The baseline run every verdict above was reached on. An entry measured by a later run with no
+# withdrawn block supersedes its verdict — `triage.verdict_superseded`.
+VERDICTS_REACHED_ON = "2026-09-12T171550"
+
+ALL_RECORDS: dict[str, TriageRecord] = {
     record.skill: record for record in (*_FLOORS, *_CEILING_AND_NOISE)
+}
+
+# Verdicts a later run cured, with the run that did it. Both sets read 0.00 against 0.00 before the
+# transcript fix and 0.33 against 0.67 on the 2026-09-27 re-baseline, so the check registers the
+# agent now. They stay above as history and leave the live records: a verdict on a set that
+# discriminates is stale, and `validate_corpus` says so.
+SUPERSEDED: dict[str, str] = {
+    "iris-connectivity": "2026-09-27T204612",
+    "objectscript-list-patterns": "2026-09-27T204612",
+}
+
+RECORDS: dict[str, TriageRecord] = {
+    name: record for name, record in ALL_RECORDS.items() if name not in SUPERSEDED
 }
 
 # The two verdicts whose action was to take the task set out of the gate rather than fix the harness

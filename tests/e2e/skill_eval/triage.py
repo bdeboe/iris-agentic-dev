@@ -150,6 +150,19 @@ class TriageRecord:
             )
 
 
+def verdict_superseded(entry: Mapping, reached_on: str) -> bool:
+    """True when a run after the verdict re-measured the skill and kept the figure.
+
+    A verdict withdraws a figure until the harness can measure it again. Once a later run has, and
+    its entry carries no withdrawn block, the verdict has done its job. Run ids are ISO timestamps,
+    so string order is time order. No run id means unknown age, which is not newer.
+    """
+    if entry.get("withdrawn"):
+        return False
+    run_id = (entry.get("provenance") or {}).get("run_id")
+    return bool(run_id) and run_id > reached_on
+
+
 def validate_corpus(
     task_sets: Iterable[TaskSet],
     records: Mapping[str, TriageRecord],
