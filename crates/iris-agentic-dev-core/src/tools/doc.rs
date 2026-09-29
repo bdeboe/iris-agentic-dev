@@ -117,6 +117,10 @@ pub struct IrisDocParams {
     /// Max results for mode=list (default 200, max 1000)
     #[serde(default, deserialize_with = "de_opt_i64_lenient")]
     pub max_results: Option<i64>,
+    /// mode=list: include iad's own `IrisDevTmp.*` scratch classes (hidden by default unless the
+    /// pattern starts with `IrisDevTmp`)
+    #[serde(default)]
+    pub include_scratch: Option<bool>,
     /// Confirms it's safe to drop this class's existing Storage definition
     /// entirely (letting IRIS regenerate it from scratch on next compile).
     /// Only ever set this after the user has explicitly confirmed the reset
@@ -1701,6 +1705,41 @@ fn glob_to_regex(pattern: &str) -> String {
     re
 }
 
+/// The Atelier `/docnames/` route for a document type. Routines live under `RTN/`: the bare
+/// `/docnames/MAC`, `/INT` and `/INC` answer HTTP 400. `ALL` is `*`.
+pub fn docnames_route(doc_type: &str) -> String {
+    match doc_type.to_uppercase().as_str() {
+        "ALL" => "*".to_string(),
+        t @ ("MAC" | "INT" | "INC") => format!("RTN/{t}"),
+        t => t.to_string(),
+    }
+}
+
+/// The routes `iris_doc mode=list` reads for a category; `ALL` is the four it can list.
+pub fn list_routes(category: &str) -> Vec<String> {
+    match category.to_uppercase().as_str() {
+        "ALL" => ["CLS", "MAC", "INT", "INC"]
+            .iter()
+            .map(|c| docnames_route(c))
+            .collect(),
+        c => vec![docnames_route(c)],
+    }
+}
+
+/// iad's own scratch package: executor and telemetry classes, plus test fixtures.
+pub fn is_scratch_doc(name: &str) -> bool {
+    name.starts_with("IrisDevTmp.")
+}
+
+/// Whether `iris_doc mode=list` drops scratch documents: yes unless asked for, and a pattern that
+/// names the package asks for it.
+pub fn list_hides_scratch(pattern: &str, include_scratch: Option<bool>) -> bool {
+    match include_scratch {
+        Some(include) => !include,
+        None => !pattern.starts_with("IrisDevTmp"),
+    }
+}
+
 async fn fetch_docnames_for_cat(
     iris: &IrisConnection,
     client: &reqwest::Client,
@@ -1752,19 +1791,8 @@ async fn handle_list(
 
     let max_results = clamp_max_results(p.max_results.unwrap_or(200));
 
-    // Fetch docs for selected categories
-    let cats: &[&str] = if category == "ALL" {
-        &["CLS", "MAC", "INT", "INC"]
-    } else {
-        // We'll build a single-element slice from the string
-        match category.as_str() {
-            "CLS" => &["CLS"],
-            "MAC" => &["MAC"],
-            "INT" => &["INT"],
-            "INC" => &["INC"],
-            _ => &["CLS"],
-        }
-    };
+    let cats = list_routes(&category);
+    let hide_scratch = list_hides_scratch(pattern, p.include_scratch);
 
     let re_str = glob_to_regex(pattern);
     let re = match regex::Regex::new(&re_str) {
@@ -1778,7 +1806,7 @@ async fn handle_list(
     };
 
     let mut all_docs: Vec<serde_json::Value> = Vec::new();
-    for cat in cats {
+    for cat in &cats {
         match fetch_docnames_for_cat(iris, client, ns, cat).await {
             Ok(docs) => all_docs.extend(docs),
             Err(e) => {
@@ -1796,7 +1824,7 @@ async fn handle_list(
         .filter(|doc| {
             doc["name"]
                 .as_str()
-                .map(|n| re.is_match(n))
+                .map(|n| re.is_match(n) && !(hide_scratch && is_scratch_doc(n)))
                 .unwrap_or(false)
         })
         .map(|doc| {

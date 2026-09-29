@@ -38,7 +38,7 @@ pub struct InfoParams {
         "sa_schema",
     ]))]
     pub what: String,
-    /// Document type filter for what=documents: CLS, MAC, INT, INC, CSP, ALL
+    /// Document type filter for what=documents: CLS, MAC, INT, INC, CSP, ALL (default ALL)
     pub doc_type: Option<String>,
     /// Schema/cube name for what=sa_schema
     pub name: Option<String>,
@@ -51,6 +51,66 @@ pub struct InfoParams {
     /// Route this call to a named registered IRIS instance. If omitted, uses the default connection.
     #[serde(default)]
     pub server: Option<String>,
+    /// what=documents: include iad's own `IrisDevTmp.*` scratch classes (hidden by default)
+    #[serde(default)]
+    pub include_scratch: bool,
+}
+
+/// Most documents one `inline=true` answer carries (`IRIS_INFO_MAX_DOCUMENTS` overrides).
+pub const DEFAULT_DOCUMENT_CEILING: usize = 500;
+
+pub fn parse_document_ceiling(raw: Option<&str>) -> usize {
+    raw.and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|n| *n > 0)
+        .unwrap_or(DEFAULT_DOCUMENT_CEILING)
+}
+
+/// Move the document list from `result.content` to a top-level `documents`, once; drop
+/// `IrisDevTmp.*` unless asked; and, for `inline`, cut at `ceiling` and say so.
+///
+/// The list used to go out twice (`result.content` stayed), and `inline=true` had no cap at all:
+/// USER's 83,546 names came back as about 20 MB per call (130 round 4).
+pub fn shape_documents(
+    result_json: &mut serde_json::Value,
+    include_scratch: bool,
+    inline: bool,
+    ceiling: usize,
+) {
+    let Some(content) = result_json["result"]
+        .as_object_mut()
+        .and_then(|r| r.remove("content"))
+    else {
+        return;
+    };
+    let mut docs = match content {
+        serde_json::Value::Array(a) => a,
+        _ => Vec::new(),
+    };
+    if !include_scratch {
+        let before = docs.len();
+        docs.retain(|d| {
+            !d["name"]
+                .as_str()
+                .is_some_and(crate::tools::doc::is_scratch_doc)
+        });
+        let hidden = before - docs.len();
+        if hidden > 0 {
+            result_json["scratch_hidden"] = serde_json::json!(hidden);
+        }
+    }
+    if inline {
+        let total = docs.len();
+        let cut = total > ceiling;
+        docs.truncate(ceiling);
+        result_json["truncated"] = serde_json::json!(cut);
+        result_json["total_count"] = serde_json::json!(total);
+        if cut {
+            result_json["hint"] = serde_json::json!(format!(
+                "{total} documents, first {ceiling} shown. Narrow it with doc_type (CLS, MAC, INT, INC, CSP), or use iris_doc mode=list with a pattern such as \"MyApp.*\"."
+            ));
+        }
+    }
+    result_json["documents"] = serde_json::Value::Array(docs);
 }
 
 pub async fn handle_iris_info(
@@ -63,10 +123,7 @@ pub async fn handle_iris_info(
     let url = match p.what.as_str() {
         "documents" => {
             // Bug 14: use versioned_ns_url so future API versions are used automatically.
-            let cat = match p.doc_type.as_deref().unwrap_or("ALL") {
-                "ALL" => "CLS".to_string(),
-                t => t.to_uppercase(),
-            };
+            let cat = crate::tools::doc::docnames_route(p.doc_type.as_deref().unwrap_or("ALL"));
             iris.versioned_ns_url(ns, &format!("/docnames/{}", cat))
         }
         "modified" => iris.versioned_ns_url(ns, "/modified/0"),
@@ -101,15 +158,17 @@ pub async fn handle_iris_info(
 
     // Progressive disclosure (027): for what=documents, truncate the document list.
     // The document names are in result["content"] — flatten to a top-level "documents" key.
-    if p.what == "documents" {
-        if let Some(content) = result_json["result"]["content"].as_array().cloned() {
-            result_json["documents"] = serde_json::Value::Array(content);
+    if p.what == "documents" && result_json["result"]["content"].is_array() {
+        let ceiling =
+            parse_document_ceiling(std::env::var("IRIS_INFO_MAX_DOCUMENTS").ok().as_deref());
+        shape_documents(&mut result_json, p.include_scratch, p.inline, ceiling);
+        if !p.inline {
             let threshold = log_store::read_inline_threshold("IRIS_INLINE_INFO", 30);
             log_store::apply_truncation(
                 &mut result_json,
                 "documents",
                 threshold,
-                p.inline,
+                false,
                 &log_store,
                 "iris_info",
             );
@@ -222,6 +281,12 @@ pub fn macro_atelier_error(body: &serde_json::Value) -> Option<String> {
     Some(parts.join("; "))
 }
 
+/// Whether an Atelier error is the one a single uncompilable include causes. Given a list of
+/// includes, Atelier compiles them all and fails the whole call if any one fails.
+pub fn macro_include_compile_failure(err: &str) -> bool {
+    err.contains("Failure to compile include files")
+}
+
 /// Include names (without `.inc`) from a `/docnames/RTN/INC` answer.
 pub fn macro_include_names(body: &serde_json::Value) -> Vec<String> {
     body["result"]["content"]
@@ -258,6 +323,43 @@ pub fn macro_defines(lines: &[String]) -> Vec<String> {
             }
         })
         .collect()
+}
+
+/// `getmacrolocation` over `includes`, leaving out the ones that do not compile.
+///
+/// One broken include fails the call for the whole list (130 round 4), so on that failure the list
+/// is halved until each broken include stands alone and is dropped. One broken include in 265
+/// costs about 16 calls. Returns the location, if any, and the includes left out.
+async fn macro_locate_around_broken(
+    iris: &IrisConnection,
+    client: &reqwest::Client,
+    url: &str,
+    name: &str,
+    includes: &[String],
+) -> Result<(Option<(String, i64)>, Vec<String>), String> {
+    let mut skipped = Vec::new();
+    let mut pending: Vec<&[String]> = vec![includes];
+    while let Some(chunk) = pending.pop() {
+        let body = macro_request_body(name, chunk, &[]);
+        match macro_post(iris, client, url, &body).await {
+            Ok(a) => {
+                if let Some(found) = macro_location(&a) {
+                    return Ok((Some(found), skipped));
+                }
+            }
+            Err(e) if macro_include_compile_failure(&e) => {
+                if chunk.len() == 1 {
+                    skipped.push(chunk[0].clone());
+                } else {
+                    let (a, b) = chunk.split_at(chunk.len() / 2);
+                    pending.push(b);
+                    pending.push(a);
+                }
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Ok((None, skipped))
 }
 
 async fn macro_get(
@@ -367,6 +469,7 @@ pub async fn handle_iris_macro(
             // need theirs named. Given every include, getmacrolocation still answers, while
             // getmacrodefinition fails compiling them — so locate first, then ask in that one.
             let given: Vec<String> = p.includes.clone().unwrap_or_default();
+            let mut skipped: Vec<String> = Vec::new();
             let mut includes = given.clone();
             let loc_body = macro_request_body(name, &includes, &[]);
             let mut location = match macro_post(iris, client, &loc_url, &loc_body).await {
@@ -384,12 +487,18 @@ pub async fn handle_iris_macro(
                     Ok(body) => macro_include_names(&body),
                     Err(e) => return err_json("ATELIER_ERROR", &e),
                 };
-                let body = macro_request_body(name, &all, &[]);
-                location = match macro_post(iris, client, &loc_url, &body).await {
-                    Ok(a) => macro_location(&a),
-                    Err(e) => return err_json("ATELIER_ERROR", &e),
-                };
+                (location, skipped) =
+                    match macro_locate_around_broken(iris, client, &loc_url, name, &all).await {
+                        Ok(found) => found,
+                        Err(e) => return err_json("ATELIER_ERROR", &e),
+                    };
                 searched = format!("all {} include files in {ns}", all.len());
+                if !skipped.is_empty() {
+                    searched.push_str(&format!(
+                        " except {}, which do not compile",
+                        skipped.join(", ")
+                    ));
+                }
                 if let Some((doc, _)) = &location {
                     includes = vec![strip_inc(doc)];
                 }
@@ -413,6 +522,9 @@ pub async fn handle_iris_macro(
                 "document": document,
                 "line": line,
             });
+            if !skipped.is_empty() {
+                out["skipped_includes"] = serde_json::json!(skipped);
+            }
             if action != "location" {
                 let url = macro_url(iris, ns, macro_route(action).unwrap_or_default());
                 let body = macro_request_body(name, &includes, &p.args);

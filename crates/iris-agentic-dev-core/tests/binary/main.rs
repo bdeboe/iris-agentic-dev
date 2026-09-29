@@ -9,6 +9,7 @@
 
 mod cli_discovery;
 mod coding_pack_129;
+mod include_scratch_130;
 mod invalid_params;
 mod macro_130;
 mod nopws_101;

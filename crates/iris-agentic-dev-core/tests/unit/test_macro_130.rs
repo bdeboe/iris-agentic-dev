@@ -10,8 +10,8 @@
 //! `integration/test_handlers_live.rs` check the same calls against IRIS.
 
 use iris_agentic_dev_core::tools::info::{
-    macro_arguments, macro_atelier_error, macro_defines, macro_include_names, macro_location,
-    macro_request_body, macro_route, macro_url, MacroParams,
+    macro_arguments, macro_atelier_error, macro_defines, macro_include_compile_failure,
+    macro_include_names, macro_location, macro_request_body, macro_route, macro_url, MacroParams,
 };
 use serde_json::json;
 
@@ -152,4 +152,18 @@ fn an_include_lists_its_own_defines() {
         macro_defines(&lines),
         vec!["eProductionStateRunning", "ERR(", "Sum("]
     );
+}
+
+/// 130 round 4. Given every include in the namespace, Atelier compiles them all, and one that does
+/// not compile fails the whole lookup with this text. The handler has to tell that apart from any
+/// other Atelier error, because this one it can route around.
+#[test]
+fn an_include_compile_failure_is_recognised() {
+    assert!(macro_include_compile_failure(
+        "ERROR #5001: Utility failed; ERROR #5001: Failure to compile include files"
+    ));
+    assert!(!macro_include_compile_failure("HTTP 401 Unauthorized"));
+    assert!(!macro_include_compile_failure(
+        "ERROR #5001: Utility failed"
+    ));
 }

@@ -309,6 +309,7 @@ fn test_handle_iris_info_namespace() {
             namespace: Some("USER".to_string()),
             inline: false,
             server: None,
+            include_scratch: false,
         };
         let r = handle_iris_info(&conn, &client, p, make_log_store()).await;
         let v = result_json(r);
@@ -340,6 +341,7 @@ fn test_handle_iris_info_documents() {
             namespace: Some("USER".to_string()),
             inline: true,
             server: None,
+            include_scratch: false,
         };
         let r = handle_iris_info(&conn, &client, p, make_log_store()).await;
         let v = result_json(r);
@@ -421,6 +423,7 @@ fn test_handle_iris_doc_get_object_cls() {
             line: None,
             allow_storage_regeneration: false,
             server: None,
+            include_scratch: None,
         };
         let r = handle_iris_doc(
             &conn,
@@ -476,6 +479,7 @@ fn test_handle_iris_doc_head_object_cls() {
             line: None,
             allow_storage_regeneration: false,
             server: None,
+            include_scratch: None,
         };
         // Must not panic; any structured JSON response is acceptable
         let r = handle_iris_doc(
@@ -600,6 +604,84 @@ fn an_unknown_macro_is_an_error_not_an_empty_success() {
     assert!(
         v["error"].as_str().unwrap_or("").contains("include files"),
         "{v}"
+    );
+}
+
+/// 130 round 4. With no `includes`, a macro outside the system includes is looked for in every
+/// include in the namespace, and Atelier compiles all of them. One include that does not compile
+/// made the lookup fail with "Failure to compile include files", whichever include the macro was
+/// in. IRIS fails only the first lookup after the broken include is saved and skips it quietly
+/// after that, which is why the full suite hit this in some runs and not others. Each lookup
+/// below therefore gets a freshly saved broken include.
+#[test]
+#[ignore = "needs live IRIS"]
+fn one_broken_include_does_not_hide_the_others() {
+    let broken = "IrisDevTmp.Broken130.inc";
+    let good = "IrisDevTmp.Good130.inc";
+    let put = |name: &str, body: &str| {
+        let body = body.to_string();
+        let name = name.to_string();
+        rt().block_on(async move {
+            let tools = make_iris_tools().expect("IRIS_HOST must be set");
+            parse_result(
+                tools
+                    .call_for_test(
+                        "iris_doc",
+                        serde_json::json!({
+                            "mode": "put", "name": name, "content": body,
+                            "namespace": "BENCHMARK", "compile": false
+                        }),
+                    )
+                    .await,
+            )
+        })
+    };
+    let delete = |name: &str| {
+        let name = name.to_string();
+        rt().block_on(async move {
+            let tools = make_iris_tools().expect("IRIS_HOST must be set");
+            let _ = tools
+                .call_for_test(
+                    "iris_doc",
+                    serde_json::json!({"mode": "delete", "name": name, "namespace": "BENCHMARK"}),
+                )
+                .await;
+        })
+    };
+    let put_broken = || {
+        let v = put(
+            broken,
+            "ROUTINE IrisDevTmp.Broken130 [Type=INC]\n#include NoSuchIncludeIad130\n",
+        );
+        assert_eq!(v["success"], true, "{v}");
+    };
+    let v = put(
+        good,
+        "ROUTINE IrisDevTmp.Good130 [Type=INC]\n#define Good130 5\n",
+    );
+    assert_eq!(v["success"], true, "{v}");
+
+    put_broken();
+    let missing = macro_call("definition", Some("NoSuchMacroIad130"), vec![], None);
+    put_broken();
+    let found = macro_call("definition", Some("Good130"), vec![], None);
+    delete(broken);
+    delete(good);
+
+    assert_eq!(missing["error_code"], "MACRO_NOT_FOUND", "{missing}");
+    assert!(
+        missing["error"]
+            .as_str()
+            .unwrap_or("")
+            .contains("IrisDevTmp.Broken130"),
+        "the include that could not be searched must be named: {missing}"
+    );
+    assert_eq!(found["success"], true, "{found}");
+    assert_eq!(found["document"], "IrisDevTmp.Good130.inc", "{found}");
+    assert_eq!(
+        found["definition"],
+        serde_json::json!(["Good130 5"]),
+        "{found}"
     );
 }
 
@@ -730,6 +812,7 @@ fn test_handle_iris_info_metadata() {
             namespace: Some("USER".to_string()),
             inline: false,
             server: None,
+            include_scratch: false,
         };
         let r = handle_iris_info(&conn, &client, p, make_log_store()).await;
         let v = result_json(r);
@@ -760,6 +843,7 @@ fn test_handle_iris_info_invalid_what() {
             namespace: Some("USER".to_string()),
             inline: false,
             server: None,
+            include_scratch: false,
         };
         let r = handle_iris_info(&conn, &client, p, make_log_store()).await;
         let v = result_json(r);
@@ -846,6 +930,7 @@ fn test_handle_iris_doc_batch_get() {
             line: None,
             allow_storage_regeneration: false,
             server: None,
+            include_scratch: None,
         };
         let r = handle_iris_doc(
             &conn,
@@ -12211,6 +12296,7 @@ async fn test_doc_put_returns_200_with_status_errors() {
             line: None,
             allow_storage_regeneration: false,
             server: None,
+            include_scratch: None,
         },
         &elicitation_store,
         &checkout_cache,
@@ -12298,6 +12384,7 @@ async fn test_doc_put_compile_non_2xx_compile_request() {
             line: None,
             allow_storage_regeneration: false,
             server: None,
+            include_scratch: None,
         },
         &elicitation_store,
         &checkout_cache,
@@ -12367,6 +12454,7 @@ async fn test_doc_delete_non_2xx_non_404() {
             line: None,
             allow_storage_regeneration: false,
             server: None,
+            include_scratch: None,
         },
         &elicitation_store,
         &iris_agentic_dev_core::elicitation::CheckoutCache::new(),
@@ -12434,6 +12522,7 @@ async fn test_doc_put_non_2xx_upload() {
             line: None,
             allow_storage_regeneration: false,
             server: None,
+            include_scratch: None,
         },
         &elicitation_store,
         &iris_agentic_dev_core::elicitation::CheckoutCache::new(),
@@ -18471,4 +18560,145 @@ async fn test_dispatch_iris_query_objectscript_function_hints_at_current_timesta
     );
     assert_eq!(v["error_code"], "SQL_ERROR", "{v}");
     assert!(v.get("hint").is_none(), "{v}");
+}
+
+// ── 130 round 4 (FR-015, FR-016): document lists on live IRIS ─────────────────
+
+fn list_params(category: &str, pattern: &str, include_scratch: Option<bool>) -> IrisDocParams {
+    IrisDocParams {
+        mode: "list".to_string(),
+        name: None,
+        names: vec![],
+        content: None,
+        namespace: Some("USER".to_string()),
+        elicitation_id: None,
+        elicitation_answer: None,
+        compile: false,
+        start: None,
+        end: None,
+        compiled_type: None,
+        pattern: Some(pattern.to_string()),
+        category: Some(category.to_string()),
+        max_results: Some(1000),
+        expected: None,
+        line: None,
+        allow_storage_regeneration: false,
+        server: None,
+        include_scratch,
+    }
+}
+
+async fn run_list(
+    conn: &IrisConnection,
+    client: &reqwest::Client,
+    p: IrisDocParams,
+) -> serde_json::Value {
+    let elicitation_store = iris_agentic_dev_core::elicitation::ElicitationStore::new();
+    result_json(
+        handle_iris_doc(
+            conn,
+            client,
+            p,
+            &elicitation_store,
+            &iris_agentic_dev_core::elicitation::CheckoutCache::new(),
+        )
+        .await,
+    )
+}
+
+fn doc_names(v: &serde_json::Value) -> Vec<String> {
+    v["documents"]
+        .as_array()
+        .unwrap_or_else(|| panic!("no documents array: {v}"))
+        .iter()
+        .filter_map(|d| d["name"].as_str().map(str::to_string))
+        .collect()
+}
+
+#[test]
+#[ignore]
+fn test_iris_info_documents_inline_is_bounded_and_clean_130() {
+    rt().block_on(async {
+        let Some((conn, client)) = make_conn() else {
+            eprintln!("SKIP — IRIS_HOST not set");
+            return;
+        };
+        let p = InfoParams {
+            what: "documents".to_string(),
+            doc_type: None,
+            name: None,
+            namespace: Some("USER".to_string()),
+            inline: true,
+            server: None,
+            include_scratch: false,
+        };
+        let v = result_json(handle_iris_info(&conn, &client, p, make_log_store()).await);
+        assert_eq!(v["success"], true, "{v}");
+        assert!(
+            v["result"].get("content").is_none(),
+            "the list went out twice: result.content is still there"
+        );
+        let names = doc_names(&v);
+        assert!(
+            names.len() <= 500,
+            "inline lifted the ceiling: {}",
+            names.len()
+        );
+        assert!(
+            !names.iter().any(|n| n.starts_with("IrisDevTmp.")),
+            "scratch classes in the default list"
+        );
+        let bytes = v.to_string().len();
+        assert!(bytes < 200_000, "documents answer is {bytes} bytes");
+    });
+}
+
+#[test]
+#[ignore]
+fn test_iris_doc_list_routines_use_valid_routes_130() {
+    rt().block_on(async {
+        let Some((conn, client)) = make_conn() else {
+            eprintln!("SKIP — IRIS_HOST not set");
+            return;
+        };
+        for cat in ["ALL", "MAC", "INT", "INC"] {
+            // `Iris*` takes in the scratch package without naming it, so scratch stays hidden.
+            let v = run_list(&conn, &client, list_params(cat, "Iris*", None)).await;
+            assert_eq!(v["success"], true, "category {cat}: {v}");
+            let names = doc_names(&v);
+            assert!(
+                !names.iter().any(|n| n.starts_with("IrisDevTmp.")),
+                "category {cat}: scratch classes in the default list"
+            );
+        }
+    });
+}
+
+#[test]
+#[ignore]
+fn test_iris_doc_list_shows_scratch_when_the_pattern_names_it_130() {
+    rt().block_on(async {
+        let Some((conn, client)) = make_conn() else {
+            eprintln!("SKIP — IRIS_HOST not set");
+            return;
+        };
+        // iris-dev-iris keeps IrisDevTmp fixture classes from other live tests.
+        let v = run_list(&conn, &client, list_params("CLS", "IrisDevTmp.*", None)).await;
+        assert_eq!(v["success"], true, "{v}");
+        assert!(
+            !doc_names(&v).is_empty(),
+            "a pattern naming the package is asking for it: {v}"
+        );
+
+        let v = run_list(
+            &conn,
+            &client,
+            list_params("CLS", "IrisDevTmp.*", Some(false)),
+        )
+        .await;
+        assert!(
+            doc_names(&v).is_empty(),
+            "include_scratch=false still showed scratch: {v}"
+        );
+    });
 }
