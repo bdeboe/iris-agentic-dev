@@ -17,6 +17,7 @@ fixing the credential would not have helped.
 import glob
 import json
 import os
+import sys
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -162,9 +163,19 @@ def _credential_report() -> str:
             f"  present but unused: {', '.join(present_unused)} — that is the agent's key, "
             "not the scorer's"
         )
-    lines.append(
-        "  the scorer runs on Bedrock; set AWS_BEARER_TOKEN_BEDROCK and AWS_REGION"
-    )
+    if os.environ.get("AWS_BEARER_TOKEN_BEDROCK"):
+        # Set and still unresolved: the SDK did not read it. anthropic 0.86 does not; 0.96 does.
+        import anthropic
+
+        lines.append(
+            f"  AWS_BEARER_TOKEN_BEDROCK is set but the SDK did not read it: anthropic "
+            f"{anthropic.__version__} under {sys.executable}; run with an interpreter "
+            "whose anthropic reads bearer tokens (0.96 does, 0.86 does not)"
+        )
+    else:
+        lines.append(
+            "  the scorer runs on Bedrock; set AWS_BEARER_TOKEN_BEDROCK and AWS_REGION"
+        )
     lines.append("  nothing was spent")
     return "\n".join(lines)
 

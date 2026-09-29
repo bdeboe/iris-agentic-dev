@@ -164,6 +164,36 @@ def test_an_unreachable_scorer_names_what_was_looked_for(
     assert "nothing was spent" in result.failure
 
 
+def test_a_set_bearer_token_that_fails_names_the_sdk_not_the_variable(
+    monkeypatch, stub_binary, good_corpus
+):
+    """A set token that the SDK never reads must not be reported as a token to set.
+
+    Seen 2026-09-28: `python3` had moved to an interpreter with anthropic 0.86, which does not
+    read AWS_BEARER_TOKEN_BEDROCK, and the message said to set the variable that was already set.
+    """
+    import sys
+
+    import anthropic
+
+    monkeypatch.setattr(
+        preflight,
+        "make_client",
+        lambda: RecordingScorer(
+            fail=RuntimeError("could not resolve credentials from session")
+        ),
+    )
+    for var in preflight.CREDENTIAL_VARS:
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("AWS_BEARER_TOKEN_BEDROCK", "present")
+
+    result = preflight.preflight(args())
+    assert result.ok is False
+    assert "set AWS_BEARER_TOKEN_BEDROCK" not in result.failure
+    assert anthropic.__version__ in result.failure
+    assert sys.executable in result.failure
+
+
 def test_a_scorer_that_answers_unparseably_fails_the_preflight(
     monkeypatch, stub_binary, good_corpus
 ):
