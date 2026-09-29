@@ -16,6 +16,7 @@ from tests.e2e.skill_eval.evaluator import SkillResult
 from tests.e2e.skill_eval.reporter import (
     EvalRun,
     print_summary,
+    lift_skipped_line,
     progress_line,
     write_result,
 )
@@ -426,9 +427,9 @@ def test_an_underpowered_comparison_prints_as_underpowered_and_never_as_a_pass(c
     print_summary(run)
     row = row_for(capsys.readouterr().out, "iris-connectivity")
     assert "too few runs to tell" in row
-    assert (
-        "held" not in row
-    ), f"underpowered replaces the pass, it does not annotate it: {row!r}"
+    assert "held" not in row, (
+        f"underpowered replaces the pass, it does not annotate it: {row!r}"
+    )
 
 
 def test_an_underpowered_row_still_shows_the_pairs_it_had(capsys):
@@ -715,3 +716,12 @@ def test_ladder_coverage_reads_the_skill_field_of_the_ladder_tasks():
     assert "SKILL-14" in coverage["objectscript-unit-test"]
     assert {"SKILL-01", "SKILL-17"} <= set(coverage["objectscript-guardrails"])
     assert all(ids == sorted(ids) for ids in coverage.values())
+
+
+def test_a_skill_with_no_benchmark_tasks_says_so_by_name():
+    """130 FR-018: sql-patterns leaves the targeted eval, so the nightly log must say which skill
+    got no lift measurement and why, rather than stay quiet or print a bare "no lift"."""
+    line = lift_skipped_line("objectscript-sql-patterns")
+    assert "[objectscript-sql-patterns]" in line
+    assert "no benchmark tasks" in line
+    assert "fire-rate only" in line

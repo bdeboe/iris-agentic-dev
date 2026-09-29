@@ -366,9 +366,9 @@ def test_baseline_merge_preserves_other_skills(tmp_path, tasks_dir):
 
     assert set(after["skills"]) == set(before["skills"])
     for untouched in ("objectscript-review", "objectscript-guardrails"):
-        assert (
-            after["skills"][untouched] == before["skills"][untouched]
-        ), f"{untouched} changed on a write that did not measure it"
+        assert after["skills"][untouched] == before["skills"][untouched], (
+            f"{untouched} changed on a write that did not measure it"
+        )
     assert after["skills"]["iris-connectivity"]["lift"] == pytest.approx(0.40)
 
 
@@ -389,9 +389,9 @@ def test_the_written_file_declares_its_schema(tmp_path, tasks_dir):
     data = json.loads(open(path).read())
     assert data["schema"] == SCHEMA_VERSION
     assert set(data) == {"schema", "skills", "ungated_skills"}
-    assert (
-        open(path).read().endswith("\n")
-    ), "no trailing newline — every commit re-diffs it"
+    assert open(path).read().endswith("\n"), (
+        "no trailing newline — every commit re-diffs it"
+    )
 
 
 def test_non_ascii_text_survives_a_write_unescaped(tmp_path, tasks_dir):
@@ -719,15 +719,27 @@ def test_every_verdicted_skill_is_withdrawn_in_the_committed_baseline():
     baseline as a live comparison basis, and the next night reports a Δ against it.
 
     A later run that re-measured the skill supersedes the verdict: its entry has no withdrawn block
-    because the figure it withdrew has been replaced by one that stands.
+    because the figure it withdrew has been replaced by one that stands. A retired set whose row was
+    dropped (sql-patterns, 130 FR-018) has no entry to withdraw, and must be excused by name instead.
     """
     from tests.e2e.skill_eval.triage import verdict_superseded
-    from tests.e2e.skill_eval.triage_records import RECORDS, VERDICTS_REACHED_ON
+    from tests.e2e.skill_eval.triage_records import (
+        RECORDS,
+        RETIRED_TASK_SETS,
+        VERDICTS_REACHED_ON,
+    )
 
     with open(_SHIPPED_BASELINE) as handle:
-        skills = json.load(handle)["skills"]
+        envelope = json.load(handle)
+    skills = envelope["skills"]
 
     for name in RECORDS:
+        if name not in skills:
+            assert name in RETIRED_TASK_SETS, (
+                f"{name} has a verdict and no baseline entry"
+            )
+            assert envelope["ungated_skills"][name].strip(), name
+            continue
         if verdict_superseded(skills[name], VERDICTS_REACHED_ON):
             continue
         block = skills[name].get("withdrawn")

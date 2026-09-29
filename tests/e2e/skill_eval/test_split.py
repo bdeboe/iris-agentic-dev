@@ -202,8 +202,10 @@ def test_every_skill_ladder_task_is_on_the_holdout_side():
 
 
 #: Skill tasks moved to train because a skill was edited while reading their transcripts. Each one
-#: has a replacement on the holdout for the same skill.
-TUNED_SKILL_TASKS = {"SKILL-13": "SKILL-20"}
+#: has a replacement on the holdout for the same skill. SKILL-21 was written on train from the start:
+#: 130 round 4 fits `objectscript-sql-patterns` to it, and SKILL-09 is the holdout that says whether
+#: the fix generalises.
+TUNED_SKILL_TASKS = {"SKILL-13": "SKILL-20", "SKILL-21": "SKILL-09"}
 
 
 def test_a_tuned_skill_task_is_on_train_and_its_replacement_on_the_holdout():

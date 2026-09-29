@@ -412,18 +412,16 @@ def test_the_real_baseline_file_triages_without_crashing():
     with open(path) as handle:
         baseline = json.load(handle)
     sets = task_sets_from_baseline(baseline)
-    assert len(sets) == 9
+    assert len(sets) == 8
     saturated = {s.skill: s.saturation for s in sets if s.needs_verdict}
-    # The 2026-09-27 re-baseline, both harness fixes in. Three sets are still saturated: the two
-    # retired ones keep their 2026-09-12 entries, and SQLCODE-SILENT floors again with every item
-    # scored.
+    # The 2026-09-27 re-baseline, both harness fixes in. The two retired sets keep their 2026-09-12
+    # entries and stay saturated. SQLCODE-SILENT floored again there with every item scored; 130
+    # round 4 found its rubric asserts a false IRIS fact, retired it, and dropped the row (FR-018).
     assert set(saturated) == {
-        "objectscript-sql-patterns",
         "objectscript-unit-test",
         "objectscript-guardrails",
     }
     assert saturated["objectscript-guardrails"] is Saturation.CEILING_CENSORED
-    assert saturated["objectscript-sql-patterns"] is Saturation.FLOOR
 
 
 # --- a verdict a later run has re-measured past — 130 round 3 --------------------------------
@@ -508,3 +506,24 @@ def test_every_superseded_verdict_was_superseded_by_the_committed_baseline():
         assert entry["provenance"]["run_id"] == run_id, skill
         assert verdict_superseded(entry, VERDICTS_REACHED_ON), skill
         assert sets[skill].saturation is None, skill
+
+
+def test_the_sqlcode_task_set_is_retired_and_its_row_gone():
+    """130 FR-018. SQLCODE-SILENT's rubric says `If SQLCODE` fires on success and asks for
+    `If SQLCODE '= 0`, which fires on the same values; SQLCODE-CHECK shares the premise. Both files
+    go, sql-patterns is measured on the ladder (SKILL-09, SKILL-21) instead, and the baseline names
+    it in `ungated_skills` so the gap is written down rather than silent."""
+    import os
+
+    from tests.e2e.skill_eval.triage_records import RETIRED_TASK_SETS
+
+    targeted = os.path.join(
+        os.path.dirname(__file__), "..", "tasks", "skills", "targeted"
+    )
+    for task in ("SQLCODE-SILENT", "SQLCODE-CHECK"):
+        assert not os.path.exists(os.path.join(targeted, f"{task}.yaml")), task
+    assert "objectscript-sql-patterns" in RETIRED_TASK_SETS
+    baseline = real_baseline()
+    assert "objectscript-sql-patterns" not in baseline["skills"]
+    reason = baseline["ungated_skills"]["objectscript-sql-patterns"]
+    assert "SQLCODE-SILENT" in reason and "SKILL-21" in reason

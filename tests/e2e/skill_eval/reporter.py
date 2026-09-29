@@ -243,6 +243,11 @@ def _row_notes(result: "SkillResult", withheld, ladder: dict, shared_surface) ->
     return [note for note in notes if note]
 
 
+def lift_skipped_line(skill: str) -> str:
+    """The line for a skill whose eval names no benchmark tasks, so the log says which one."""
+    return f"  [{skill}] no benchmark tasks: lift not measured, fire-rate only"
+
+
 def progress_line(skill: str, lift_data: dict) -> str:
     """The per-skill line the nightly log is read from, with the lift's resolution on it.
 

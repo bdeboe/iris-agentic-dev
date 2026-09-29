@@ -211,23 +211,23 @@ def test_every_document_names_the_homebrew_tap_that_exists():
     name is the same in every document, so a repo-wide scan is the right shape of check.
     """
     wrong: list[str] = []
-    for dirpath, dirnames, filenames in os.walk(_REPO_ROOT):
-        dirnames[:] = [
-            name
-            for name in dirnames
-            if name not in {".git", "target", "node_modules", ".venv", "worktrees"}
-        ]
-        for filename in filenames:
-            if not filename.endswith(".md"):
-                continue
-            path = os.path.join(dirpath, filename)
-            with open(path, encoding="utf-8", errors="replace") as handle:
-                for number, line in enumerate(handle, start=1):
-                    for tap in re.findall(_BREW_TAP_RE, line):
-                        if tap != _HOMEBREW_TAP:
-                            wrong.append(
-                                f"{os.path.relpath(path, _REPO_ROOT)}:{number}: {tap}"
-                            )
+    # Tracked plus untracked-but-not-ignored: git-ignored local scratch (.iad-local/) never ships.
+    listed = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", "*.md"],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    for relpath in filter(None, listed.split("\0")):
+        path = os.path.join(_REPO_ROOT, relpath)
+        if not os.path.isfile(path):
+            continue
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            for number, line in enumerate(handle, start=1):
+                for tap in re.findall(_BREW_TAP_RE, line):
+                    if tap != _HOMEBREW_TAP:
+                        wrong.append(f"{relpath}:{number}: {tap}")
     assert not wrong, (
         f"these lines name a Homebrew tap that is not {_HOMEBREW_TAP}, so `brew tap` fails "
         f"for anyone who follows them: {wrong}"

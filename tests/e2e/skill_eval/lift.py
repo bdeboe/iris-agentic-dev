@@ -215,7 +215,8 @@ def compute_lift_from_scores(
 # judge graded a fragment that stopped mid-sentence — and scored it 1, "partial", exactly as the
 # rubric tells it to. Four skills read 0.00 against 0.00 on that for months (121 T021).
 #
-# 8000 is `runner.judge._format_transcript`'s own per-turn cap: the two agree so neither silently
+# 8000 is `runner.judge._format_transcript`'s own per-turn cap, for text, tool args and tool
+# results alike (args and results were 120/200/300 until 130 round 4): the two agree so neither silently
 # decides what the scorer sees. It stays a cap because the judge call is billed per token.
 TRANSCRIPT_TEXT_LIMIT = 8000
 
@@ -235,7 +236,7 @@ def format_transcript(events: list[dict]) -> list[dict]:
                     "role": "assistant",
                     "tool_name": tool,
                     "args": state.get("input", {}),
-                    "tool_result": str(state.get("output", ""))[:300],
+                    "tool_result": str(state.get("output", ""))[:TRANSCRIPT_TEXT_LIMIT],
                 }
             )
         elif event.get("type") == "text":

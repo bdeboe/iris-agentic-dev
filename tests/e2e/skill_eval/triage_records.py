@@ -182,6 +182,10 @@ RECORDS: dict[str, TriageRecord] = {
 # `test_triage.py` checks each one's `eval.yaml` really has no `benchmark_tasks` left, because
 # "retired" written here and `benchmark_tasks: [GEN-01, GEN-02]` still in the config is exactly the
 # state that reads as acted on and is not.
+#
+# 130 round 4 (FR-018) adds sql-patterns: SQLCODE-SILENT and SQLCODE-CHECK assert a false IRIS fact
+# (`If SQLCODE` firing on success), so both task files are gone and the skill is measured on the
+# ladder instead, SKILL-21 on train and SKILL-09 on the holdout.
 RETIRED_TASK_SETS: frozenset[str] = frozenset(
-    {"objectscript-unit-test", "objectscript-guardrails"}
+    {"objectscript-unit-test", "objectscript-guardrails", "objectscript-sql-patterns"}
 )

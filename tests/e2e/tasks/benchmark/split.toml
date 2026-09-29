@@ -26,6 +26,9 @@
 # - **SKILL-13 moved to train in 130 round 3.** The ladder flagged `iris-query-plans` on it, and I
 #   rewrote the skill's `%NOINDEX` section while reading its transcripts. SKILL-20 replaces it on the
 #   holdout for the same skill (`TUNED_SKILL_TASKS` in `test_split.py`).
+# - **SKILL-21 is train from the day it was written, in 130 round 4.** It exists so the
+#   `objectscript-sql-patterns` fix has a task to be fitted to; SKILL-09 stays on the holdout for the
+#   same skill and says whether the fix generalises.
 #
 # One caveat that the split cannot fix and the report has to carry instead: I wrote the 42 corpus
 # tasks knowing what iad's 81 tools can do. Authoring is not tuning — no description, prompt or skill
@@ -43,6 +46,7 @@ train = [
   "CORPUS-35",
   "CORPUS-42",
   "SKILL-13",
+  "SKILL-21",
 ]
 
 holdout = [

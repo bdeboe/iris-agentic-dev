@@ -35,6 +35,7 @@ from tests.e2e.skill_eval.provenance import Provenance
 from tests.e2e.skill_eval.reporter import (
     EvalRun,
     print_summary,
+    lift_skipped_line,
     progress_line,
     write_result,
 )
@@ -157,6 +158,8 @@ def _run_skill(
             iris_container=iris_container,
         )
         print(progress_line(config.skill, lift_data), flush=True)
+    else:
+        print(lift_skipped_line(config.skill), flush=True)
 
     result = SkillResult(
         skill=config.skill,

@@ -153,8 +153,10 @@ def test_every_result_artifact_a_test_depends_on_is_tracked():
     ran three named files and none of them were these.
     """
     results_dir = os.path.join(_REPO_ROOT, "tests", "e2e", "results")
+    # A test may read a tracked copy under `skill_eval/fixtures/` instead; the name then also
+    # exists, untracked, in `results/`, and the copy is what a clean checkout has.
     tracked = subprocess.run(
-        ["git", "ls-files", "tests/e2e/results"],
+        ["git", "ls-files", "tests/e2e/results", "tests/e2e/skill_eval/fixtures"],
         cwd=_REPO_ROOT,
         capture_output=True,
         text=True,

@@ -225,6 +225,60 @@ def test_a_runaway_answer_is_still_bounded():
     assert len(text) == TRANSCRIPT_TEXT_LIMIT
 
 
+# --- the judge has to see the code the agent wrote — 130 round 4 ------------------------------
+#
+# `judge._format_transcript` cut tool args to 120 characters of JSON and results to 200, and
+# `format_transcript` cut results to 300 before that. For an `iris_doc put` the judge saw
+# `{"mode": "put", "name": "EvalDemo.PatientLookup.cls", ...` and none of the class body, so on
+# SQLCODE-SILENT it said "put call truncated" and graded the rest. 121 T021 raised assistant text
+# to 8000 and left these two alone.
+
+
+def _put_event(content: str, output: str) -> dict:
+    return {
+        "type": "tool_use",
+        "part": {
+            "tool": "iris_agentic_dev_iris_doc",
+            "state": {
+                "status": "completed",
+                "input": {"mode": "put", "name": "Bench.Big.cls", "content": content},
+                "output": output,
+            },
+        },
+    }
+
+
+def test_the_judge_sees_a_whole_class_body_in_a_tool_arg():
+    from tests.e2e.skill_eval.judge import _format_transcript
+
+    body = _long_class("the fix the judge must see", 250)
+    assert 4000 < len(body) <= 7000
+    rendered = _format_transcript(format_transcript([_put_event(body, "ok")]))
+    assert "the fix the judge must see" in rendered
+
+
+def test_the_judge_sees_a_long_tool_result():
+    from tests.e2e.skill_eval.judge import _format_transcript
+
+    output = _long_class("fixture line the agent read", 250)
+    turns = format_transcript([_put_event("x", output)])
+    assert "fixture line the agent read" in turns[0]["tool_result"]
+    assert "fixture line the agent read" in _format_transcript(turns)
+
+
+def test_runaway_tool_args_and_results_are_still_bounded():
+    from tests.e2e.skill_eval.judge import _format_transcript
+    from tests.e2e.skill_eval.lift import TRANSCRIPT_TEXT_LIMIT
+
+    huge = "y" * (TRANSCRIPT_TEXT_LIMIT * 4)
+    turns = format_transcript([_put_event(huge, huge)])
+    assert len(turns[0]["tool_result"]) == TRANSCRIPT_TEXT_LIMIT
+    rendered = _format_transcript(turns)
+    call_line, result_line = rendered.split("\n")[:2]
+    assert len(call_line) < TRANSCRIPT_TEXT_LIMIT + 200
+    assert len(result_line) < TRANSCRIPT_TEXT_LIMIT + 50
+
+
 # --- a session that was killed is not a failing agent — 121 T021 ------------------------------
 #
 # `opencode_runner.run_opencode` arms a 300 s timer, kills the process tree when it fires, and then

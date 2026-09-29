@@ -462,75 +462,6 @@
         "tool_surface": "1.4.2+fa0b694f8725"
       }
     },
-    "objectscript-sql-patterns": {
-      "comparison": {
-        "arm_a": "baseline",
-        "arm_b": "skill",
-        "b": 0,
-        "c": 0,
-        "discordance": 0.0,
-        "floor": 37,
-        "holes": [],
-        "interval": [
-          0.0,
-          0.0
-        ],
-        "lift": 0.0,
-        "mde": null,
-        "n_pairs": 3,
-        "p_value_one_sided": null,
-        "publishable": false,
-        "purpose": "result",
-        "summary": "baseline -> skill  lift +0.000 [+0.000, +0.000]  n=3 pairs  floor=37  discordance=0.00 (b=0, c=0)  mde=n/a  threshold=0.200  underpowered",
-        "threshold_applied": 0.2,
-        "underpowered": true,
-        "verdict": "underpowered"
-      },
-      "fire_rate": 1.0,
-      "items": {
-        "baseline": {
-          "items_passed": 0,
-          "items_scored": 3,
-          "items_total": 3,
-          "items_unscored": 0,
-          "pass_rate": 0.0
-        },
-        "skill": {
-          "items_passed": 0,
-          "items_scored": 3,
-          "items_total": 3,
-          "items_unscored": 0,
-          "pass_rate": 0.0
-        }
-      },
-      "lift": 0.0,
-      "pass_rate_baseline": 0.0,
-      "pass_rate_skill": 0.0,
-      "provenance": {
-        "agent_model": null,
-        "container": null,
-        "corpus_commit": null,
-        "corpus_dirty": null,
-        "corpus_task_count": null,
-        "driver": "opencode",
-        "harness_commit": "d05fb33",
-        "harness_version": "1.14.17",
-        "image": null,
-        "image_digest": null,
-        "image_id": null,
-        "item_counts": {},
-        "measured_at": "2026-09-27T21:48:33Z",
-        "run_id": "2026-09-27T204612",
-        "runs": 3,
-        "scorer_model": "claude-sonnet-4-6",
-        "scorer_model_requested": "us.anthropic.claude-sonnet-4-6",
-        "scoring_mode": "judge",
-        "task_ids": [
-          "SQLCODE-SILENT"
-        ],
-        "tool_surface": "1.4.2+fa0b694f8725"
-      }
-    },
     "objectscript-unit-test": {
       "fire_rate": 1.0,
       "items": {
@@ -573,5 +504,7 @@
       }
     }
   },
-  "ungated_skills": {}
+  "ungated_skills": {
+    "objectscript-sql-patterns": "Task set retired 2026-09-28 (130 FR-018). SQLCODE-SILENT and SQLCODE-CHECK asserted a false IRIS fact, so the 2026-09-27 0.00/0.00 row measured the rubric, not the skill, and was dropped. Measured on the ladder instead: SKILL-21 (train), SKILL-09 (holdout)."
+  }
 }

@@ -1,0 +1,74 @@
+id: SKILL-21
+prompt: |
+  In the BENCHMARK namespace, Bench.Q21.Lookup.FindPatient(pMRN) returns the Name of the
+  Bench.Q21.Patient row with that MRN. Its callers rely on three things: a known MRN returns its
+  name, an MRN with no row returns "", and when the lookup itself fails the method throws an
+  exception instead of returning a value. The method breaks the third. Fix it, and keep the other
+  two. Leave the classes compiled on the server.
+
+  IRIS: host localhost, web port 52780, username _SYSTEM, password SYS, namespace BENCHMARK.
+  The instance runs in the Docker container iris-dev-iris.
+skill: objectscript-sql-patterns
+fixtures:
+  - name: Bench.Q21.Patient
+    content: |
+      Class Bench.Q21.Patient Extends %Persistent
+      {
+
+      Property MRN As %String;
+
+      Property Name As %String;
+
+      Index MRNIdx On MRN;
+
+      }
+  - name: Bench.Q21.Lookup
+    content: |
+      Class Bench.Q21.Lookup Extends %RegisteredObject
+      {
+
+      /// Name of the patient with MRN pMRN, or "" when there is none.
+      ClassMethod FindPatient(pMRN As %String) As %String
+      {
+          Set tName = ""
+          &sql(SELECT Name INTO :tName FROM Bench_Q21.Patient WHERE MRN = :pMRN)
+          If SQLCODE < 0 { Return "" }
+          Quit tName
+      }
+
+      }
+check: |
+  try { set ok=0 do ##class(Bench.Q21.Patient).%KillExtent() for m="MRN001:Ann","MRN002:Bob","MRN666:Zed" { set o=##class(Bench.Q21.Patient).%New(), o.MRN=$piece(m,":"), o.Name=$piece(m,":",2) do o.%Save() } set bad=o.%Id(), g=##class(%Dictionary.CompiledStorage).%OpenId("Bench.Q21.Patient||Default").DataLocation, @g@(bad)="not a list" set a=##class(Bench.Q21.Lookup).FindPatient("MRN001"), b=##class(Bench.Q21.Lookup).FindPatient("NOPE"), threw=0 try { set c=##class(Bench.Q21.Lookup).FindPatient("MRN666") } catch { set threw=1 } set ok=((a="Ann")&&(b="")&&threw) do ##class(Bench.Q21.Patient).%KillExtent() } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: Bench.Q21.Patient
+    content: |
+      Class Bench.Q21.Patient Extends %Persistent
+      {
+
+      Property MRN As %String;
+
+      Property Name As %String;
+
+      Index MRNIdx On MRN;
+
+      }
+  - name: Bench.Q21.Lookup
+    content: |
+      Class Bench.Q21.Lookup Extends %RegisteredObject
+      {
+
+      /// Name of the patient with MRN pMRN, or "" when there is none.
+      ClassMethod FindPatient(pMRN As %String) As %String
+      {
+          Set tName = ""
+          &sql(SELECT Name INTO :tName FROM Bench_Q21.Patient WHERE MRN = :pMRN)
+          If SQLCODE < 0 { Throw ##class(%Exception.SQL).CreateFromSQLCODE(SQLCODE, %msg) }
+          If SQLCODE = 100 { Quit "" }
+          Quit tName
+      }
+
+      }
+tags:
+  - sqlcode
+  - embedded-sql
+  - error-handling

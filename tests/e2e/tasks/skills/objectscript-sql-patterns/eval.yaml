@@ -4,7 +4,11 @@ fire_rate_prompt: |
   Use the objectscript-sql-patterns skill to help write an ObjectScript embedded SQL query that searches for patients by name using LIKE, handles NULL values correctly, and uses proper IRIS table naming conventions.
 implicit_fire_rate_prompt: |
   Write an ObjectScript method that queries Bench.Patient by name using &sql(), iterates results, and handles the case where no rows are found. Show me the complete method.
-benchmark_tasks:
-  - SQLCODE-SILENT
+# Task set retired — 130 round 4 (FR-018). SQLCODE-SILENT said `If SQLCODE` fires on success and
+# asked for `If SQLCODE '= 0`, which fires on exactly the same values; SQLCODE-CHECK shared the
+# premise, and the judge rewarded answers that agreed with it over answers that were right about
+# IRIS (specs/130-content-skills/sql-patterns-review.md). Both files are deleted. The skill is
+# measured on the ladder: SKILL-21 (train) and SKILL-09 (holdout).
+benchmark_tasks: []
 domain_skill: false
 targeted_tasks_dir: tests/e2e/tasks/skills/targeted

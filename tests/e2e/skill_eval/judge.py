@@ -189,16 +189,21 @@ def score_result(task: dict, result: dict) -> dict:
     return unscored(reason)
 
 
+# Text, tool args and tool results share one cap. Args were cut at 120 characters and results at
+# 200 until 130 round 4, so the judge never saw the body of an `iris_doc put` (sql-patterns-review.md).
+TURN_LIMIT = 8000
+
+
 def _format_transcript(turns: list) -> str:
     lines = []
     for turn in turns:
         role = turn.get("role", "?")
         if turn.get("tool_name"):
             lines.append(
-                f"[{role}] tool_call: {turn['tool_name']}({json.dumps(turn.get('args', {}))[:120]})"
+                f"[{role}] tool_call: {turn['tool_name']}({json.dumps(turn.get('args', {}))[:TURN_LIMIT]})"
             )
         if turn.get("tool_result"):
-            lines.append(f"[tool_result] {str(turn['tool_result'])[:200]}")
+            lines.append(f"[tool_result] {str(turn['tool_result'])[:TURN_LIMIT]}")
         if turn.get("text"):
-            lines.append(f"[{role}] {turn['text'][:8000]}")
+            lines.append(f"[{role}] {turn['text'][:TURN_LIMIT]}")
     return "\n".join(lines) if lines else "(empty transcript)"
