@@ -82,3 +82,4 @@ Run 2:
 - [x] T046a Tests first: unit `package_prefixes`, `created_classes`, and a `run_one` test that a class created during the session is deleted after the check; live `test_a_session_leftover_is_deleted`; then wire it (FR-023)
 - [x] T046b Purge the leftovers from BENCHMARK: `Bench.Calc.Tests.MathTest`, `Bench.Patient.Test`, `Bench.Probe`, `Bench.Q2.CountOther`, `Bench.Stor`, `Bench.Validator`; no task names any of them (FR-023)
 - [x] T047 Triage record for sql-patterns: `broken_check`, rubric asserted a false IRIS fact and the judge could not see code; research.md round 4; CLAUDE.md entry; markdown lint; local commit
+- [ ] T048 Billable, needs Tom's go: re-run the SKILL-09 ladder with FR-023 in place, 3 repeats per arm (~$0.51, outside SC-007). The T046 run is contaminated by the leftover class, so the sql-patterns ladder has no clean figure until this runs

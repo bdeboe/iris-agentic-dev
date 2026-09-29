@@ -114,7 +114,7 @@ The first ladder run found tools alone passing 7 of 7 and tools+skill 4 of 7, wi
 - **FR-020**: The leftover `IrisDevTmp.IrisDevRun*` classes and `^Test130Err.*` globals are removed from iris-dev-iris after the leak fix lands.
 - **FR-021**: `iris_macro` with no `includes` still answers when an include in the namespace does not compile. Atelier fails the whole lookup for one such include, so the handler drops the includes that fail and names them: `skipped_includes` on a hit, and the `MACRO_NOT_FOUND` text on a miss.
 - **FR-022**: A skill-eval run is valid when no more than one item in ten went unscored across the whole run, as 118's scoring contract states. A skill over that share on its own, or with nothing scored, gets no comparison and is left out of the baseline write; it does not void the other skills. The shard-merge `--update-baseline` applies the same rule, and it used to write every measured result with no check at all.
-- **FR-023**: A graded session leaves no class behind. After the fixture goes on, the runner lists the classes under each fixture's top-level package; after the check it lists them again and deletes every class the session or the check created. Classes that earlier sessions left in BENCHMARK under those packages are deleted once. A leftover class had misled two SKILL-09 skill-arm sessions: `Bench.Q2.CountOther`, written on 2026-09-27 by a session that read the method name as a class name, was read as a finished answer by 2026-09-27 r2 and 2026-09-29 r1, and each stopped after 3 calls.
+- **FR-023**: A graded session leaves no class behind. After the fixture goes on, the runner lists the classes under each fixture's top-level package; after the check it lists them again and deletes every class the session or the check created. Classes that earlier sessions left in BENCHMARK under those packages are deleted once. A leftover class had misled two SKILL-09 skill-arm sessions: `Bench.Q2.CountOther`, written on 2026-09-27 by a session that read the method name as a class name, was read as a finished answer by 2026-09-27 r2 and 2026-09-29 r1, and each stopped after 3 calls. The listing is per package, because `iris_doc list` refuses a bare wildcard, so a class a session writes outside the fixture's top-level packages is not deleted.
 
 ## Success Criteria
 
@@ -125,6 +125,7 @@ The first ladder run found tools alone passing 7 of 7 and tools+skill 4 of 7, wi
 - **SC-005**: Round 2 costs $3 or less: $1.50 for the 18-session re-run and about $0.50 per replacement holdout task.
 - **SC-006**: After round 4, USER on iris-dev-iris holds no `IrisDevTmp.IrisDevRun*` class, and `iris_info what=documents inline=true` there returns under the ceiling.
 - **SC-007**: Round 4 costs about $3.50: $3 for the re-baseline after the judge fix, cents for the probe re-run, and about $0.50 for the sql-patterns ladder run.
+- **SC-008**: After a graded session, BENCHMARK holds no class under a fixture's top-level package that the session or the check created (FR-023).
 
 ## Assumptions
 
