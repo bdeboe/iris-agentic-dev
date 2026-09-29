@@ -78,5 +78,7 @@ Run 1:
 Run 2:
 
 - [x] T045 Tests first: wording tests for sql-patterns §§3/5/9 and the -114 fact, and live `#[ignore]` tests on `Test130.SqlCode`; then the skill edits (FR-019)
-- [ ] T046 Billable: ladder on SKILL-09 and SKILL-21, 3 repeats per arm (~$0.50)
-- [ ] T047 Triage record for sql-patterns: `broken_check`, rubric asserted a false IRIS fact and the judge could not see code; research.md round 4; CLAUDE.md entry; markdown lint; local commit
+- [x] T046 Billable: ladder on SKILL-09, 3 repeats per arm (~$0.50). SKILL-21 is train, and the ladder runs holdout tasks only, so it is not on this run
+- [x] T046a Tests first: unit `package_prefixes`, `created_classes`, and a `run_one` test that a class created during the session is deleted after the check; live `test_a_session_leftover_is_deleted`; then wire it (FR-023)
+- [x] T046b Purge the leftovers from BENCHMARK: `Bench.Calc.Tests.MathTest`, `Bench.Patient.Test`, `Bench.Probe`, `Bench.Q2.CountOther`, `Bench.Stor`, `Bench.Validator`; no task names any of them (FR-023)
+- [x] T047 Triage record for sql-patterns: `broken_check`, rubric asserted a false IRIS fact and the judge could not see code; research.md round 4; CLAUDE.md entry; markdown lint; local commit

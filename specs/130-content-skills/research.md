@@ -381,3 +381,22 @@ Run `2026-09-29T031029`, after the SQLCODE sets were retired and SKILL-21 moved 
 No lift claim, and no regression either: every skill is far below its MDE (floors of 63 and 129 pairs). The two negative lifts are one session each at 3 pairs. The run record gives no reason for the unscored item, since the results JSON keeps no per-item reason; that is a legibility gap for the drafts list.
 
 The write tripped the Phase 2 triage gate (`test_triage.py`) five times. `ensemble-production` (+0.33) and `iris-ai-hub` (+0.22) carried `not_helped` verdicts from 2026-09-12 and now read over the gate, so both verdicts are superseded by this run. Three sets now have one arm at an end of the scale, which at 3 and 6 pairs takes one session. `iris-connectivity` (3/3 against 2/3, the reverse of the 2026-09-27 reading) and `objectscript-review` (3/3 against 2/3) are `not_helped`; `iris-vector-ai` (0/6 against 4/6) is `too_hard` for the bare arm. All three entries are withdrawn in the baseline, so none of the three is a comparison basis. The records are in `triage_records._ROUND_4`.
+
+### sql-patterns ladder (T046)
+
+Run `ladder-20260929T004750`, SKILL-09 only, 3 repeats per arm, about $0.51. SKILL-21 is train and the ladder takes holdout tasks only, so it was not on the run; it is the task the §§3/5/9 fix was fitted to.
+
+| Arm         | r0            | r1            | r2            | Passed |
+| ----------- | ------------- | ------------- | ------------- | ------ |
+| tools       | FAIL 27 calls | PASS 85 calls | PASS 57 calls | 2/3    |
+| tools+skill | PASS 25 calls | FAIL 3 calls  | PASS 53 calls | 2/3    |
+
+`b=0 c=0`, underpowered, no lift claim. The skill arm loaded its skill in all three sessions.
+
+The 3-call FAIL is not the skill's. The session read `Bench.Q2.CountOther(pCode)` as a class name, opened `Bench.Q2.CountOther.cls`, found a finished-looking class there, compiled it and stopped. That class was written on 2026-09-27 by ladder session `SKILL-09__tools+objectscript-sql-patterns__r1`, which made the same misreading, and nothing deleted it: `reset_documents` only resets the fixture's own names. It also ended the 2026-09-27 r2 session after 3 calls. So two SKILL-09 skill-arm FAILs across the two runs came from a leftover, and the 2026-09-27 full ladder (tools+skill 12/19) counts one of them. That run's `needs_fix` flag on `objectscript-sql-patterns` (skill arm failing 2 of 3 where tools passed 2) rests on that FAIL; without it the skill arm fails 1 and the flag does not fire.
+
+FR-023 fixes this. After the fixture goes on, `pilot.run_one` lists the classes under the fixture's top-level packages, lists them again after the check, and deletes the difference. The six leftovers no task names (`Bench.Calc.Tests.MathTest`, `Bench.Patient.Test`, `Bench.Probe`, `Bench.Q2.CountOther`, `Bench.Stor`, `Bench.Validator`) are deleted from BENCHMARK. `iris_doc list` refuses a bare wildcard, so a class a session writes outside the fixture's packages is still not seen.
+
+The misreading itself happened in both arms: tools r0 on this run asked for `Bench.Q2.CountOther` too and got a 400. SKILL-09's prompt names the method `Bench.Q2.CountOther(pCode)`, which reads as a class path. The prompt is left as it is, because changing a holdout task after looking at its results is what the split forbids. A new holdout task should name the class and the method separately.
+
+Triage: sql-patterns gets a round-4 `broken_check` record (the rubric's false `If SQLCODE` claim, and a judge that saw 120 characters of tool args and 200 of results), and it replaces T021's killed-session record.

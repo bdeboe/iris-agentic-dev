@@ -544,3 +544,17 @@ def test_the_sqlcode_task_set_is_retired_and_its_row_gone():
     assert "objectscript-sql-patterns" not in baseline["skills"]
     reason = baseline["ungated_skills"]["objectscript-sql-patterns"]
     assert "SQLCODE-SILENT" in reason and "SKILL-21" in reason
+
+
+def test_the_sqlcode_verdict_names_the_rubric_and_the_judge_view():
+    """130 T047. T021 called the sql-patterns floor the harness's (a killed session scored 0).
+    Round 4 found the rest: the rubric asserted a false IRIS fact and the judge could not see the
+    code. The round-4 record replaces T021's in ALL_RECORDS and stays broken_check."""
+    from tests.e2e.skill_eval.triage_records import _ROUND_4, ALL_RECORDS
+
+    record = ALL_RECORDS["objectscript-sql-patterns"]
+    assert record in _ROUND_4
+    assert record.verdict is TriageVerdict.BROKEN_CHECK
+    assert "0 is falsy" in record.evidence
+    assert "120" in record.evidence and "200" in record.evidence
+    assert "SKILL-21" in record.action and "SKILL-09" in record.action

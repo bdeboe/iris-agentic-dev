@@ -520,6 +520,6 @@
     }
   },
   "ungated_skills": {
-    "objectscript-sql-patterns": "Task set retired 2026-09-28 (130 FR-018). SQLCODE-SILENT and SQLCODE-CHECK asserted a false IRIS fact, so the 2026-09-27 0.00/0.00 row measured the rubric, not the skill, and was dropped. Measured on the ladder instead: SKILL-21 (train), SKILL-09 (holdout)."
+    "objectscript-sql-patterns": "Task set retired 2026-09-28 (130 FR-018). SQLCODE-SILENT and SQLCODE-CHECK asserted a false IRIS fact, so the 2026-09-27 0.00/0.00 row measured the rubric, not the skill, and was dropped. Fitted on SKILL-21 (train); measured on the ladder by SKILL-09 (holdout)."
   }
 }

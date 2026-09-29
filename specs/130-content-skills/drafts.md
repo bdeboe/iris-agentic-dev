@@ -45,3 +45,7 @@ It calls Atelier `/saschema/<url>`, the Studio Assist grammar for an XData names
 ## 8. The skill-eval results file does not say why an item went unscored
 
 Run `2026-09-29T031029` left one item in `objectscript-list-patterns` unscored, and the results JSON gives counts per arm but no reason per item: scorer error, timeout, a truncated reply, or a session that never went idle. Someone reading the file cannot tell which, and the fix differs for each. Each unscored item should carry its task id, arm, repeat and the reason the scorer gave up.
+
+## 9. SKILL-09's prompt reads as a class path
+
+The prompt names the method `Bench.Q2.CountOther(pCode)`. In ladder `2026-09-27T094542` and `2026-09-29T004750`, both arms asked `iris_doc` for `Bench.Q2.CountOther.cls`, and one skill-arm session wrote a class under that name, which then misled two later sessions (research.md § sql-patterns ladder). SKILL-09 is holdout, so its wording stays. The next holdout task for the same fact should say "method `CountOther` of class `Bench.Q2`".

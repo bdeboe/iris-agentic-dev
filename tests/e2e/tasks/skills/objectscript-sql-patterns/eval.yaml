@@ -8,7 +8,7 @@ implicit_fire_rate_prompt: |
 # asked for `If SQLCODE '= 0`, which fires on exactly the same values; SQLCODE-CHECK shared the
 # premise, and the judge rewarded answers that agreed with it over answers that were right about
 # IRIS (specs/130-content-skills/sql-patterns-review.md). Both files are deleted. The skill is
-# measured on the ladder: SKILL-21 (train) and SKILL-09 (holdout).
+# fitted on SKILL-21 (train) and measured on the ladder by SKILL-09 (holdout).
 benchmark_tasks: []
 domain_skill: false
 targeted_tasks_dir: tests/e2e/tasks/skills/targeted

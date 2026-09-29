@@ -201,6 +201,26 @@ _ROUND_4 = [
             "means anything."
         ),
     ),
+    # Not from the re-baseline: the 2026-09-28 review of the sql-patterns floor. It replaces T021's
+    # record, which found only the killed-session half.
+    TriageRecord(
+        skill="objectscript-sql-patterns",
+        verdict=TriageVerdict.BROKEN_CHECK,
+        evidence=(
+            "SQLCODE-SILENT and SQLCODE-CHECK, 0.00 both arms after every harness fix. The rubric "
+            "said `If SQLCODE` fires on success; 0 is falsy, so it does not, and the `If SQLCODE "
+            "'= 0` it asked for fires on the same values. The judge took up the rubric's claim and "
+            "could not check it against the code: tool args were cut to 120 characters and results "
+            "to 200. The skill's §3 made the same false claim "
+            "(specs/130-content-skills/sql-patterns-review.md)."
+        ),
+        action=(
+            "Both task files deleted and the baseline row dropped (FR-018). The judge reads tool "
+            "args and results up to 8000 characters (FR-013). §§3, 5, 9 fixed with live tests "
+            "(T045). SKILL-21 (train) is the task the fix was fitted to; SKILL-09 (holdout) is the "
+            "ladder measure."
+        ),
+    ),
 ]
 
 # The baseline run every verdict above was reached on. An entry measured by a later run with no
