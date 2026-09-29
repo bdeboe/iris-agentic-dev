@@ -710,3 +710,49 @@ async fn sa_schema_returns_the_grammar_and_refuses_an_unknown_url() {
     assert!(text.contains("SA_SCHEMA_NOT_FOUND"), "{text}");
     assert!(text.contains("%GetCubeList"), "{text}");
 }
+
+/// PR 142 review: the discovery and query snippets proposed for the skill's §14, run as written
+/// with the fixture's cube, level and measure names swapped in.
+#[tokio::test]
+#[ignore = "requires live IRIS"]
+async fn the_proposed_skill_snippets_run_as_written() {
+    with_cube!(|c, client| {
+        let cubes = run(
+            &c,
+            &client,
+            r#"Set sc = ##class(%DeepSee.Utils).%GetCubeList(.list)
+Set k = "" For { Set k = $Order(list(k)) Quit:k=""  Write $ListGet(list(k),1),! }"#,
+        )
+        .await;
+        assert!(cubes.to_uppercase().contains("IADLIVE131SALES"), "{cubes}");
+
+        let dims = run(
+            &c,
+            &client,
+            r#"Set sc = ##class(%DeepSee.Utils).%GetDimensionList("IadLive131Sales", .info)
+Set d = "" For { Set d = $Order(info(d)) Quit:d=""
+    Set h = "" For { Set h = $Order(info(d,h)) Quit:h=""
+        Set l = "" For { Set l = $Order(info(d,h,l)) Quit:l=""  Write $ListToString(info(d,h,l)),! } } }"#,
+        )
+        .await;
+        assert!(dims.contains("l,RegionD,H1,Region"), "{dims}");
+        assert!(dims.lines().any(|l| l.starts_with("m,")), "{dims}");
+
+        let grid = run(
+            &c,
+            &client,
+            r#"Set rs = ##class(%DeepSee.ResultSet).%New()
+Set sc = rs.%PrepareMDX("SELECT MEASURES.[Amount] ON 0, NON EMPTY [RegionD].[H1].[Region].MEMBERS ON 1 FROM [IadLive131Sales]")
+If $$$ISERR(sc) { Write $System.Status.GetErrorText(sc),! Quit }
+Set sc = rs.%Execute()
+If $$$ISERR(sc) { Write $System.Status.GetErrorText(sc),! Quit }
+For r = 1:1:rs.%GetAxisSize(2) {
+    Kill lab Set n = rs.%GetOrdinalLabel(.lab, 2, r)
+    Write $Get(lab(1)), ": ", rs.%GetOrdinalValue(1, r),!
+}"#,
+        )
+        .await;
+        assert!(grid.contains("Asia: "), "{grid}");
+        assert!(grid.contains("Europe: "), "{grid}");
+    });
+}
