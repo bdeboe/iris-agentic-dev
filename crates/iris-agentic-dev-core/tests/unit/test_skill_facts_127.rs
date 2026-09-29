@@ -388,3 +388,83 @@ fn aihub_eap_is_upstream_plus_the_marked_patch() {
         "aihub-eap differs from upstream 72f9046 outside the marked patch"
     );
 }
+
+/// The text of one `## N.` section of a skill, heading included.
+fn section(text: &str, number: u32) -> String {
+    let head = format!("\n## {number}. ");
+    let start = text
+        .find(&head)
+        .unwrap_or_else(|| panic!("no section {number}"));
+    let rest = &text[start + 1..];
+    let end = rest[1..].find("\n## ").map_or(rest.len(), |i| i + 1);
+    rest[..end].to_string()
+}
+
+/// sql-3 (130 FR-019). `If SQLCODE` is false on 0, so a found row is never reported as missing.
+/// The defect is that it fires on 100 and on every negative code alike, so an SQL error reads as
+/// "not found".
+#[test]
+fn sql_patterns_section_3_blames_the_lumping_not_the_zero() {
+    let s3 = section(&skill("objectscript-sql-patterns"), 3);
+    assert!(
+        !s3.contains("NOT FOUND when row EXISTS"),
+        "sql-patterns §3 still says `If SQLCODE` reports a found row as missing"
+    );
+    assert!(
+        s3.contains("fires on 100 and on every negative code"),
+        "sql-patterns §3 must say what `If SQLCODE` gets wrong: 100 and errors in one branch"
+    );
+}
+
+/// sql-5 (130 FR-019). `If SQLCODE < 0 { Return "" }` hands an SQL error back as an empty
+/// answer. The section must surface it.
+#[test]
+fn sql_patterns_section_5_does_not_swallow_a_negative_sqlcode() {
+    let s5 = section(&skill("objectscript-sql-patterns"), 5);
+    for line in s5.lines() {
+        let squashed: String = line.split_whitespace().collect();
+        assert!(
+            !squashed.contains("SQLCODE<0{Return\"\"}"),
+            "sql-patterns §5 still returns \"\" on a negative SQLCODE: {line}"
+        );
+    }
+    assert!(
+        s5.contains("CreateFromSQLCODE"),
+        "sql-patterns §5 must surface the error, e.g. %Exception.SQL.CreateFromSQLCODE"
+    );
+}
+
+/// sql-114 (130 FR-019). A row lock that times out is -114, and the INTO variable is not a
+/// sign of success: it can hold the locked row's data.
+#[test]
+fn sql_patterns_section_5_names_the_lock_timeout() {
+    let s5 = section(&skill("objectscript-sql-patterns"), 5);
+    assert!(s5.contains("-114"), "sql-patterns §5 must name -114");
+    assert!(
+        s5.contains("READ COMMITTED"),
+        "sql-patterns §5 must say -114 comes from READ COMMITTED's row lock"
+    );
+}
+
+/// sql-9 (130 FR-019). `COUNT(*) INTO :n` with `n` undefined leaves `n` defined and 0. On
+/// SQLCODE 100 a plain SELECT sets the INTO variable to "", which the section keeps.
+#[test]
+fn sql_patterns_section_9_says_count_into_sets_zero() {
+    let s9 = section(&skill("objectscript-sql-patterns"), 9);
+    assert!(
+        !s9.contains("IRIS leaves it empty string"),
+        "sql-patterns §9 still says COUNT(*) INTO leaves an undefined variable empty"
+    );
+    assert!(
+        !s9.contains("outputs \"count=\" (empty)"),
+        "sql-patterns §9 still shows COUNT(*) INTO printing an empty count"
+    );
+    assert!(
+        s9.contains("defined and 0"),
+        "sql-patterns §9 must say COUNT(*) INTO leaves the variable defined and 0"
+    );
+    assert!(
+        s9.contains("SQLCODE 100") && s9.contains("\"\""),
+        "sql-patterns §9 must keep the true fact: SQLCODE 100 sets the INTO variable to \"\""
+    );
+}

@@ -73,9 +73,10 @@ Run 1:
 - [x] T043 fmt, clippy, all suites (unit parallel, integration serial with `--include-ignored`), pytest; local commit
 - [x] T043a Tests first: `run_validity` (one thin skill does not void the run; a run-wide share over the limit does; a skill with nothing scored is excluded), `baseline_writes` for the merge path; then wire both (FR-022)
 - [x] T044 Billable: tell Tom the cost (~$3), then skill-eval `--update-baseline`
+- [x] T044a Triage the re-baseline: supersede the `ensemble-production` and `iris-ai-hub` verdicts; verdicts and withdrawn blocks for `iris-connectivity`, `objectscript-review` (`not_helped`) and `iris-vector-ai` (`too_hard`); `test_triage.py` updated first
 
 Run 2:
 
-- [ ] T045 Tests first: wording tests for sql-patterns §§3/5/9 and the -114 fact, and live `#[ignore]` tests on `Test130.SqlCode`; then the skill edits (FR-019)
+- [x] T045 Tests first: wording tests for sql-patterns §§3/5/9 and the -114 fact, and live `#[ignore]` tests on `Test130.SqlCode`; then the skill edits (FR-019)
 - [ ] T046 Billable: ladder on SKILL-09 and SKILL-21, 3 repeats per arm (~$0.50)
 - [ ] T047 Triage record for sql-patterns: `broken_check`, rubric asserted a false IRIS fact and the judge could not see code; research.md round 4; CLAUDE.md entry; markdown lint; local commit

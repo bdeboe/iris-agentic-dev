@@ -92,12 +92,13 @@ Set rs = stmt.%Execute(category, +$HOROLOG)
 ```objectscript
 &sql(SELECT Label INTO :result FROM MyTable WHERE Code = :code)
 
-// WRONG — if SQLCODE is true it means NOT ok, but 0 (ok) is falsy:
-If SQLCODE { Return "NOT FOUND" }          // returns NOT FOUND when row EXISTS!
+// WRONG — 0 is falsy, so a found row gets through, but the branch
+// fires on 100 and on every negative code, so an SQL error comes back as "NOT FOUND":
+If SQLCODE { Return "NOT FOUND" }
 
-// CORRECT:
+// CORRECT — no row and an error are different answers:
 If SQLCODE = 100 { Return "NOT FOUND" }    // 100 = no rows
-If SQLCODE < 0   { Return "SQL ERROR" }    // negative = error
+If SQLCODE < 0   { Throw ##class(%Exception.SQL).CreateFromSQLCODE(SQLCODE, %msg) }
 Return result                               // SQLCODE = 0 = found
 ```
 
@@ -128,7 +129,7 @@ Check twice. `%SQLCODE` after `%Execute` covers errors raised before the first r
 // Embedded SQL — compiled into the method, faster but static:
 &sql(SELECT Name INTO :name FROM Config.Setting WHERE Name = :key)
 If SQLCODE = 100 { Return "" }    // not found
-If SQLCODE < 0   { Return "" }    // error
+If SQLCODE < 0   { Throw ##class(%Exception.SQL).CreateFromSQLCODE(SQLCODE, %msg) }
 
 // %SQL.Statement — dynamic, preferred for variable table/field names:
 Set stmt = ##class(%SQL.Statement).%New()
@@ -136,6 +137,10 @@ Set tSC = stmt.%Prepare("SELECT Name FROM " _ tableName _ " WHERE Key = ?")
 If $$$ISERR(tSC) { Return tSC }    // %Prepare returns the error; it does not throw
 Set rs = stmt.%Execute(key)
 ```
+
+Returning `""` on a negative SQLCODE hands the caller the not-found answer for an error. Throw it, or return a `%Status`, so the caller can tell them apart.
+
+**-114 is a lock timeout, not a miss.** Under `READ COMMITTED`, a read of a row another process has locked waits for the lock, then fails with SQLCODE -114. The `INTO` variable still holds the row's values, so code that checks only for 100 carries on with them. Treat -114 as an error like any other negative code.
 
 ## 6. IS NULL in IRIS SQL
 
@@ -197,29 +202,32 @@ Set display = $ZDATE(today, 3)     // "YYYY-MM-DD"
 Set hDate   = $ZDATEH("2026-01-15", 3)  // back to $HOROLOG integer
 ```
 
-## 9. Embedded SQL INTO Variable — Must Be Initialized First
+## 9. Embedded SQL INTO Variables — What a SELECT Leaves Behind
 
 ```objectscript
-// WRONG — tCount stays empty if SELECT returns 0 rows or SQLCODE fires:
-&sql(SELECT COUNT(*) INTO :tCount FROM Bench.Patient)
-write "count="_tCount  // outputs "count=" (empty)
+// COUNT(*) always returns one row, so SQLCODE is 0 and tCount is set,
+// even when nothing matches and tCount was never defined:
+Kill tCount
+&sql(SELECT COUNT(*) INTO :tCount FROM Bench.Patient WHERE Code = 'none')
+If SQLCODE < 0 { Throw ##class(%Exception.SQL).CreateFromSQLCODE(SQLCODE, %msg) }
+Write "count="_tCount  // outputs "count=0"
 
-// CORRECT — initialize the variable first:
-Set tCount = 0
-&sql(SELECT COUNT(*) INTO :tCount FROM Bench.Patient)
-If SQLCODE < 0 { write "SQL error: "_SQLMESSAGE quit }
-write "count="_tCount  // outputs "count=0" or actual count
+// A plain SELECT that finds no row sets SQLCODE 100 and sets each INTO variable to "":
+Set tLabel = "untouched"
+&sql(SELECT Label INTO :tLabel FROM Bench.Patient WHERE Code = 'none')
+// SQLCODE = 100, tLabel = ""
 
-// CORRECT for %SQL.Statement path:
+// %SQL.Statement path:
 Set stmt = ##class(%SQL.Statement).%New()
 Set sc = stmt.%Prepare("SELECT COUNT(*) AS cnt FROM Bench.Patient")
 Set rs = stmt.%Execute()
 If rs.%Next() { Set tCount = rs.%Get("cnt") } Else { Set tCount = 0 }
 ```
 
-**Why this trips up agents**: `SELECT COUNT(*) INTO :var` always succeeds (SQLCODE=0)
-even when there are no rows — it just stores 0. But if `:var` was never declared,
-IRIS leaves it empty string `""`, not `0`. Always `Set var = 0` before the SQL call.
+**Why this trips up agents**: `SELECT COUNT(*) INTO :var` leaves `var` defined and 0 when no
+rows match, whether or not it was set first. On SQLCODE 100 a plain SELECT overwrites its `INTO`
+variables with `""`, so a default set before the query does not survive a miss. Check SQLCODE
+rather than the variable. The error text is in `%msg`.
 
 ## 10. Debugging SQL Table Name Errors — Agent Red Herring Alert
 

@@ -379,3 +379,5 @@ Run `2026-09-29T031029`, after the SQLCODE sets were retired and SKILL-21 moved 
 | objectscript-list-patterns | 5/6    | 0.00 → 0.67 | +1.00 | 2     | not written  |
 
 No lift claim, and no regression either: every skill is far below its MDE (floors of 63 and 129 pairs). The two negative lifts are one session each at 3 pairs. The run record gives no reason for the unscored item, since the results JSON keeps no per-item reason; that is a legibility gap for the drafts list.
+
+The write tripped the Phase 2 triage gate (`test_triage.py`) five times. `ensemble-production` (+0.33) and `iris-ai-hub` (+0.22) carried `not_helped` verdicts from 2026-09-12 and now read over the gate, so both verdicts are superseded by this run. Three sets now have one arm at an end of the scale, which at 3 and 6 pairs takes one session. `iris-connectivity` (3/3 against 2/3, the reverse of the 2026-09-27 reading) and `objectscript-review` (3/3 against 2/3) are `not_helped`; `iris-vector-ai` (0/6 against 4/6) is `too_hard` for the bare arm. All three entries are withdrawn in the baseline, so none of the three is a comparison basis. The records are in `triage_records._ROUND_4`.

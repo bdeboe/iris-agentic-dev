@@ -734,3 +734,234 @@ async fn long_class_name_compiles_and_saves() {
     assert_eq!(out, "1,1", "save and a short hashed DataLocation");
     drop_classes(&c, &client, &[name]).await;
 }
+
+/// 130 FR-019. The class the sql-patterns review ran its probes on. It stays on iris-dev-iris
+/// (130 clarifications); the tests put it again so they do not depend on what is there.
+const SQLCODE_CLASS: &str = r#"Class Test130.SqlCode Extends %Persistent
+{
+
+Property Code As %String;
+
+Property Label As %String;
+
+ClassMethod Seed() As %Status
+{
+    Set tSC = $$$OK
+    Do ..%KillExtent()
+    Set o = ..%New(), o.Code = "A", o.Label = "Alpha"
+    Set tSC = o.%Save()
+    Quit tSC
+}
+
+/// Section 3 WRONG form, verbatim shape
+ClassMethod Bare(pCode As %String) As %String
+{
+    Set result = ""
+    &sql(SELECT Label INTO :result FROM Test130.SqlCode WHERE Code = :pCode)
+    If SQLCODE { Quit "NOT FOUND" }
+    Quit result_" (SQLCODE="_SQLCODE_")"
+}
+
+/// Section 3 WRONG form against a missing table
+ClassMethod Missing(pCode As %String) As %String
+{
+    Set result = ""
+    &sql(SELECT Label INTO :result FROM Test130_SqlCode WHERE Code = :pCode)
+    If SQLCODE { Quit "NOT FOUND (SQLCODE="_SQLCODE_")" }
+    Quit result
+}
+
+/// Section 5 old form: a negative SQLCODE returns "", the same as no row
+ClassMethod Swallow(pCode As %String, pDiv As %Integer) As %String
+{
+    Set tName = "", tRatio = ""
+    &sql(SELECT Label, 1/:pDiv INTO :tName, :tRatio FROM Test130.SqlCode WHERE Code = :pCode)
+    If SQLCODE = 100 { Quit "" }
+    If SQLCODE < 0 { Quit "" }
+    Quit tName
+}
+
+/// Section 5 corrected form: a negative SQLCODE throws
+ClassMethod Surface(pCode As %String, pDiv As %Integer) As %String
+{
+    Set tName = "", tRatio = ""
+    &sql(SELECT Label, 1/:pDiv INTO :tName, :tRatio FROM Test130.SqlCode WHERE Code = :pCode)
+    If SQLCODE = 100 { Quit "" }
+    If SQLCODE < 0 { Throw ##class(%Exception.SQL).CreateFromSQLCODE(SQLCODE, %msg) }
+    Quit tName
+}
+
+/// Section 9 WRONG form: COUNT(*) INTO an undefined variable
+ClassMethod CountUndefined() As %String
+{
+    Kill tCount
+    &sql(SELECT COUNT(*) INTO :tCount FROM Test130.SqlCode WHERE Code = 'none')
+    Quit "SQLCODE="_SQLCODE_" defined="_$Data(tCount)_" value=["_$Get(tCount,"<undef>")_"]"
+}
+
+/// Section 9 on a no-row SELECT: is the INTO variable touched?
+ClassMethod NoRowInto() As %String
+{
+    Set tLabel = "untouched"
+    &sql(SELECT Label INTO :tLabel FROM Test130.SqlCode WHERE Code = 'none')
+    Quit "SQLCODE="_SQLCODE_" value=["_tLabel_"]"
+}
+
+/// -114 probe, background half: hold row 1's lock until told to let go
+ClassMethod HoldLock()
+{
+    Lock +^Test130.SqlCodeD(1)
+    Set ^Test130Lk("held") = 1
+    For i = 1:1:300 { Quit:$Get(^Test130Lk("release"))  Hang 0.1 }
+    Lock -^Test130.SqlCodeD(1)
+    Kill ^Test130Lk("held")
+}
+
+/// -114 probe, reading half: a READ COMMITTED read of the locked row
+ClassMethod ReadLocked(pCode As %String) As %String
+{
+    Do $SYSTEM.SQL.Util.SetOption("ProcessLockTimeout", 1)
+    &sql(SET TRANSACTION ISOLATION LEVEL READ COMMITTED)
+    Set tLabel = "untouched"
+    &sql(SELECT Label INTO :tLabel FROM Test130.SqlCode WHERE Code = :pCode)
+    Quit "SQLCODE="_SQLCODE_" value=["_tLabel_"]"
+}
+
+}"#;
+
+async fn sqlcode_class(c: &IrisConnection, client: &reqwest::Client) {
+    put_doc(c, client, "Test130.SqlCode.cls", SQLCODE_CLASS).await;
+    let r = compile(c, client, "Test130.SqlCode.cls").await;
+    assert!(r.success(), "Test130.SqlCode must compile: {:?}", r.errors);
+    let seeded = run(
+        c,
+        client,
+        " Write $System.Status.IsOK(##class(Test130.SqlCode).Seed())",
+    )
+    .await;
+    assert_eq!(seeded, "1", "Test130.SqlCode.Seed failed");
+}
+
+/// sql-3. `If SQLCODE` is false on 0, so a found row comes back. It is true on 100 and on -30,
+/// so a missing table reads as "NOT FOUND".
+#[tokio::test]
+#[ignore]
+async fn if_sqlcode_lumps_no_row_with_an_error() {
+    let Some((c, client)) = conn() else { return };
+    sqlcode_class(&c, &client).await;
+    let found = run(&c, &client, " Write ##class(Test130.SqlCode).Bare(\"A\")").await;
+    assert_eq!(found, "Alpha (SQLCODE=0)", "a found row must come back");
+    let none = run(&c, &client, " Write ##class(Test130.SqlCode).Bare(\"Z\")").await;
+    assert_eq!(none, "NOT FOUND");
+    let missing = run(
+        &c,
+        &client,
+        " Write ##class(Test130.SqlCode).Missing(\"A\")",
+    )
+    .await;
+    assert_eq!(
+        missing, "NOT FOUND (SQLCODE=-30)",
+        "a missing table must read as not found under `If SQLCODE`"
+    );
+}
+
+/// sql-5. `If SQLCODE < 0 { Quit "" }` turns a -400 into the no-row answer. Throwing from
+/// `CreateFromSQLCODE` keeps the code.
+#[tokio::test]
+#[ignore]
+async fn a_negative_sqlcode_is_surfaced_not_returned_empty() {
+    let Some((c, client)) = conn() else { return };
+    sqlcode_class(&c, &client).await;
+    let swallowed = run(
+        &c,
+        &client,
+        " Write \"[\",##class(Test130.SqlCode).Swallow(\"A\",0),\"]\"",
+    )
+    .await;
+    let no_row = run(
+        &c,
+        &client,
+        " Write \"[\",##class(Test130.SqlCode).Swallow(\"Z\",1),\"]\"",
+    )
+    .await;
+    assert_eq!(swallowed, "[]", "the old form returns \"\" on -400");
+    assert_eq!(swallowed, no_row, "and that is the no-row answer");
+
+    let surfaced = run(
+        &c,
+        &client,
+        " Try { Write ##class(Test130.SqlCode).Surface(\"A\",0) } \
+         Catch e { Write \"caught \",e.Code }",
+    )
+    .await;
+    assert_eq!(
+        surfaced, "caught -400",
+        "the corrected form must throw with the SQLCODE"
+    );
+    let ok = run(
+        &c,
+        &client,
+        " Write ##class(Test130.SqlCode).Surface(\"A\",1)",
+    )
+    .await;
+    assert_eq!(ok, "Alpha");
+}
+
+/// sql-9. `COUNT(*) INTO` with an undefined variable sets it to 0. A no-row SELECT sets the INTO
+/// variable to "" rather than leaving it alone.
+#[tokio::test]
+#[ignore]
+async fn count_into_sets_zero_and_no_row_sets_empty() {
+    let Some((c, client)) = conn() else { return };
+    sqlcode_class(&c, &client).await;
+    let count = run(
+        &c,
+        &client,
+        " Write ##class(Test130.SqlCode).CountUndefined()",
+    )
+    .await;
+    assert_eq!(count, "SQLCODE=0 defined=1 value=[0]");
+    let no_row = run(&c, &client, " Write ##class(Test130.SqlCode).NoRowInto()").await;
+    assert_eq!(no_row, "SQLCODE=100 value=[]");
+}
+
+/// sql-114. Under READ COMMITTED a read of a row another process holds times out with -114. The
+/// timeout and isolation level are set per process, so nothing instance-wide changes.
+#[tokio::test]
+#[ignore]
+async fn a_read_committed_read_of_a_locked_row_is_minus_114() {
+    let Some((c, client)) = conn() else { return };
+    sqlcode_class(&c, &client).await;
+    run(
+        &c,
+        &client,
+        " Kill ^Test130Lk Job ##class(Test130.SqlCode).HoldLock() \
+         For i=1:1:50 { Quit:$Get(^Test130Lk(\"held\"))  Hang 0.1 } Write $Get(^Test130Lk(\"held\"))",
+    )
+    .await;
+    let read = run(
+        &c,
+        &client,
+        " Write ##class(Test130.SqlCode).ReadLocked(\"A\")",
+    )
+    .await;
+    run(
+        &c,
+        &client,
+        " Set ^Test130Lk(\"release\")=1 For i=1:1:50 { Quit:'$Data(^Test130Lk(\"held\"))  Hang 0.1 } \
+         Kill ^Test130Lk Write 1",
+    )
+    .await;
+    // The INTO variable still holds the row, so code that checks only for 100 uses it.
+    assert_eq!(
+        read, "SQLCODE=-114 value=[Alpha]",
+        "expected -114 with the row read"
+    );
+    let unlocked = run(
+        &c,
+        &client,
+        " Write ##class(Test130.SqlCode).ReadLocked(\"A\")",
+    )
+    .await;
+    assert_eq!(unlocked, "SQLCODE=0 value=[Alpha]");
+}
