@@ -4,30 +4,9 @@ use std::process::{Command, Stdio};
 
 /// Locates the built `iris-agentic-dev` binary (the `[[bin]] name` in
 /// `iris-agentic-dev-bin`'s Cargo.toml — NOT `iris-dev`, a stale name from before a
-/// crate rename). Checks both `target/{debug,release}/` (plain `cargo build`/`cargo
-/// test`) and `target/llvm-cov-target/{debug,release}/` (`cargo llvm-cov`, which
-/// builds into a separate target dir) since this test is exercised by both.
+/// crate rename), by the one rule every harness shares (`testing::iad_binary_path`).
 fn iris_dev_bin() -> std::path::PathBuf {
-    let workspace_root = {
-        let mut p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        p.pop();
-        p.pop();
-        p
-    };
-    for target_subdir in [
-        "target/debug/iris-agentic-dev",
-        "target/release/iris-agentic-dev",
-        "target/llvm-cov-target/debug/iris-agentic-dev",
-        "target/llvm-cov-target/release/iris-agentic-dev",
-    ] {
-        let candidate = workspace_root.join(target_subdir);
-        if candidate.exists() {
-            return candidate;
-        }
-    }
-    // Fall back to the plain debug path so the resulting error message names the
-    // path we expected, rather than an empty PathBuf.
-    workspace_root.join("target/debug/iris-agentic-dev")
+    iris_agentic_dev_core::testing::iad_binary_path()
 }
 
 fn mcp_exchange(
@@ -100,7 +79,7 @@ fn mcp_exchange(
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
     }
-    child.kill().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
     results
 }
 

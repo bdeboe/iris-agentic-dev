@@ -261,3 +261,87 @@ fn test_exec_kill_global_allowed_live() {
         "^IadGateTest should be gone after Kill, $Data returned: {vstdout}"
     );
 }
+
+// --- 130 round 4: a CLI call leaves no telemetry scratch class behind ---------------------------
+//
+// Every tool call writes a telemetry record to `^IRISDEV("telemetry",...)` through a scratch class.
+// `record_call` spawned that write and the CLI exited without waiting, so the runtime dropped it
+// between compile and delete: 78,183 `IrisDevTmp.IrisDevRun*` classes in USER. Telemetry now uses
+// its own prefix, so this counts the fix alone and not the older MCP processes still running.
+
+fn telemetry_scratch_classes() -> std::collections::BTreeSet<String> {
+    let url = format!(
+        "http://{}:{}/api/atelier/v1/USER/docnames/CLS?filter=IrisDevTmp.IrisDevTel%25",
+        env_or("IRIS_HOST", "localhost"),
+        env_or("IRIS_WEB_PORT", "52780")
+    );
+    let auth = format!(
+        "{}:{}",
+        env_or("IRIS_USERNAME", "_SYSTEM"),
+        env_or("IRIS_PASSWORD", "SYS")
+    );
+    let out = Command::new("curl")
+        .args(["-s", "-u", &auth, &url])
+        .output()
+        .expect("curl");
+    let body: serde_json::Value = serde_json::from_slice(&out.stdout)
+        .unwrap_or_else(|e| panic!("docnames answer is not JSON ({e}): {:?}", out));
+    body["result"]["content"]
+        .as_array()
+        .expect("docnames content")
+        .iter()
+        .filter_map(|d| d["name"].as_str())
+        .filter(|n| n.contains("IrisDevTel"))
+        .map(str::to_string)
+        .collect()
+}
+
+fn telemetry_sessions() -> u64 {
+    let out = iris_dev()
+        .args([
+            "exec",
+            r#"set n=0,k="" for  { set k=$order(^IRISDEV("telemetry",k)) quit:k=""  set n=n+1 } write n,!"#,
+        ])
+        .output()
+        .expect("failed to run iris-agentic-dev");
+    String::from_utf8_lossy(&out.stdout)
+        .trim()
+        .parse()
+        .unwrap_or_else(|_| panic!("session count: {:?}", out))
+}
+
+#[test]
+#[ignore]
+fn test_exec_leaves_no_telemetry_scratch_class_130() {
+    let before = telemetry_sessions();
+    // Names, not a count: a class another suite leaked (a killed server, a dropped runtime) must
+    // not fail this one, and one this test leaks must not hide behind a cleanup elsewhere.
+    let classes_before = telemetry_scratch_classes();
+
+    let ok = iris_dev().args(["exec", "write 1,!"]).output().unwrap();
+    assert!(ok.status.success(), "{ok:?}");
+    // A failing call exits through the other path, `exit(1)`.
+    let failed = iris_dev()
+        .args(["exec", "do ##class(Nonexistent.Class130).Method()"])
+        .output()
+        .unwrap();
+    assert!(
+        !failed.status.success() || !failed.stdout.is_empty(),
+        "{failed:?}"
+    );
+
+    let leaked: Vec<_> = telemetry_scratch_classes()
+        .difference(&classes_before)
+        .cloned()
+        .collect();
+    assert!(
+        leaked.is_empty(),
+        "a CLI process exited before its telemetry write removed its scratch class: {leaked:?}"
+    );
+    // The writes happened, so no new class means cleaned up and not skipped. The counting calls are
+    // CLI processes too, so the number only goes up.
+    assert!(
+        telemetry_sessions() >= before + 2,
+        "no telemetry write landed, so the empty diff above proves nothing"
+    );
+}

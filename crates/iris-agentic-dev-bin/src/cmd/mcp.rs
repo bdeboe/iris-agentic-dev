@@ -185,7 +185,7 @@ impl McpCommand {
             // Also on bare stderr: the exit happens before the MCP handshake, so a client sees a
             // process that died without speaking. `RUST_LOG` can silence tracing; this it cannot.
             eprintln!("error: {}", e);
-            std::process::exit(2);
+            crate::exit(2);
         }
 
         tokio::spawn(async move {
@@ -284,20 +284,55 @@ impl McpCommand {
                     .serve(stdio())
                     .await
                     .inspect_err(|e| tracing::error!("MCP server error: {:?}", e))?;
-                service.waiting().await?;
+                tokio::select! {
+                    r = service.waiting() => { r?; }
+                    sig = shutdown_signal() => tracing::info!("{sig}: shutting down"),
+                }
             }
             "http" => {
-                run_http_transport(tools, &self.bind, self.port).await?;
+                tokio::select! {
+                    r = run_http_transport(tools, &self.bind, self.port) => r?,
+                    sig = shutdown_signal() => tracing::info!("{sig}: shutting down"),
+                }
             }
             other => {
                 eprintln!(
                     "error: unsupported transport '{}' — supported values: stdio, http",
                     other
                 );
-                std::process::exit(1);
+                crate::exit(1);
             }
         }
         Ok(())
+    }
+}
+
+/// Resolves on SIGTERM or Ctrl-C, naming which.
+///
+/// MCP hosts stop a server with SIGTERM. Left to its default, that ends the process on the spot,
+/// before `main` flushes the telemetry write the last call started, and the write's scratch class
+/// stays in USER (130 round 4). Returning instead lets `main` flush, and dropping the runtime runs
+/// the scratch-class cleanup of any call still in flight.
+async fn shutdown_signal() -> &'static str {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{signal, SignalKind};
+        match signal(SignalKind::terminate()) {
+            Ok(mut term) => tokio::select! {
+                _ = term.recv() => "SIGTERM",
+                _ = tokio::signal::ctrl_c() => "SIGINT",
+            },
+            Err(e) => {
+                tracing::warn!("cannot listen for SIGTERM: {e}");
+                let _ = tokio::signal::ctrl_c().await;
+                "SIGINT"
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
+        "Ctrl-C"
     }
 }
 

@@ -53,25 +53,19 @@ fn the_resolved_binary_sits_under_the_workspace_target_directory() {
 }
 
 /// Under coverage the instrumented binary is the one that must run: a subprocess from
-/// `target/debug` contributes nothing to the report and may be a different build entirely.
-/// Which build exists depends on how the suite was invoked, so the expectation is computed
-/// rather than skipped — a test that returns early here would assert nothing on a normal run.
+/// `target/debug` contributes nothing to the report. Outside coverage the instrumented build is
+/// whatever an old `cargo llvm-cov` left behind, and preferring it ran stale code (130 round 4).
+/// The benchmark and the test harnesses resolve through the same function, so they agree.
 #[test]
-fn the_instrumented_build_is_preferred_over_the_plain_one() {
+fn the_benchmark_resolves_the_binary_the_way_the_test_harnesses_do() {
     let root = workspace_root();
-    let cov = root
-        .join("target")
-        .join("llvm-cov-target")
-        .join("debug")
-        .join("iris-agentic-dev");
-    let plain = root.join("target").join("debug").join("iris-agentic-dev");
-    let expected = if cov.exists() { &cov } else { &plain };
-
+    let expected = iris_agentic_dev_core::benchmark::cli_dispatch::workspace_iad_binary(&root);
+    assert_eq!(iris_dev_bin(), expected);
+    let cov = root.join("target").join("llvm-cov-target");
     assert_eq!(
-        &iris_dev_bin(),
-        expected,
-        "with llvm-cov build present={}, the resolver must pick {}",
-        cov.exists(),
+        expected.starts_with(&cov),
+        std::env::var_os("CARGO_LLVM_COV").is_some(),
+        "the coverage build is chosen exactly when running under cargo llvm-cov, got {}",
         expected.display()
     );
 }

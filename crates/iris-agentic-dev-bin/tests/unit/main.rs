@@ -14,6 +14,7 @@ mod test_connection_args;
 mod test_doc_args;
 mod test_eval_session_binary;
 mod test_exec_args;
+mod test_exit_flush;
 mod test_plugin_manifest_version;
 mod test_query_tsv;
 mod test_tool_dispatch;

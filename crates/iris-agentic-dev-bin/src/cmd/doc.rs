@@ -58,7 +58,7 @@ impl DocCommand {
                 if body["success"].as_bool() != Some(true) {
                     let msg = body["error"].as_str().unwrap_or("get failed");
                     eprintln!("error: {}", msg);
-                    std::process::exit(1);
+                    crate::exit(1);
                 }
                 let content = body["content"].as_str().unwrap_or("");
                 // Print raw UDL source — no framing, pipe-safe
@@ -75,7 +75,7 @@ impl DocCommand {
                         "error: write operations are suppressed on production IRIS instances.\n\
                          Set IRIS_ALLOW_PROD=1 to override."
                     );
-                    std::process::exit(1);
+                    crate::exit(1);
                 }
 
                 let doc_name = ensure_cls_extension(&name);
@@ -90,7 +90,7 @@ impl DocCommand {
                         .with_context(|| format!("reading {}", path.display()))?
                 } else {
                     eprintln!("error: `doc put` requires --file <path> or `-` to read from stdin");
-                    std::process::exit(1);
+                    crate::exit(1);
                 };
 
                 let mut args = serde_json::json!({
@@ -128,7 +128,7 @@ impl DocCommand {
                 if body["success"].as_bool() != Some(true) {
                     let msg = body["error"].as_str().unwrap_or("write failed");
                     eprintln!("error: {}", msg);
-                    std::process::exit(1);
+                    crate::exit(1);
                 }
                 println!("OK: {}", body["name"].as_str().unwrap_or(&doc_name));
             }

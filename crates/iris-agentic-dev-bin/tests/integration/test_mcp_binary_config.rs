@@ -129,8 +129,7 @@ fn config_file_enabled_tools_limits_tools_list() {
     let (mut child, mut stdin, stdout) = spawn_mcp(Some(&cfg_path.to_string_lossy()));
     send_initialize(&mut stdin);
     let names = get_tool_names(&mut stdin, stdout);
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     assert_eq!(
         names.len(),
@@ -169,8 +168,7 @@ fn config_file_disabled_tools_removes_named_tools() {
     let (mut child, mut stdin, stdout) = spawn_mcp(Some(&cfg_path.to_string_lossy()));
     send_initialize(&mut stdin);
     let names = get_tool_names(&mut stdin, stdout);
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     assert!(
         !names.is_empty(),
@@ -204,8 +202,7 @@ fn config_file_write_tools_disabled_shown_in_check_config() {
     let (mut child, mut stdin, stdout) = spawn_mcp(Some(&cfg_path.to_string_lossy()));
     send_initialize(&mut stdin);
     let cfg = get_check_config(&mut stdin, stdout);
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     assert_eq!(
         cfg.get("write_tools_enabled").and_then(|v| v.as_bool()),
@@ -233,8 +230,7 @@ fn config_file_write_tools_enabled_shown_in_check_config() {
     let (mut child, mut stdin, stdout) = spawn_mcp(Some(&cfg_path.to_string_lossy()));
     send_initialize(&mut stdin);
     let cfg = get_check_config(&mut stdin, stdout);
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     assert_eq!(
         cfg.get("write_tools_enabled").and_then(|v| v.as_bool()),
@@ -408,8 +404,7 @@ fn workspace_flag_applies_enabled_tools_from_toml() {
     let stdout = child.stdout.take().unwrap();
     send_initialize(&mut stdin);
     let names = get_tool_names(&mut stdin, stdout);
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     assert_eq!(
         names.len(),
@@ -461,8 +456,7 @@ fn no_config_returns_default_toolset() {
     let stdout = child.stdout.take().unwrap();
     send_initialize(&mut stdin);
     let names = get_tool_names(&mut stdin, stdout);
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     assert!(
         names.len() >= 70,
@@ -526,8 +520,7 @@ fn tools_list_response_omits_output_schema() {
         Some((tools.len(), with_schema))
     });
 
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let (tool_count, tools_with_schema) = result.expect("no tools/list response received");
     assert!(
@@ -579,8 +572,7 @@ fn iris_debug_capture_no_docker_required() {
         }
     });
 
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let response = result.expect("no tools/call response received");
     let body = serde_json::to_string(&response).unwrap();
@@ -618,8 +610,7 @@ fn iris_production_input_schema_has_namespace() {
     let (mut child, mut stdin, stdout) = spawn_mcp(None);
     send_initialize(&mut stdin);
     let tool = get_tool_schema(&mut stdin, stdout, "iris_production");
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let tool = tool.expect("iris_production not found in tools/list");
     let props = tool
@@ -693,8 +684,7 @@ fn no_skills_flag_removes_skill_tools() {
     let (mut child, mut stdin, stdout) = spawn_mcp_extra(&["--no-skills"], &[]);
     send_initialize(&mut stdin);
     let names = get_tool_names(&mut stdin, stdout);
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     assert!(
         !names.is_empty(),
@@ -719,8 +709,7 @@ fn no_skills_env_var_removes_skill_tools() {
     let (mut child, mut stdin, stdout) = spawn_mcp_extra(&[], &[("IRIS_NO_SKILLS", "true")]);
     send_initialize(&mut stdin);
     let names = get_tool_names(&mut stdin, stdout);
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     assert!(
         !names.is_empty(),
@@ -788,8 +777,7 @@ fn write_tools_disabled_blocks_iris_compile() {
         "iris_compile",
         r#"{"target":"App.Foo.cls"}"#,
     );
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
     assert_write_gate_error(&text, "iris_compile");
 }
 
@@ -807,8 +795,7 @@ fn write_tools_disabled_blocks_iris_execute() {
     let (mut child, mut stdin, stdout) = spawn_mcp(Some(&cfg_path.to_string_lossy()));
     send_initialize(&mut stdin);
     let text = call_tool(&mut stdin, stdout, "iris_execute", r#"{"code":"Write 1"}"#);
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
     assert_write_gate_error(&text, "iris_execute");
 }
 
@@ -831,8 +818,7 @@ fn write_tools_disabled_blocks_iris_doc_put() {
         "iris_doc",
         r#"{"mode":"put","name":"App.Foo.cls","content":"Class App.Foo {}"}"#,
     );
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
     assert_write_gate_error(&text, "iris_doc put");
 }
 
@@ -855,8 +841,7 @@ fn write_tools_disabled_blocks_iris_query_write() {
         "iris_query",
         r#"{"mode":"write","query":"INSERT INTO Sample.Person (Name) VALUES ('Test')"}"#,
     );
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
     assert_write_gate_error(&text, "iris_query write");
 }
 
@@ -879,8 +864,7 @@ struct Session {
 
 impl Drop for Session {
     fn drop(&mut self) {
-        self.child.kill().ok();
-        self.child.wait().ok();
+        iris_agentic_dev_core::testing::stop_server(&mut self.child);
     }
 }
 

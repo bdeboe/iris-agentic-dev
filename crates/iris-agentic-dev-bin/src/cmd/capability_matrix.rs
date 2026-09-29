@@ -42,7 +42,7 @@ impl CapabilityMatrixCommand {
             }
             Err(e) => {
                 eprintln!("error: {e}");
-                std::process::exit(1);
+                crate::exit(1);
             }
         }
         Ok(())

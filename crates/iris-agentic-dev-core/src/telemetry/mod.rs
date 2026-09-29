@@ -7,9 +7,109 @@ pub mod redact;
 pub mod trace_export;
 
 use crate::iris::connection::IrisConnection;
+use std::future::Future;
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use uuid::Uuid;
+
+/// Class-name prefix for the scratch class a durable IRIS write runs through, under `IrisDevTmp`.
+/// User code keeps `IrisDevRun`, so a leftover class says which of the two leaked it.
+pub const TELEMETRY_SCRATCH_PREFIX: &str = "IrisDevTel";
+
+/// Durable writes that have been spawned and not yet finished.
+///
+/// `record_call` must not wait for its write (FR-014 of 059), but a process must not exit in the
+/// middle of one either: the IRIS write is a put/compile/query/delete cycle, and a task dropped
+/// between compile and delete leaves its scratch class behind for good (130 round 4 found 78,183 of
+/// them in USER). Spawn through this, then [`PendingWrites::flush_blocking`] before exiting.
+pub struct PendingWrites {
+    count: AtomicUsize,
+}
+
+/// The tracker `record_call` spawns through and the CLI flushes on exit.
+pub static DURABLE_WRITES: PendingWrites = PendingWrites::new();
+
+/// How long an exiting process waits for its telemetry writes.
+pub const EXIT_FLUSH_TIMEOUT: Duration = Duration::from_secs(3);
+
+struct PendingGuard(&'static PendingWrites);
+
+impl Drop for PendingGuard {
+    fn drop(&mut self) {
+        self.0.count.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+impl PendingWrites {
+    pub const fn new() -> Self {
+        Self {
+            count: AtomicUsize::new(0),
+        }
+    }
+
+    /// Spawn `fut` on the current runtime and count it until it finishes or is dropped.
+    pub fn spawn<F>(&'static self, fut: F) -> tokio::task::JoinHandle<()>
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        self.count.fetch_add(1, Ordering::SeqCst);
+        let guard = PendingGuard(self);
+        tokio::spawn(async move {
+            let _guard = guard;
+            fut.await;
+        })
+    }
+
+    pub fn pending(&self) -> usize {
+        self.count.load(Ordering::SeqCst)
+    }
+
+    /// Wait until nothing is pending. `false` means the timeout came first.
+    pub async fn flush(&self, timeout: Duration) -> bool {
+        let deadline = Instant::now() + timeout;
+        while self.pending() > 0 {
+            if Instant::now() >= deadline {
+                return false;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        true
+    }
+
+    /// [`Self::flush`] from sync code, for the exit path.
+    ///
+    /// On a multi-thread runtime this goes through `block_in_place`, which hands the calling
+    /// worker's queue to another thread. A task spawned from this worker sits in its LIFO slot,
+    /// which no other worker steals, so sleeping here instead would starve the very write being
+    /// waited for. A current-thread runtime cannot run anything while blocked, so it only reports.
+    pub fn flush_blocking(&self, timeout: Duration) -> bool {
+        match tokio::runtime::Handle::try_current() {
+            Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
+                tokio::task::block_in_place(|| handle.block_on(self.flush(timeout)))
+            }
+            _ => self.pending() == 0,
+        }
+    }
+}
+
+impl Default for PendingWrites {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Flush [`DURABLE_WRITES`] for up to [`EXIT_FLUSH_TIMEOUT`]; a write still running then is logged.
+pub fn flush_before_exit() {
+    if !DURABLE_WRITES.flush_blocking(EXIT_FLUSH_TIMEOUT) {
+        tracing::warn!(
+            "exiting with {} telemetry write(s) unfinished; an IrisDevTmp.{}* class may be left in USER",
+            DURABLE_WRITES.pending(),
+            TELEMETRY_SCRATCH_PREFIX
+        );
+    }
+}
 
 /// One MCP server process lifetime. `id` is generated once and stays fixed until exit.
 #[derive(Debug, Clone)]
@@ -182,7 +282,10 @@ pub async fn write_durable(
                 sid = record.session_id,
                 lb = listbuild
             );
-            if let Err(e) = iris.execute_via_generator(&code, "USER", client).await {
+            if let Err(e) = iris
+                .execute_via_generator_prefixed(&code, "USER", client, TELEMETRY_SCRATCH_PREFIX)
+                .await
+            {
                 tracing::debug!("telemetry durable write (IRIS) failed, dropping: {e}");
             }
         }

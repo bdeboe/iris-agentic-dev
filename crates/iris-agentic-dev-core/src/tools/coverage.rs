@@ -95,9 +95,8 @@ pub fn build_coverage_run_code(routines: &[String], test_path: &str, namespace: 
         " Do ##class(%Monitor.System.LineByLine).Stop()".to_string(),
         format!(" Set routines={}", routine_list),
         " Set sc=##class(%Monitor.System.LineByLine).Start(routines,\"\",\"\")".to_string(),
-        format!(
-            r#" If $System.Status.IsError(sc)  Write "ERROR|MONITOR_IN_USE|"_$System.Status.GetErrorText(sc),$C(10)  Quit"#
-        ),
+        r#" If $System.Status.IsError(sc)  Write "ERROR|MONITOR_IN_USE|"_$System.Status.GetErrorText(sc),$C(10)  Quit"#
+            .to_string(),
         format!(
             " Do ##class(%UnitTest.Manager).RunTest(\"{}\",\"/noload/nodelete\")",
             test_path

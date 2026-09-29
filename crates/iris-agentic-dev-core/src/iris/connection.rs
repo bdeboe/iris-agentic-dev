@@ -523,6 +523,18 @@ impl IrisConnection {
         namespace: &str,
         client: &reqwest::Client,
     ) -> anyhow::Result<String> {
+        self.execute_via_generator_prefixed(code, namespace, client, "IrisDevRun")
+            .await
+    }
+
+    /// [`Self::execute_via_generator`] with the scratch class named `IrisDevTmp.<prefix><id>`.
+    pub async fn execute_via_generator_prefixed(
+        &self,
+        code: &str,
+        namespace: &str,
+        client: &reqwest::Client,
+        prefix: &str,
+    ) -> anyhow::Result<String> {
         let delays = [
             std::time::Duration::from_millis(100),
             std::time::Duration::from_millis(200),
@@ -532,7 +544,7 @@ impl IrisConnection {
 
         for (attempt, delay) in delays.iter().enumerate() {
             match self
-                .execute_via_generator_once(code, namespace, client)
+                .execute_via_generator_once(code, namespace, client, prefix)
                 .await
             {
                 Ok(output) => {
@@ -588,6 +600,7 @@ impl IrisConnection {
         code: &str,
         namespace: &str,
         client: &reqwest::Client,
+        prefix: &str,
     ) -> anyhow::Result<String> {
         let id: String = uuid::Uuid::new_v4()
             .simple()
@@ -597,18 +610,22 @@ impl IrisConnection {
             .collect();
         // Use a dedicated scratch package (IrisDevTmp) rather than User.* to avoid
         // polluting the user's application namespace with transient executor classes.
-        let class_name = format!("IrisDevTmp.IrisDevRun{}", id);
+        let class_name = format!("IrisDevTmp.{}{}", prefix, id);
         let doc_name = format!("{}.cls", class_name);
         // SQL proc name: for non-User packages, IRIS SQL schema = package name (no "SQL" prefix).
         // IrisDevTmp.IrisDevRunXXX → SQL schema IrisDevTmp, proc IrisDevTmp.IrisDevRunXXX_Execute.
         // (The SQLUser prefix is a historical special case only for the User package.)
-        let sql_func = format!("IrisDevTmp.IrisDevRun{}_Execute", id);
+        let sql_func = format!("{}_Execute", class_name);
         let content = Self::build_exec_class(&class_name, code);
 
         // Compute the per-request User-Agent now (inside call_tool task scope so mcp_peer()
         // returns the connected client's name/version). This overrides the static default
         // set on the reqwest::Client at build time (which predates any tool call).
         let ua = user_agent(caller_mode());
+
+        // Armed before the PUT: a future dropped while the request is in flight cannot know whether
+        // IRIS stored the class, and deleting one that is not there costs a 404.
+        let mut scratch = ScratchGuard::new(self, &doc_name, namespace);
 
         // 1. PUT the class document
         let put_url = self.versioned_ns_url(
@@ -623,6 +640,7 @@ impl IrisConnection {
             .send()
             .await?;
         if !put_resp.status().is_success() {
+            scratch.disarm();
             anyhow::bail!("PUT doc failed: HTTP {}", put_resp.status());
         }
 
@@ -634,9 +652,17 @@ impl IrisConnection {
             .basic_auth(&self.username, Some(&self.password))
             .json(&serde_json::json!([doc_name]))
             .send()
-            .await?;
+            .await;
+        // The PUT stored the class, so every exit from here on removes it.
+        let compile_resp = match compile_resp {
+            Ok(r) => r,
+            Err(e) => {
+                scratch.release(self, client).await;
+                return Err(e.into());
+            }
+        };
         if !compile_resp.status().is_success() {
-            let _ = self.delete_doc(&doc_name, namespace, client).await;
+            scratch.release(self, client).await;
             anyhow::bail!("compile HTTP {}", compile_resp.status());
         }
         let compile_body: serde_json::Value = compile_resp.json().await.unwrap_or_default();
@@ -652,7 +678,7 @@ impl IrisConnection {
             })
             .unwrap_or(false);
         if has_errors {
-            let _ = self.delete_doc(&doc_name, namespace, client).await;
+            scratch.release(self, client).await;
             anyhow::bail!("compile errors: {:?}", compile_body["result"]["log"]);
         }
 
@@ -666,7 +692,15 @@ impl IrisConnection {
             .basic_auth(&self.username, Some(&self.password))
             .json(&serde_json::json!({"query": sql}))
             .send()
-            .await?;
+            .await;
+        // The class is compiled by now, so a failed send must still remove it before returning.
+        let query_resp = match query_resp {
+            Ok(r) => r,
+            Err(e) => {
+                scratch.release(self, client).await;
+                return Err(e.into());
+            }
+        };
         let query_body: serde_json::Value = query_resp.json().await.unwrap_or_default();
         // Atelier does not always hand the column back as a JSON string. When the captured output
         // parses as JSON on its own — an array, an object, a number, a bare `true` — IRIS emits it
@@ -678,8 +712,8 @@ impl IrisConnection {
             other => other.to_string(),
         };
 
-        // 4. Delete the temp class (best-effort)
-        let _ = self.delete_doc(&doc_name, namespace, client).await;
+        // 4. Delete the temp class; a failure is logged, the output still returns
+        scratch.release(self, client).await;
 
         Ok(output)
     }
@@ -757,7 +791,8 @@ impl IrisConnection {
         lines
     }
 
-    /// Delete an Atelier document (best-effort).
+    /// Delete an Atelier document. A non-2xx answer is an error, not a success: the status used to
+    /// be ignored, so a scratch class IRIS refused to delete left no trace anywhere.
     async fn delete_doc(
         &self,
         doc_name: &str,
@@ -768,12 +803,22 @@ impl IrisConnection {
             namespace,
             &format!("/doc/{}", urlencoding::encode(doc_name)),
         );
-        client
+        let resp = client
             .delete(&url)
             .basic_auth(&self.username, Some(&self.password))
             .send()
             .await?;
+        if !resp.status().is_success() {
+            anyhow::bail!("DELETE {doc_name} failed: HTTP {}", resp.status());
+        }
         Ok(())
+    }
+
+    /// Delete the executor's scratch class; the caller's result stands, a failure is logged.
+    async fn delete_scratch(&self, doc_name: &str, namespace: &str, client: &reqwest::Client) {
+        if let Err(e) = self.delete_doc(doc_name, namespace, client).await {
+            tracing::warn!("scratch class not removed, it stays in {namespace}: {e}");
+        }
     }
 
     /// Execute ObjectScript code via docker exec (iris session stdin).
@@ -1159,6 +1204,94 @@ fn is_bare_prompt_line(s: &str) -> bool {
     }
     let digits = &digits[1..];
     !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit())
+}
+
+/// Removes an executor's scratch class even when the executing future never reaches its own delete.
+///
+/// A dropped future runs none of the deletes in `execute_via_generator_once`. That happens when a
+/// tokio runtime shuts down with the call in flight (in-process tests, `main` returning) and when an
+/// MCP client cancels a slow `iris_execute`; one full test run left 125 classes in USER that way.
+/// `Drop` cannot await, and the runtime it ran on may be the one going away, so the delete runs on
+/// its own thread with its own runtime and client, and the drop waits for it.
+struct ScratchGuard {
+    url: String,
+    username: String,
+    password: String,
+    doc_name: String,
+    namespace: String,
+    armed: bool,
+}
+
+impl ScratchGuard {
+    fn new(conn: &IrisConnection, doc_name: &str, namespace: &str) -> Self {
+        Self {
+            url: conn.versioned_ns_url(
+                namespace,
+                &format!("/doc/{}", urlencoding::encode(doc_name)),
+            ),
+            username: conn.username.clone(),
+            password: conn.password.clone(),
+            doc_name: doc_name.to_string(),
+            namespace: namespace.to_string(),
+            armed: true,
+        }
+    }
+
+    /// Delete on the caller's runtime. Disarmed only once the delete has returned, so a drop
+    /// during it still cleans up.
+    async fn release(&mut self, conn: &IrisConnection, client: &reqwest::Client) {
+        conn.delete_scratch(&self.doc_name, &self.namespace, client)
+            .await;
+        self.armed = false;
+    }
+
+    /// IRIS never stored the class.
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for ScratchGuard {
+    fn drop(&mut self) {
+        if !self.armed {
+            return;
+        }
+        let url = std::mem::take(&mut self.url);
+        let user = std::mem::take(&mut self.username);
+        let pass = std::mem::take(&mut self.password);
+        let doc = std::mem::take(&mut self.doc_name);
+        let namespace = std::mem::take(&mut self.namespace);
+        let worker = std::thread::spawn(move || {
+            let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            else {
+                return;
+            };
+            rt.block_on(async move {
+                let Ok(client) = IrisConnection::http_client() else {
+                    return;
+                };
+                let sent = client
+                    .delete(&url)
+                    .basic_auth(&user, Some(&pass))
+                    .timeout(std::time::Duration::from_secs(5))
+                    .send()
+                    .await;
+                match sent {
+                    Ok(r) if r.status().is_success() || r.status() == 404 => {}
+                    Ok(r) => tracing::warn!(
+                        "scratch class {doc} not removed after cancel, it stays in {namespace}: HTTP {}",
+                        r.status()
+                    ),
+                    Err(e) => tracing::warn!(
+                        "scratch class {doc} not removed after cancel, it stays in {namespace}: {e}"
+                    ),
+                }
+            });
+        });
+        let _ = worker.join();
+    }
 }
 
 #[cfg(test)]

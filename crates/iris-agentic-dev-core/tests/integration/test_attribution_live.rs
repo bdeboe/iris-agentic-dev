@@ -325,8 +325,7 @@ fn docker_only_attribution_warn_once() {
         }
         if std::time::Instant::now() >= init_deadline {
             eprintln!("T019: timed out waiting for initialize response — skipping");
-            let _ = child.kill();
-            let _ = child.wait();
+            iris_agentic_dev_core::testing::stop_server(&mut child);
             return;
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
@@ -358,8 +357,7 @@ fn docker_only_attribution_warn_once() {
 
     // Close stdin and reap the child.
     drop(stdin);
-    let _ = child.kill();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
     // Give stderr thread a moment to drain.
     std::thread::sleep(std::time::Duration::from_millis(300));
 

@@ -59,7 +59,7 @@ impl BenchmarkCommand {
                  are explicitly deferred.",
                 self.suite
             );
-            std::process::exit(1);
+            crate::exit(1);
         }
 
         // Validate mode before doing any heavy work
@@ -70,7 +70,7 @@ impl BenchmarkCommand {
                     "Error [UNKNOWN_MODE]: unknown benchmark mode '{other}'. \
                      Use 'mcp' (default) or 'cli-dispatch'."
                 );
-                std::process::exit(1);
+                crate::exit(1);
             }
         }
 
@@ -109,7 +109,7 @@ impl BenchmarkCommand {
                 );
             }
             IrisDiscovery::Explained => {
-                std::process::exit(1);
+                crate::exit(1);
             }
         };
 
@@ -132,7 +132,7 @@ impl BenchmarkCommand {
                  abandoned, it will be treated as stale after {}s.",
                 self.max_time_s
             );
-            std::process::exit(1);
+            crate::exit(1);
         }
 
         let run_result = self.run_inner(&iris, &client, &skill_content).await;

@@ -82,7 +82,7 @@ impl ConnectionArgs {
                 );
             }
             IrisDiscovery::Explained => {
-                std::process::exit(1);
+                crate::exit(1);
             }
         }
     }

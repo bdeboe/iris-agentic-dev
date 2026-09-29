@@ -3314,7 +3314,8 @@ impl IrisTools {
         let iris = self.connection.lock().unwrap().iris.clone();
         let client = Arc::clone(&self.client);
         let config_dir = telemetry_config_dir();
-        tokio::spawn(async move {
+        // Counted, so an exiting CLI process can wait for it (130 round 4).
+        crate::telemetry::DURABLE_WRITES.spawn(async move {
             crate::telemetry::write_durable(&record, iris, &client, &config_dir).await;
         });
     }
@@ -6163,7 +6164,7 @@ Methods:
             }
         }
 
-        scored.sort_by(|a, b| b.1.cmp(&a.1));
+        scored.sort_by_key(|e| std::cmp::Reverse(e.1));
         scored.truncate(p.top_k);
         let results: Vec<serde_json::Value> = scored.into_iter().map(|(v, _)| v).collect();
 

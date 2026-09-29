@@ -147,8 +147,7 @@ fn test_iris_admin_description_mentions_fresh_container_setup() {
         None
     });
 
-    child.kill().ok();
-    child.wait().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let desc = description.expect("T099-B1: iris_admin not found in tools/list");
     assert!(
@@ -203,8 +202,7 @@ fn test_iris_admin_fresh_container_setup_returns_structured_json() {
         parse_tool_result(v)
     });
 
-    child.kill().ok();
-    child.wait().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let result = result.expect("T099-B2: no tools/call response for fresh_container_setup");
 

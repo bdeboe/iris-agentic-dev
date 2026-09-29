@@ -158,7 +158,7 @@ async fn run_install(args: SkillInstallArgs) -> Result<()> {
     );
 
     if failed > 0 {
-        std::process::exit(1);
+        crate::exit(1);
     }
     Ok(())
 }

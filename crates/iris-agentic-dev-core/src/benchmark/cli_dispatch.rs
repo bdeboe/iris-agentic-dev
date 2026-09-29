@@ -28,9 +28,7 @@ pub struct CliDispatchConfig {
     pub connection_env: Vec<(String, String)>,
 }
 
-/// Resolves the `iris-agentic-dev` binary path using the same pattern as
-/// `progressive_disclosure_integration.rs`: prefers the llvm-cov-target build,
-/// falls back to the normal debug build.
+/// Resolves the `iris-agentic-dev` binary under the workspace `target` directory.
 pub fn iris_dev_bin() -> PathBuf {
     let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
     // CARGO_MANIFEST_DIR is the core crate; go up two levels to workspace root
@@ -39,18 +37,25 @@ pub fn iris_dev_bin() -> PathBuf {
         .and_then(|p| p.parent())
         .unwrap_or(Path::new("."))
         .to_path_buf();
-    let preferred = workspace
-        .join("target")
-        .join("llvm-cov-target")
-        .join("debug")
-        .join("iris-agentic-dev");
-    if preferred.exists() {
-        return preferred;
+    workspace_iad_binary(&workspace)
+}
+
+/// The workspace build of `iris-agentic-dev`: the instrumented one under `cargo llvm-cov`,
+/// otherwise `debug`, then `release`.
+///
+/// The coverage build is chosen only when `CARGO_LLVM_COV` says this is a coverage run. Outside
+/// one it is whatever the last `cargo llvm-cov` left behind, and preferring it because it exists
+/// ran a weeks-old binary under plain `cargo test` (130 round 4).
+pub fn workspace_iad_binary(workspace: &Path) -> PathBuf {
+    let target = workspace.join("target");
+    if std::env::var_os("CARGO_LLVM_COV").is_some() {
+        return target.join("llvm-cov-target/debug/iris-agentic-dev");
     }
-    workspace
-        .join("target")
-        .join("debug")
-        .join("iris-agentic-dev")
+    let debug = target.join("debug/iris-agentic-dev");
+    if debug.exists() {
+        return debug;
+    }
+    target.join("release/iris-agentic-dev")
 }
 
 /// Parses tool invocations from an LLM response.

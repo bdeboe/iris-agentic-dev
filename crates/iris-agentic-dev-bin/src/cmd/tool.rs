@@ -182,7 +182,7 @@ impl ToolCommand {
         let Some(name) = self.name.clone() else {
             eprintln!("error: a tool name is required; run `iris-agentic-dev tool --list` to see");
             eprintln!("       every tool this CLI can dispatch, or pass --schema with a name");
-            std::process::exit(1);
+            crate::exit(1);
         };
         let envelope = self.envelope;
         let run_id = std::env::var("GAUNTLET_RUN_ID")
@@ -210,7 +210,7 @@ impl ToolCommand {
                     eprintln!("  {}", t);
                 }
             }
-            std::process::exit(1);
+            crate::exit(1);
         }
 
         // A session tool under `tool` can only ever fail, and used to fail two commands later with
@@ -232,7 +232,7 @@ impl ToolCommand {
             } else {
                 eprintln!("error: {refusal}");
             }
-            std::process::exit(1);
+            crate::exit(1);
         }
 
         // Parse args JSON
@@ -253,7 +253,7 @@ impl ToolCommand {
                 } else {
                     eprintln!("error: --args is not valid JSON: {}", e);
                 }
-                std::process::exit(1);
+                crate::exit(1);
             })
             .unwrap();
 
@@ -298,7 +298,7 @@ impl ToolCommand {
                 } else {
                     eprintln!("error: {}", e);
                 }
-                std::process::exit(1);
+                crate::exit(1);
             }
         };
 
@@ -335,7 +335,7 @@ impl ToolCommand {
                         })
                     );
                     if !tool_ok {
-                        std::process::exit(1);
+                        crate::exit(1);
                     }
                 } else {
                     let mut tool_success = true;
@@ -351,7 +351,7 @@ impl ToolCommand {
                         }
                     }
                     if !tool_success {
-                        std::process::exit(1);
+                        crate::exit(1);
                     }
                 }
             }
@@ -372,7 +372,7 @@ impl ToolCommand {
                 } else {
                     eprintln!("error: {}", e);
                 }
-                std::process::exit(1);
+                crate::exit(1);
             }
         }
         Ok(())
@@ -394,7 +394,7 @@ impl ToolCommand {
             if let Some(name) = &self.name {
                 eprintln!("error: --list takes no tool name (got '{name}')");
                 eprintln!("       for one tool's contract: iris-agentic-dev tool {name} --schema");
-                std::process::exit(1);
+                crate::exit(1);
             }
             self.print_list(&entries);
             return Ok(());
@@ -403,7 +403,7 @@ impl ToolCommand {
         let Some(name) = self.name.as_deref() else {
             eprintln!("error: --schema needs a tool name");
             eprintln!("       for the whole list: iris-agentic-dev tool --list");
-            std::process::exit(1);
+            crate::exit(1);
         };
         match entries.iter().find(|e| e.name == name) {
             Some(entry) => {
@@ -418,7 +418,7 @@ impl ToolCommand {
                     eprintln!("       did you mean '{suggestion}'?");
                 }
                 eprintln!("       for the whole list: iris-agentic-dev tool --list");
-                std::process::exit(1);
+                crate::exit(1);
             }
         }
     }

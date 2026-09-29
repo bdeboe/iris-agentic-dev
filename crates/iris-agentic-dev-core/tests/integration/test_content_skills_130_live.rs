@@ -295,9 +295,9 @@ async fn run_unit_test(c: &IrisConnection, client: &reqwest::Client, class: &str
         c,
         client,
         &format!(
-            " Set old=$Get(^UnitTestRoot) Set:old=\"\" ^UnitTestRoot=\"/tmp/\"\n \
+            " Set had=$Data(^UnitTestRoot)#2, old=$Get(^UnitTestRoot), ^UnitTestRoot=\"/tmp/\"\n \
              Set sc=##class(%UnitTest.Manager).RunTest(\":{class}\",\"/noload/nodelete\")\n \
-             Kill:old=\"\" ^UnitTestRoot\n \
+             If had Set ^UnitTestRoot=old\n Else  Kill ^UnitTestRoot\n \
              Set idx=$Order(^UnitTest.Result(\"\"),-1), ref=$Name(^UnitTest.Result(idx)), m=\"\", bad=0\n \
              For {{ Set ref=$Query(@ref) Quit:ref=\"\"  Quit:$QSubscript(ref,1)'=idx  If $QLength(ref)=4 {{ Set m=m_$QSubscript(ref,4)_\",\" Set:$ListGet(@ref,1)=0 bad=1 }} }}\n \
              Write \"~[\",m,\"|\",bad,\"]~\""

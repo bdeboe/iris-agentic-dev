@@ -65,3 +65,23 @@ fn test_inline_code_preserved_verbatim() {
         panic!("expected inline");
     }
 }
+
+// 130 round 4: a gate refusal carries `message`, not `output` or `error`, so `iad exec` printed
+// nothing and exited 1. The purge of the leaked scratch classes hit exactly that.
+#[test]
+fn exec_prints_a_gate_refusal() {
+    use iris_agentic_dev::cmd::exec::exec_text;
+    let refusal = serde_json::json!({
+        "success": false,
+        "error_code": "CODE_EDIT_BLOCKED",
+        "message": "Reaching class or routine code through arbitrary execution is blocked"
+    });
+    let text = exec_text(&refusal).expect("a refusal must print something");
+    assert!(text.contains("CODE_EDIT_BLOCKED"), "{text}");
+    assert!(text.contains("is blocked"), "{text}");
+
+    let ok = serde_json::json!({"success": true, "output": "1\n"});
+    assert_eq!(exec_text(&ok).as_deref(), Some("1\n"));
+    let err = serde_json::json!({"success": false, "error": "TIMEOUT"});
+    assert_eq!(exec_text(&err).as_deref(), Some("TIMEOUT\n"));
+}

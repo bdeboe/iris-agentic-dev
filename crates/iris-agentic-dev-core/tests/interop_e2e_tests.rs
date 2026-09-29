@@ -3,19 +3,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 
 fn iris_dev_bin() -> std::path::PathBuf {
-    let mut root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    root.pop();
-    root.pop();
-    // Try all known locations and names in priority order
-    for dir in &["target/llvm-cov-target/debug", "target/debug"] {
-        for name in &["iris-agentic-dev", "iris-dev"] {
-            let candidate = root.join(dir).join(name);
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    root.join("target/debug/iris-agentic-dev")
+    iris_agentic_dev_core::testing::iad_binary_path()
 }
 
 fn mcp_exchange(messages: &[serde_json::Value]) -> Vec<serde_json::Value> {
@@ -80,7 +68,7 @@ fn mcp_exchange(messages: &[serde_json::Value]) -> Vec<serde_json::Value> {
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
     }
-    child.kill().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
     results
 }
 
@@ -125,7 +113,7 @@ fn tools_list_returns_32_tools() {
     assert!(
         names.contains(&"iris_production") || names.contains(&"iris_interop_query"),
         "must contain interop tools: {:?}",
-        &names
+        names
     );
     for name in &names {
         assert!(!name.contains('.'), "tool '{}' has dot", name);

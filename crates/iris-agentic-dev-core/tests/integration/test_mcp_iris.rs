@@ -7,24 +7,7 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 
 fn iris_dev_bin() -> std::path::PathBuf {
-    let workspace_root = {
-        let mut p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        p.pop();
-        p.pop();
-        p
-    };
-    for target_subdir in [
-        "target/debug/iris-agentic-dev",
-        "target/release/iris-agentic-dev",
-        "target/llvm-cov-target/debug/iris-agentic-dev",
-        "target/llvm-cov-target/release/iris-agentic-dev",
-    ] {
-        let candidate = workspace_root.join(target_subdir);
-        if candidate.exists() {
-            return candidate;
-        }
-    }
-    workspace_root.join("target/debug/iris-agentic-dev")
+    iris_agentic_dev_core::testing::iad_binary_path()
 }
 
 /// Exchange messages with iris-dev mcp. Sends messages with delays, reads responses live.
@@ -93,7 +76,7 @@ fn mcp_exchange(messages: &[serde_json::Value]) -> Vec<serde_json::Value> {
         }
     }
 
-    child.kill().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
     results
 }
 

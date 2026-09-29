@@ -219,12 +219,8 @@ pub async fn compare_namespace_impl(
         let a = fetch_document_source(&params.server_a, client, doc, &params.namespace).await;
         let b = fetch_document_source(&params.server_b, client, doc, &params.namespace).await;
         match (a, b) {
-            (Ok(sa), Ok(sb)) => {
-                if sa == sb {
-                    same_count += 1;
-                } else {
-                    different.push(doc.clone());
-                }
+            (Ok(sa), Ok(sb)) if sa == sb => {
+                same_count += 1;
             }
             _ => {
                 different.push(doc.clone());

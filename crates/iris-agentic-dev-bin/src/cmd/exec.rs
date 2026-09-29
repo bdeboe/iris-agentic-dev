@@ -84,7 +84,7 @@ impl ExecCommand {
                 "error: write operations are suppressed on production IRIS instances.\n\
                  Set IRIS_ALLOW_PROD=1 to override."
             );
-            std::process::exit(1);
+            crate::exit(1);
         }
 
         let mut args = serde_json::json!({ "code": code, "namespace": namespace });
@@ -101,17 +101,8 @@ impl ExecCommand {
         let body = dispatch_tool(iris, "iris_execute", args).await?;
         let success = body["success"].as_bool().unwrap_or(false);
 
-        // `output` carries both the normal case and an ObjectScript runtime error
-        // caught by the executor's own Try/Catch (embedded as "ERROR: ..." text) — print
-        // it raw either way, matching the prior behavior of printing whatever IRIS sent
-        // back with no framing.
-        if let Some(out) = body["output"].as_str() {
-            print!("{}", out);
-        } else if let Some(err) = body["error"].as_str() {
-            // Failure modes with no `output` at all (TIMEOUT, HTTP_EXECUTION_FAILED,
-            // SESSION_INVALID, ...) — print the error message alone, matching the prior
-            // behavior of printing just the error string, no JSON framing.
-            println!("{}", err);
+        if let Some(text) = exec_text(&body) {
+            print!("{}", text);
         }
 
         // Only printed when the caller opted into sessions, so the raw-output-only
@@ -123,8 +114,29 @@ impl ExecCommand {
         }
 
         if !success {
-            std::process::exit(1);
+            crate::exit(1);
         }
         Ok(())
     }
+}
+
+/// What `iad exec` prints for a tool response.
+///
+/// `output` carries both the normal case and an ObjectScript runtime error caught by the
+/// executor's own Try/Catch (embedded as "ERROR: ..." text), printed raw. Failure modes with no
+/// `output` (TIMEOUT, HTTP_EXECUTION_FAILED, SESSION_INVALID, ...) print the error string alone. A
+/// gate refusal has neither, only `error_code` and `message`; it used to print nothing at all.
+pub fn exec_text(body: &serde_json::Value) -> Option<String> {
+    if let Some(out) = body["output"].as_str() {
+        return Some(out.to_string());
+    }
+    if let Some(err) = body["error"].as_str() {
+        return Some(format!("{err}\n"));
+    }
+    body["message"]
+        .as_str()
+        .map(|msg| match body["error_code"].as_str() {
+            Some(code) => format!("{code}: {msg}\n"),
+            None => format!("{msg}\n"),
+        })
 }

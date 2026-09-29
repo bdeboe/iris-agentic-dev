@@ -144,8 +144,7 @@ fn test_add_server_returns_success_without_keychain() {
         parse_tool_result(v)
     });
 
-    child.kill().ok();
-    child.wait().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let result = result.expect("T095-B1: no tools/call response received");
 
@@ -229,8 +228,7 @@ fn test_add_server_description_mentions_plaintext_fallback() {
         None
     });
 
-    child.kill().ok();
-    child.wait().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let desc = description.expect("T095-B2: iris_add_server description not found in tools/list");
 

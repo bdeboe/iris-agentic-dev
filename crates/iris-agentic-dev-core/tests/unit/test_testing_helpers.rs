@@ -16,13 +16,19 @@ use iris_agentic_dev_core::testing::{
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-/// `IAD_BINARY` and `IAD_ALLOW_SKIP` are process-global. Serialize the tests that write
+/// The variables `iad_binary_path` reads are process-global. Serialize the tests that write
 /// them and put the previous values back, so a harness that set `IAD_BINARY` for the whole
-/// run still sees it afterwards.
+/// run, or a `cargo llvm-cov` run that set `CARGO_LLVM_COV`, still sees it afterwards.
+const GUARDED: [&str; 4] = [
+    "IAD_BINARY",
+    "IAD_ALLOW_SKIP",
+    "IRIS_DEV_BIN",
+    "CARGO_LLVM_COV",
+];
+
 struct EnvGuard {
     _lock: MutexGuard<'static, ()>,
-    binary: Option<String>,
-    allow_skip: Option<String>,
+    saved: Vec<(&'static str, Option<String>)>,
 }
 
 impl EnvGuard {
@@ -32,26 +38,24 @@ impl EnvGuard {
             .get_or_init(|| Mutex::new(()))
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        let guard = EnvGuard {
-            _lock: lock,
-            binary: std::env::var("IAD_BINARY").ok(),
-            allow_skip: std::env::var("IAD_ALLOW_SKIP").ok(),
-        };
-        std::env::remove_var("IAD_BINARY");
-        std::env::remove_var("IAD_ALLOW_SKIP");
-        guard
+        let saved = GUARDED
+            .iter()
+            .map(|k| (*k, std::env::var(k).ok()))
+            .collect();
+        for k in GUARDED {
+            std::env::remove_var(k);
+        }
+        EnvGuard { _lock: lock, saved }
     }
 }
 
 impl Drop for EnvGuard {
     fn drop(&mut self) {
-        match &self.binary {
-            Some(v) => std::env::set_var("IAD_BINARY", v),
-            None => std::env::remove_var("IAD_BINARY"),
-        }
-        match &self.allow_skip {
-            Some(v) => std::env::set_var("IAD_ALLOW_SKIP", v),
-            None => std::env::remove_var("IAD_ALLOW_SKIP"),
+        for (k, v) in &self.saved {
+            match v {
+                Some(v) => std::env::set_var(k, v),
+                None => std::env::remove_var(k),
+            }
         }
     }
 }
@@ -127,6 +131,52 @@ fn unset_iad_binary_falls_back_to_a_workspace_target_path() {
         "fallback must name one of the two profiles, got {}",
         tail.display()
     );
+}
+
+/// 130 round 4. Six harnesses tried `target/llvm-cov-target/debug` first, and a coverage run
+/// leaves that binary behind. Plain `cargo test` then spawned a two-week-old build that had no
+/// SIGTERM handler, so `stop_server` killed it before its telemetry flush and every tool call
+/// leaked an `IrisDevTmp` class: 32 from `interop_e2e_tests` alone. It also meant those suites
+/// were testing old code. The instrumented build is right only inside `cargo llvm-cov`.
+#[test]
+fn outside_cargo_llvm_cov_the_instrumented_build_is_never_chosen() {
+    let _g = EnvGuard::new();
+    let resolved = iad_binary_path();
+    assert!(
+        !resolved.to_string_lossy().contains("llvm-cov-target"),
+        "a plain cargo test run must not pick the coverage build, got {}",
+        resolved.display()
+    );
+}
+
+#[test]
+fn under_cargo_llvm_cov_the_instrumented_build_is_chosen() {
+    let _g = EnvGuard::new();
+    std::env::set_var("CARGO_LLVM_COV", "1");
+    let resolved = iad_binary_path();
+    assert!(
+        resolved.ends_with("target/llvm-cov-target/debug/iris-agentic-dev"),
+        "under cargo llvm-cov the subprocess must be the instrumented build, got {}",
+        resolved.display()
+    );
+}
+
+/// `scripts/coverage.sh` points `IRIS_DEV_BIN` at its instrumented wrapper.
+#[test]
+fn iris_dev_bin_names_the_binary_when_iad_binary_is_unset() {
+    let _g = EnvGuard::new();
+    let want = missing_absolute_path();
+    std::env::set_var("IRIS_DEV_BIN", &want);
+    assert_eq!(iad_binary_path(), want);
+}
+
+#[test]
+fn iad_binary_wins_over_iris_dev_bin() {
+    let _g = EnvGuard::new();
+    let want = missing_absolute_path();
+    std::env::set_var("IAD_BINARY", &want);
+    std::env::set_var("IRIS_DEV_BIN", "/elsewhere/iris-agentic-dev");
+    assert_eq!(iad_binary_path(), want);
 }
 
 #[test]

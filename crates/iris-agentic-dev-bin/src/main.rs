@@ -62,8 +62,20 @@ enum Commands {
     External(Vec<OsString>),
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    let result = rt.block_on(async_main());
+    // `#[tokio::main]` drops the runtime with no deadline, and dropping waits for blocking
+    // threads. The stdin reader behind `iad mcp` is one, parked in `read` until the host closes
+    // the pipe, so after a SIGTERM the process never exited (130 round 4). The telemetry flush has
+    // already run by now; give the rest a bound.
+    rt.shutdown_timeout(std::time::Duration::from_secs(2));
+    result
+}
+
+async fn async_main() -> Result<()> {
     let cli = Cli::parse();
 
     tracing_subscriber::fmt()
@@ -89,7 +101,7 @@ async fn main() -> Result<()> {
         _ => iris_agentic_dev_core::iris::connection::CallerMode::Cli,
     });
 
-    match cli.command {
+    let result = match cli.command {
         Some(Commands::Mcp(cmd)) => cmd.run().await,
         Some(Commands::Compile(cmd)) => cmd.run().await,
         Some(Commands::Exec(cmd)) => cmd.run().await,
@@ -116,11 +128,14 @@ async fn main() -> Result<()> {
                 .collect();
             cmd::plugin::try_dispatch_plugin(&name, &rest)?;
             eprintln!("Run `iris-agentic-dev --help` for usage.");
-            std::process::exit(1);
+            iris_agentic_dev::exit(1);
         }
         None => {
             eprintln!("Run `iris-agentic-dev --help` for usage.");
-            std::process::exit(1);
+            iris_agentic_dev::exit(1);
         }
-    }
+    };
+    // Returning drops the runtime and every task still on it, a telemetry write included.
+    iris_agentic_dev_core::telemetry::flush_before_exit();
+    result
 }

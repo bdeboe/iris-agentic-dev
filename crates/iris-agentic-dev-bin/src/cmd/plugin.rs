@@ -42,7 +42,7 @@ pub fn try_dispatch_plugin(cmd: &str, args: &[String]) -> Result<()> {
             #[cfg(not(unix))]
             {
                 let status = std::process::Command::new(&path).args(args).status()?;
-                std::process::exit(status.code().unwrap_or(1));
+                crate::exit(status.code().unwrap_or(1));
             }
         }
         Err(_) => {
@@ -50,7 +50,7 @@ pub fn try_dispatch_plugin(cmd: &str, args: &[String]) -> Result<()> {
                 "iris-agentic-dev: unknown command '{}'\nRun `iris-agentic-dev --help` for available commands.",
                 cmd
             );
-            std::process::exit(1);
+            crate::exit(1);
         }
     }
 }

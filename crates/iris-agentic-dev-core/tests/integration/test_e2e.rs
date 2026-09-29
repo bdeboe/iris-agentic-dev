@@ -16,23 +16,7 @@ use std::process::{Command, Stdio};
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn iris_dev_bin() -> std::path::PathBuf {
-    // Allow scripts/coverage.sh to override the binary path so it can point at
-    // an instrumented build for E2E subprocess coverage collection.
-    if let Ok(path) = std::env::var("IRIS_DEV_BIN") {
-        let p = std::path::PathBuf::from(path);
-        if p.exists() {
-            return p;
-        }
-    }
-    let mut p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    p.pop(); // crates/iris-dev-core
-    p.pop(); // crates/
-    p.push("target/debug/iris-agentic-dev");
-    if !p.exists() {
-        p.pop();
-        p.push("release/iris-agentic-dev");
-    }
-    p
+    iris_agentic_dev_core::testing::iad_binary_path()
 }
 
 fn iris_host() -> String {
@@ -171,7 +155,7 @@ fn mcp_call_timeout(
                 std::thread::sleep(std::time::Duration::from_millis(20));
             }
             _ => {
-                child.kill().ok();
+                iris_agentic_dev_core::testing::stop_server(&mut child);
                 break;
             }
         }

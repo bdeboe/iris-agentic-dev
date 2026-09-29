@@ -144,8 +144,7 @@ fn test_block_syntax_blocked_on_docker_exec() {
         parse_tool_result(v)
     });
 
-    child.kill().ok();
-    child.wait().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let result = result.expect("no tools/call response received for block-syntax test");
 
@@ -195,8 +194,7 @@ fn test_classic_syntax_not_blocked_on_docker_exec() {
         parse_tool_result(v)
     });
 
-    child.kill().ok();
-    child.wait().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let result = result.expect("no tools/call response received for classic-syntax test");
 
@@ -271,8 +269,7 @@ fn test_http_path_does_not_trigger_terminal_guard() {
         parse_tool_result(v)
     });
 
-    child.kill().ok();
-    child.wait().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let result = result.expect("no tools/call response received for HTTP path test");
 
@@ -344,8 +341,7 @@ fn test_iris_execute_description_documents_both_paths() {
         None
     });
 
-    child.kill().ok();
-    child.wait().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let desc = description.expect("iris_execute tool description not found in tools/list");
 

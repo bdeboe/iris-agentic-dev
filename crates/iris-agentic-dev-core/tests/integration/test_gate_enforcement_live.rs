@@ -53,30 +53,7 @@ const GATE_ON_BOTH: &str = "write_tools_enabled = true\ndestructive_tools_enable
 // ── harness ───────────────────────────────────────────────────────────────────
 
 fn iris_dev_bin() -> std::path::PathBuf {
-    if let Ok(path) = std::env::var("IRIS_DEV_BIN") {
-        let p = std::path::PathBuf::from(path);
-        if p.exists() {
-            return p;
-        }
-    }
-    let workspace_root = {
-        let mut p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        p.pop();
-        p.pop();
-        p
-    };
-    for target_subdir in [
-        "target/debug/iris-agentic-dev",
-        "target/release/iris-agentic-dev",
-        "target/llvm-cov-target/debug/iris-agentic-dev",
-        "target/llvm-cov-target/release/iris-agentic-dev",
-    ] {
-        let candidate = workspace_root.join(target_subdir);
-        if candidate.exists() {
-            return candidate;
-        }
-    }
-    workspace_root.join("target/debug/iris-agentic-dev")
+    iris_agentic_dev_core::testing::iad_binary_path()
 }
 
 /// These tests need a live container. They skip without one rather than fail, but they never skip
@@ -106,8 +83,7 @@ struct Mcp {
 
 impl Drop for Mcp {
     fn drop(&mut self) {
-        self.child.kill().ok();
-        self.child.wait().ok();
+        iris_agentic_dev_core::testing::stop_server(&mut self.child);
     }
 }
 

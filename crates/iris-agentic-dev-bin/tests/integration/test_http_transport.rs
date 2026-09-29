@@ -57,8 +57,7 @@ fn test_http_transport_binds_and_accepts() {
         std::thread::sleep(Duration::from_millis(100));
     }
 
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     assert!(
         connected,
@@ -122,8 +121,7 @@ fn test_http_transport_initialize() {
         }
     }
 
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     assert!(
         response.starts_with("HTTP/1.1 200") || response.starts_with("HTTP/1.0 200"),
@@ -183,8 +181,7 @@ fn test_http_transport_bind_flag() {
     // 127.0.0.1 should refuse
     let default_refused = TcpStream::connect(format!("127.0.0.1:{}", port)).is_err();
 
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     assert!(bound_ok, "expected server to accept on 127.0.0.2:{}", port);
     assert!(

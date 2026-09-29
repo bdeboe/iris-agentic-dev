@@ -59,7 +59,7 @@ impl CompileCommand {
             } else {
                 let result = serde_json::json!({"success": false, "error_code": "IRIS_COMPILE_FAILED", "error": out, "target": target});
                 output_result(&result, &format);
-                std::process::exit(1);
+                crate::exit(1);
             }
             return Ok(());
         }
@@ -113,7 +113,7 @@ impl CompileCommand {
         }
 
         if any_error {
-            std::process::exit(1);
+            crate::exit(1);
         }
         Ok(())
     }

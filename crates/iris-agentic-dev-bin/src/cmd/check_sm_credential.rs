@@ -22,7 +22,7 @@ impl CheckSmCredentialCommand {
                  from the OS keychain directly. If credentials are missing, reconnect \
                  the server in VS Code (right-click → Reconnect)."
             );
-            std::process::exit(1);
+            crate::exit(1);
         }
 
         #[cfg(target_os = "windows")]
@@ -39,7 +39,7 @@ impl CheckSmCredentialCommand {
                 }
                 Err(e) => {
                     eprintln!("FAIL: {e}");
-                    std::process::exit(1);
+                    crate::exit(1);
                 }
             }
             Ok(())

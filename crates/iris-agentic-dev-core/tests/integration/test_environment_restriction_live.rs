@@ -286,8 +286,7 @@ async fn code_edit_blocked_carries_message_and_remediation() {
     let resp_line = rx
         .recv_timeout(std::time::Duration::from_secs(15))
         .unwrap_or_default();
-    let _ = child.kill();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     eprintln!("T043 response: {resp_line}");
     let resp_str = resp_line;
@@ -386,8 +385,7 @@ async fn systemperformance_history_read_is_not_code_edit_blocked() {
     let resp_str = rx
         .recv_timeout(std::time::Duration::from_secs(15))
         .unwrap_or_default();
-    let _ = child.kill();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     eprintln!("SystemPerformance read response: {resp_str}");
     assert!(

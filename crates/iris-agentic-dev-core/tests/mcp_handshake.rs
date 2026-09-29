@@ -89,7 +89,7 @@ fn mcp_server_starts_and_responds_to_initialize() {
         response
     );
 
-    child.kill().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 }
 
 /// tools/list returns ≥23 tools.
@@ -176,7 +176,7 @@ fn mcp_server_tools_list_returns_23_tools() {
         );
     }
 
-    child.kill().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 }
 
 /// 076-interface-modernization User Story 4: `tools/list` pagination works end-to-end over
@@ -278,7 +278,7 @@ fn mcp_server_tools_list_pagination_works() {
         all_names.len()
     );
 
-    child.kill().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 }
 
 /// Startup latency p50 < 100ms over 5 runs (SC-001).
@@ -314,7 +314,7 @@ fn mcp_server_startup_latency_under_100ms() {
         );
         let _resp = read_jsonrpc(&mut reader);
         latencies.push(start.elapsed());
-        child.kill().ok();
+        iris_agentic_dev_core::testing::stop_server(&mut child);
     }
 
     latencies.sort();
@@ -395,7 +395,7 @@ fn discovery_waits_for_iris() {
         "expected tools to be listed even without IRIS connection"
     );
 
-    child.kill().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 }
 
 /// T010: web prefix is included in Atelier request URL.
@@ -469,7 +469,7 @@ fn mcp_server_negotiates_all_known_protocol_versions() {
             "client sent {client_version}, server replied {server_version} — should echo known versions"
         );
 
-        child.kill().ok();
+        iris_agentic_dev_core::testing::stop_server(&mut child);
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
 }
@@ -531,5 +531,5 @@ fn mcp_server_tools_list_includes_cache_annotation_for_2026_07_28() {
         response
     );
 
-    child.kill().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 }

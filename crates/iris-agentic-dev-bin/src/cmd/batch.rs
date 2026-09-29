@@ -80,7 +80,7 @@ impl BatchCommand {
 
         if steps.is_empty() {
             eprintln!("error: batch script is empty — nothing to run");
-            std::process::exit(1);
+            crate::exit(1);
         }
 
         let iris = self.conn.resolve().await?;
@@ -105,12 +105,12 @@ impl BatchCommand {
                             "error: step {i} ({}) reported failure — stopping batch",
                             step.tool
                         );
-                        std::process::exit(1);
+                        crate::exit(1);
                     }
                 }
                 Err(e) => {
                     eprintln!("error: step {i} ({}) failed: {e}", step.tool);
-                    std::process::exit(1);
+                    crate::exit(1);
                 }
             }
         }

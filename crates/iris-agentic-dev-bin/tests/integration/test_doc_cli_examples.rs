@@ -101,18 +101,21 @@ fn is_redirect(word: &str) -> bool {
 /// Pull every `iris-agentic-dev …` line out of one file's fenced code blocks.
 ///
 /// Prose mentions are skipped: only lines inside a fence whose first word is the binary name
-/// count. Leading `VAR=value` assignments, trailing `# comments`, and shell redirects are dropped.
+/// count, and `text`/`output` fences are skipped as printed output. Leading `VAR=value` assignments, trailing `# comments`, and shell redirects are dropped.
 fn doc_examples(file: &str, text: &str) -> Vec<Example> {
     let mut examples = Vec::new();
     let mut in_fence = false;
+    let mut output_fence = false;
 
     for (idx, raw) in text.lines().enumerate() {
         let line = raw.trim();
-        if line.starts_with("```") {
+        if let Some(info) = line.strip_prefix("```") {
             in_fence = !in_fence;
+            // A `text` or `output` fence shows what a command printed, not a command.
+            output_fence = in_fence && matches!(info.trim(), "text" | "output");
             continue;
         }
-        if !in_fence {
+        if !in_fence || output_fence {
             continue;
         }
         let words = split_words(line);
@@ -247,4 +250,35 @@ IRIS_HOST=localhost IRIS_WEB_PORT=52780 iris-agentic-dev tool check_config --arg
         examples[0].argv,
         vec!["tool", "check_config", "--args", "{}"]
     );
+}
+
+/// A `text` fence is what the command printed, not a command. getting-started shows
+/// `iris-agentic-dev --version` and then its answer, `iris-agentic-dev 1.4.2`, which is not an
+/// invocation and never parsed.
+#[test]
+fn extractor_skips_output_fences() {
+    let doc = "\
+```bash
+iris-agentic-dev --version
+```
+
+```text
+iris-agentic-dev 1.4.2
+```
+
+```output
+iris-agentic-dev 1.4.2
+```
+";
+    let examples = doc_examples("docs/example.md", doc);
+    assert_eq!(
+        examples.len(),
+        1,
+        "{:?}",
+        examples
+            .iter()
+            .map(|e| e.argv.join(" "))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(examples[0].argv, vec!["--version"]);
 }

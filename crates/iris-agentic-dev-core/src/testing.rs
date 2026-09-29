@@ -46,12 +46,38 @@ fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
+/// Stop a spawned `iris-agentic-dev` the way an MCP host does: SIGTERM, up to 10 s to exit, and a
+/// kill only if it hangs.
+///
+/// A bare `Child::kill` is SIGKILL. It dropped the telemetry write and any execute still in flight,
+/// and each left its `IrisDevTmp` scratch class in USER: 39 from one run of the gate-enforcement
+/// suite alone (130 round 4).
+pub fn stop_server(child: &mut std::process::Child) {
+    if let Ok(Some(_)) = child.try_wait() {
+        return;
+    }
+    #[cfg(unix)]
+    let _ = std::process::Command::new("kill")
+        .args(["-TERM", &child.id().to_string()])
+        .status();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while std::time::Instant::now() < deadline {
+        if let Ok(Some(_)) = child.try_wait() {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
 /// Where the `iris-agentic-dev` binary is expected to be.
 ///
 /// `IAD_BINARY` wins when set. A relative `IAD_BINARY` is resolved against the workspace root
 /// rather than the process working directory, because CI passes `./target/debug/iris-agentic-dev`
-/// and the two differ. Otherwise both `debug` and `release` profiles are tried, so a
-/// `cargo test --release` run finds its own binary.
+/// and the two differ. `IRIS_DEV_BIN` comes next. Otherwise the workspace build, by the rule in
+/// [`crate::benchmark::cli_dispatch::workspace_iad_binary`]: the instrumented build only under
+/// `cargo llvm-cov`, else `debug`, else `release`.
 pub fn iad_binary_path() -> PathBuf {
     if let Ok(v) = std::env::var("IAD_BINARY") {
         let p = PathBuf::from(&v);
@@ -61,12 +87,11 @@ pub fn iad_binary_path() -> PathBuf {
             workspace_root().join(p)
         };
     }
-    let root = workspace_root();
-    let debug = root.join("target/debug/iris-agentic-dev");
-    if debug.exists() {
-        return debug;
+    // `scripts/coverage.sh` names its instrumented wrapper this way.
+    if let Some(v) = std::env::var_os("IRIS_DEV_BIN") {
+        return PathBuf::from(v);
     }
-    root.join("target/release/iris-agentic-dev")
+    crate::benchmark::cli_dispatch::workspace_iad_binary(&workspace_root())
 }
 
 /// The binary, or a panic naming what to run.
@@ -1323,7 +1348,18 @@ impl McpSession {
 }
 
 impl Drop for McpSession {
+    /// Shut down the way an MCP client does: close stdin, give the server a moment to finish, and
+    /// kill it only if it hangs. A bare kill dropped the telemetry write still in flight and left its
+    /// `IrisDevTmp.IrisDevTel*` scratch class in USER on every live run.
     fn drop(&mut self) {
+        drop(self.child.stdin.take());
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while std::time::Instant::now() < deadline {
+            if let Ok(Some(_)) = self.child.try_wait() {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
         let _ = self.child.kill();
         let _ = self.child.wait();
     }

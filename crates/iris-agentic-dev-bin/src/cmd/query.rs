@@ -34,14 +34,14 @@ impl QueryCommand {
             Ok(b) => b,
             Err(e) => {
                 eprintln!("error: {}", e);
-                std::process::exit(1);
+                crate::exit(1);
             }
         };
 
         if body["success"].as_bool() != Some(true) {
             let msg = body["error"].as_str().unwrap_or("query failed");
             eprintln!("error: {}", msg);
-            std::process::exit(1);
+            crate::exit(1);
         }
 
         // iris_query returns {"rows": [...], "count": N}, a flat array of row-objects —

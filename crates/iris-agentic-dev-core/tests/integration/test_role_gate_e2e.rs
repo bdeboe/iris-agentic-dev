@@ -22,21 +22,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 
 fn iris_dev_bin() -> std::path::PathBuf {
-    if let Ok(path) = std::env::var("IRIS_DEV_BIN") {
-        let p = std::path::PathBuf::from(path);
-        if p.exists() {
-            return p;
-        }
-    }
-    let mut p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    p.pop(); // crates/iris-agentic-dev-core
-    p.pop(); // crates/
-    p.push("target/debug/iris-agentic-dev");
-    if !p.exists() {
-        p.pop();
-        p.push("release/iris-agentic-dev");
-    }
-    p
+    iris_agentic_dev_core::testing::iad_binary_path()
 }
 
 fn iris_host() -> String {
@@ -177,8 +163,7 @@ fn mcp_call_with_workspace(
         }
     }
 
-    child.kill().ok();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
     results
 }
 

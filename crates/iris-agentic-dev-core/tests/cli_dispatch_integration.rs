@@ -239,17 +239,7 @@ fn live_llm_client() -> Option<LlmClient> {
 }
 
 fn live_binary_path() -> PathBuf {
-    // Use compile-time CARGO_MANIFEST_DIR to find the binary in the worktree's target dir.
-    // This mirrors progressive_disclosure_integration.rs which uses env!() directly.
-    let mut p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    p.pop(); // → crates/
-    p.pop(); // → workspace root
-             // Prefer llvm-cov-target build (used by coverage runs), fall back to debug
-    let llvm = p.join("target/llvm-cov-target/debug/iris-agentic-dev");
-    if llvm.exists() {
-        return llvm;
-    }
-    p.join("target/debug/iris-agentic-dev")
+    iris_agentic_dev_core::testing::iad_binary_path()
 }
 
 /// S-002 / T023: Token counts appear in result when using a real LLM.

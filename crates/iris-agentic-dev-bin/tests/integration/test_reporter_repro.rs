@@ -68,8 +68,7 @@ struct Session {
 
 impl Drop for Session {
     fn drop(&mut self) {
-        self.child.kill().ok();
-        self.child.wait().ok();
+        iris_agentic_dev_core::testing::stop_server(&mut self.child);
     }
 }
 

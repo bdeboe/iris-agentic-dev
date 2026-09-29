@@ -110,8 +110,7 @@ fn test_iris_reload_pool_in_tools_list() {
         None
     });
 
-    child.kill().ok();
-    child.wait().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
     assert!(
         found.is_some(),
         "T093-B1: iris_reload_pool not found in tools/list"
@@ -169,8 +168,7 @@ fn test_iris_reload_pool_returns_success_json() {
         parse_tool_result(v)
     });
 
-    child.kill().ok();
-    child.wait().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let result = result.expect("T093-B2: no response from iris_reload_pool");
     assert_eq!(
@@ -247,8 +245,7 @@ fn test_iris_reload_pool_returns_toml_parse_error_on_bad_config() {
         parse_tool_result(v)
     });
 
-    child.kill().ok();
-    child.wait().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let result = result.expect("T093-B3: no response from iris_reload_pool");
     assert_eq!(

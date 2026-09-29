@@ -19,22 +19,7 @@ fn admin_call_live(action: serde_json::Value, extra_env: &[(&str, &str)]) -> ser
         p.pop();
         p
     };
-    let bin = {
-        let mut found = workspace_root.join("target/debug/iris-agentic-dev");
-        for subdir in [
-            "target/debug/iris-agentic-dev",
-            "target/release/iris-agentic-dev",
-            "target/llvm-cov-target/debug/iris-agentic-dev",
-            "target/llvm-cov-target/release/iris-agentic-dev",
-        ] {
-            let c = workspace_root.join(subdir);
-            if c.exists() {
-                found = c;
-                break;
-            }
-        }
-        found
-    };
+    let bin = iris_agentic_dev_core::testing::iad_binary_path();
 
     let iris_host = std::env::var("IRIS_HOST").unwrap_or_default();
     let iris_port = std::env::var("IRIS_WEB_PORT").unwrap_or_else(|_| "52780".to_string());
@@ -114,8 +99,7 @@ fn admin_call_live(action: serde_json::Value, extra_env: &[(&str, &str)]) -> ser
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
     }
-    child.kill().ok();
-    child.wait().ok();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let resp = results.iter().find(|r| r["id"] == 2).cloned();
     resp.map(|r| {

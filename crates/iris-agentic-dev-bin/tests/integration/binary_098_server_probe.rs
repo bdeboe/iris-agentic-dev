@@ -130,7 +130,7 @@ fn test_adhoc_probe_response_shape() {
     stdin.flush().ok();
 
     let result = read_until(stdout, 12000, parse_tool_result);
-    let _ = child.kill();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let r = result.expect("T019: timed out waiting for iris_test_server response");
     assert!(
@@ -159,7 +159,7 @@ fn test_neither_name_nor_host_error() {
     stdin.flush().ok();
 
     let result = read_until(stdout, 8000, parse_tool_result);
-    let _ = child.kill();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let r = result.expect("T020: timed out waiting for iris_test_server response");
     assert_eq!(
@@ -184,7 +184,7 @@ fn test_closed_port_unreachable() {
     stdin.flush().ok();
 
     let result = read_until(stdout, 12000, parse_tool_result);
-    let _ = child.kill();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let r = result.expect("T021: timed out waiting for iris_test_server response");
     assert_eq!(
@@ -214,7 +214,7 @@ fn test_iris_servers_no_probe_reachable_null() {
     stdin.flush().ok();
 
     let result = read_until(stdout, 8000, parse_tool_result);
-    let _ = child.kill();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     let r = result.expect("T031: timed out waiting for iris_servers response");
     let servers = r["servers"]

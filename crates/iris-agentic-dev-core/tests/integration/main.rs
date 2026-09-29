@@ -54,6 +54,7 @@ mod test_mirror_and_freespace;
 mod test_retry;
 mod test_role_gate_e2e;
 mod test_scm;
+mod test_scratch_cancel_130;
 mod test_search_live;
 mod test_server_pool_e2e;
 mod test_skill_facts_127_live;

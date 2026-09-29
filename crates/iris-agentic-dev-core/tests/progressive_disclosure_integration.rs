@@ -104,8 +104,7 @@ fn mcp_exchange(
         }
     }
 
-    let _ = child.kill();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
     results
 }
 

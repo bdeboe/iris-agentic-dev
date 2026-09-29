@@ -23,6 +23,7 @@ mod test_doc_live;
 mod test_exec_live;
 mod test_http_transport;
 mod test_mcp_binary_config;
+mod test_mcp_sigterm_130;
 mod test_query_live;
 mod test_reporter_repro;
 mod test_tool_live;

@@ -184,8 +184,7 @@ fn mcp_mode_marker_names_connected_client() {
     // The _init_resp above is None (we never matched it in the predicate above because
     // we were looking for tool-call content, not initialize result). The reader thread
     // from that read_until ran to EOF or timeout. Let's use a cleaner design:
-    let _ = child.kill();
-    let _ = child.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child);
 
     // Restart with a fresh process and a single-pass approach.
     let (mut child2, mut stdin2, stdout2) = match spawn_mcp_live() {
@@ -238,8 +237,7 @@ fn mcp_mode_marker_names_connected_client() {
         None
     });
 
-    let _ = child2.kill();
-    let _ = child2.wait();
+    iris_agentic_dev_core::testing::stop_server(&mut child2);
 
     let ua = match ua {
         Some(u) => u,
@@ -369,8 +367,7 @@ fn iris_audit_emission_wiring() {
         // Give the background audit task a moment to run (it's spawned async).
         std::thread::sleep(Duration::from_millis(500));
         drop(stdin);
-        let _ = child.kill();
-        let _ = child.wait();
+        iris_agentic_dev_core::testing::stop_server(&mut child);
 
         rx.recv_timeout(Duration::from_secs(5)).unwrap_or_default()
     };
@@ -427,7 +424,12 @@ fn iris_audit_failures_surfaced_in_check_config() {
         "host = \"{host}\"\nweb_port = {port}\nusername = \"{username}\"\npassword = \"{password}\"\nnamespace = \"{namespace}\"\n",
     );
 
-    let run_and_get_check_config = |toml_content: &str| -> Option<serde_json::Value> {
+    // The audit write is a background task, so its failure lands some time after `iris_execute`
+    // answers. A fixed sleep before one `check_config` failed under load (130 round 4); poll
+    // instead, and only as long as the caller expects the counter to appear.
+    let run_and_get_check_config = |toml_content: &str,
+                                    expect_failures: bool|
+     -> Option<serde_json::Value> {
         let dir = tempfile::tempdir().ok()?;
         std::fs::write(dir.path().join(".iris-agentic-dev.toml"), toml_content).ok()?;
         let mut child = std::process::Command::new(&bin)
@@ -442,6 +444,26 @@ fn iris_audit_failures_surfaced_in_check_config() {
             .ok()?;
         let mut stdin = child.stdin.take()?;
         let stdout = child.stdout.take()?;
+        let (tx, rx) = std::sync::mpsc::channel::<serde_json::Value>();
+        std::thread::spawn(move || {
+            for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(line.trim()) {
+                    if tx.send(v).is_err() {
+                        return;
+                    }
+                }
+            }
+        });
+        let wait_for = |id: u64| -> Option<serde_json::Value> {
+            let deadline = std::time::Instant::now() + Duration::from_secs(15);
+            while let Some(left) = deadline.checked_duration_since(std::time::Instant::now()) {
+                let v = rx.recv_timeout(left).ok()?;
+                if v.get("id").and_then(|i| i.as_u64()) == Some(id) {
+                    return Some(v);
+                }
+            }
+            None
+        };
 
         let init = concat!(
             r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"#,
@@ -451,79 +473,45 @@ fn iris_audit_failures_surfaced_in_check_config() {
         );
         let notif =
             "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\",\"params\":{}}\n";
-        stdin.write_all(init.as_bytes()).ok();
-        stdin.write_all(notif.as_bytes()).ok();
-
         // Trigger an emission attempt (will fail — no event definition exists).
         let exec_call = "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"iris_execute\",\"arguments\":{\"code\":\"write 1\"}}}\n";
+        stdin.write_all(init.as_bytes()).ok();
+        stdin.write_all(notif.as_bytes()).ok();
         stdin.write_all(exec_call.as_bytes()).ok();
+        wait_for(2)?;
 
-        // Wait for exec response, then call check_config.
-        let _ = read_until(stdout, 15000, |v| {
-            if v.get("id")?.as_u64()? == 2 {
-                Some(())
-            } else {
-                None
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        let mut result = None;
+        for id in 3u64.. {
+            std::thread::sleep(Duration::from_millis(300));
+            let cc_call = format!(
+                    "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"tools/call\",\"params\":{{\"name\":\"check_config\",\"arguments\":{{}}}}}}\n"
+                );
+            stdin.write_all(cc_call.as_bytes()).ok();
+            result = wait_for(id).and_then(|v| {
+                v.get("result")?
+                    .get("content")?
+                    .as_array()?
+                    .iter()
+                    .filter_map(|c| c.get("text")?.as_str())
+                    .find_map(|t| serde_json::from_str::<serde_json::Value>(t.trim()).ok())
+            });
+            let seen = result
+                .as_ref()
+                .is_some_and(|v| v.get("iris_audit_failures").is_some());
+            if !expect_failures || seen || std::time::Instant::now() > deadline {
+                break;
             }
-        });
+        }
 
-        // Give the background audit task a moment to record the failure.
-        std::thread::sleep(Duration::from_millis(500));
-
-        // We need a fresh process-stdout handle for the check_config read.
-        // Since stdout was consumed, we restart with a two-call approach.
-        let _ = child.kill();
-        let _ = child.wait();
-
-        // Restart: initialize + exec (triggers failure) + check_config — read check_config response.
-        let dir2 = tempfile::tempdir().ok()?;
-        std::fs::write(dir2.path().join(".iris-agentic-dev.toml"), toml_content).ok()?;
-        let mut child2 = std::process::Command::new(&bin)
-            .arg("mcp")
-            .arg("--workspace")
-            .arg(".")
-            .current_dir(dir2.path())
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .ok()?;
-        let mut stdin2 = child2.stdin.take()?;
-        let stdout2 = child2.stdout.take()?;
-
-        stdin2.write_all(init.as_bytes()).ok();
-        stdin2.write_all(notif.as_bytes()).ok();
-        stdin2.write_all(exec_call.as_bytes()).ok();
-
-        // Flush and wait briefly for exec + background audit task.
-        std::thread::sleep(Duration::from_millis(600));
-
-        let cc_call = "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"check_config\",\"arguments\":{}}}\n";
-        stdin2.write_all(cc_call.as_bytes()).ok();
-
-        let result = read_until(stdout2, 15000, |v| {
-            if v.get("id")?.as_u64()? != 3 {
-                return None;
-            }
-            let content = v.get("result")?.get("content")?.as_array()?;
-            for c in content {
-                let text = c.get("text")?.as_str()?;
-                if let Ok(obj) = serde_json::from_str::<serde_json::Value>(text.trim()) {
-                    return Some(obj);
-                }
-            }
-            None
-        });
-
-        let _ = child2.kill();
-        let _ = child2.wait();
+        iris_agentic_dev_core::testing::stop_server(&mut child);
         result
     };
 
-    let cc_with = run_and_get_check_config(&config_with_audit);
+    let cc_with = run_and_get_check_config(&config_with_audit, true);
     eprintln!("T038 check_config (with irisAudit): {:?}", cc_with);
 
-    let cc_without = run_and_get_check_config(&config_without_audit);
+    let cc_without = run_and_get_check_config(&config_without_audit, false);
     eprintln!("T038 check_config (without irisAudit): {:?}", cc_without);
 
     // With irisAudit = true and no event definition: failures > 0 must appear.
