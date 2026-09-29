@@ -381,14 +381,14 @@ iris_compile(target="MyApp.*.cls", flags="cukd")
 
 Run arbitrary ObjectScript and return the output.
 
-| Parameter       | Type   | Default  | Notes                                                      |
-| --------------- | ------ | -------- | ---------------------------------------------------------- |
-| `code`          | string | —        | **Required.** ObjectScript to execute                      |
-| `namespace`     | string | `"USER"` |                                                            |
-| `timeout`       | int    | `120`    | Seconds; overridden by `OBJECTSCRIPT_TEST_TIMEOUT` env var |
-| `translate_sql` | bool   | `true`   | Rewrite `&sql(...)` macros to `%SQL.Statement`             |
-| `use_session`   | bool   | `false`  | Enable `%ctx` session carrier (see below)                  |
-| `session_state` | string | —        | Token from a prior call; restores `%ctx`                   |
+| Parameter       | Type   | Default  | Notes                                                                                               |
+| --------------- | ------ | -------- | --------------------------------------------------------------------------------------------------- |
+| `code`          | string | —        | **Required.** ObjectScript to execute                                                               |
+| `namespace`     | string | `"USER"` |                                                                                                     |
+| `timeout`       | int    | `120`    | Seconds; overridden by `OBJECTSCRIPT_TEST_TIMEOUT` env var                                          |
+| `translate_sql` | bool   | `true`   | Rewrite `&sql(...)` macros to `%SQL.Statement` on the docker exec path; HTTP runs `&sql` as written |
+| `use_session`   | bool   | `false`  | Enable `%ctx` session carrier (see below)                                                           |
+| `session_state` | string | —        | Token from a prior call; restores `%ctx`                                                            |
 
 ```text
 iris_execute(code="Write $ZVersion")

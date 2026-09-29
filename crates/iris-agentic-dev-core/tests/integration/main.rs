@@ -36,6 +36,7 @@ mod test_doc_search_live;
 mod test_e2e;
 mod test_e2e_all_tools;
 mod test_environment_restriction_live;
+mod test_exec_sql_131_live;
 mod test_fresh_container_setup_live;
 mod test_gate_enforcement_live;
 mod test_generator_device_live;

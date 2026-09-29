@@ -41,17 +41,17 @@ fn test_select_into_single_var() {
         "should contain %Execute"
     );
     assert!(
-        r.translated_code.contains("%Get(\"Name\")"),
-        "should contain %Get(\"Name\")"
+        r.translated_code.contains("%GetData(1)"),
+        "should read column 1 by position"
     );
     assert!(
-        r.translated_code.contains("set name = "),
+        r.translated_code.contains("name = $Select("),
         "should set 'name' variable"
     );
-    // No-rows branch: name set to ""
+    // No row: name set to ""
     assert!(
-        r.translated_code.contains("set name = \"\""),
-        "no-rows branch should set name to empty string"
+        r.translated_code.contains("%GetData(1),1:\"\")"),
+        "no row should set name to empty string"
     );
 }
 
@@ -62,10 +62,12 @@ fn test_select_into_multiple_vars() {
     let code = "&sql(SELECT Name, Description INTO :nm, :desc FROM MyApp.Table WHERE ID = :id)";
     let r = translate_sql_macros(code);
     assert!(r.found);
-    assert!(r.translated_code.contains("%Get(\"Name\")"));
-    assert!(r.translated_code.contains("%Get(\"Description\")"));
-    assert!(r.translated_code.contains("set nm = "));
-    assert!(r.translated_code.contains("set desc = "));
+    assert!(r
+        .translated_code
+        .contains("nm = $Select(sqlnx1:sqlrs1.%GetData(1)"));
+    assert!(r
+        .translated_code
+        .contains("desc = $Select(sqlnx1:sqlrs1.%GetData(2)"));
 }
 
 // ── T009: INSERT DML ──────────────────────────────────────────────────────────
@@ -210,10 +212,11 @@ fn test_select_into_no_rows_sets_empty_string() {
     let code = "&sql(SELECT Name INTO :name FROM foo WHERE 1 = 0)";
     let r = translate_sql_macros(code);
     assert!(r.found);
-    // The else branch must set name = ""
+    // No row: name = ""
     assert!(
-        r.translated_code.contains("set name = \"\""),
-        "no-rows else branch must set name to empty string"
+        r.translated_code
+            .contains("name = $Select(sqlnx1:sqlrs1.%GetData(1),1:\"\")"),
+        "no row must set name to empty string"
     );
 }
 
@@ -233,7 +236,7 @@ fn test_nested_parens_correct_boundary() {
     );
 }
 
-// ── T018: Column alias — %Get uses alias ─────────────────────────────────────
+// ── T018: Column alias — read by position, alias kept in the SQL ─────────────
 
 #[test]
 fn test_column_alias_uses_alias() {
@@ -241,8 +244,11 @@ fn test_column_alias_uses_alias() {
     let r = translate_sql_macros(code);
     assert!(r.found);
     assert!(
-        r.translated_code.contains("%Get(\"nm\")"),
-        "should use alias 'nm' not original column name"
+        r.translated_code.contains("SELECT Name AS nm FROM foo")
+            && r.translated_code
+                .contains("nm = $Select(sqlnx1:sqlrs1.%GetData(1)"),
+        "alias stays in the SQL, the column is read by position: {}",
+        r.translated_code
     );
 }
 
@@ -285,8 +291,12 @@ fn test_multi_column_translated_code_has_all_gets() {
     let code = "&sql(SELECT ColA, ColB INTO :a, :b FROM foo)";
     let r = translate_sql_macros(code);
     assert!(r.found);
-    assert!(r.translated_code.contains("%Get(\"ColA\")"));
-    assert!(r.translated_code.contains("%Get(\"ColB\")"));
+    assert!(r
+        .translated_code
+        .contains("a = $Select(sqlnx1:sqlrs1.%GetData(1)"));
+    assert!(r
+        .translated_code
+        .contains("b = $Select(sqlnx1:sqlrs1.%GetData(2)"));
 }
 
 #[test]
@@ -369,7 +379,7 @@ fn test_sc001_representative_patterns() {
             "alias" => {
                 assert!(r.found);
                 assert!(
-                    r.translated_code.contains("%Get(\"n\")"),
+                    r.translated_code.contains("%GetData(1)"),
                     "alias should be used for: {code}"
                 );
             }
@@ -433,8 +443,8 @@ fn test_select_no_select_keyword_in_col_extraction() {
     let r = translate_sql_macros("&sql(SELECT Name, Age INTO :n, :a FROM foo WHERE ID=1)");
     assert!(r.found);
     assert!(
-        r.translated_code.contains("%Get(\"Name\")") || r.translated_code.contains("%Get(\"Age\")"),
-        "multi-col SELECT INTO should extract column names: {}",
+        r.translated_code.contains("%GetData(1)") && r.translated_code.contains("%GetData(2)"),
+        "multi-col SELECT INTO should read each column by position: {}",
         r.translated_code
     );
 }

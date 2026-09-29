@@ -36,3 +36,11 @@ Test-first inside every phase. Live runs use `--test-threads=1` against iris-dev
 
 - [x] T016 CLAUDE.md Recent Changes entry for 131
 - [x] T017 Full unit + binary suites, `test_test_target_layout`, fmt, clippy; commit locally
+
+## Phase 7: US5 `&sql` inside `iris_execute`
+
+- [x] T018 [P] [US5] Unit tests (red): position reads, `TOP` kept in the SQL, no block syntax, `SQLCODE`/`%msg`/`%ROWCOUNT` set, in `crates/iris-agentic-dev-core/tests/unit/test_sql_translate_131.rs`, `mod` line in `tests/unit/main.rs`
+- [x] T019 [P] [US5] Live tests (red): HTTP and `docker_only` cases, in `crates/iris-agentic-dev-core/tests/integration/test_exec_sql_131_live.rs`, `mod` line in `tests/integration/main.rs`
+- [x] T020 [US5] `translate_select_into` / `translate_dml` rewrite and the HTTP/terminal code split in `crates/iris-agentic-dev-core/src/tools/mod.rs`; description and `translate_sql` doc; `docs/tools.md`
+- [x] T021 [US5] Move the 035 tests to the new contract (`tests/unit/test_sql_translate.rs`, `tests/integration/test_sql_translate_e2e.rs`)
+- [x] T022 [US5] Gate: T018–T019 green, lib + unit + binary + misc suites, live sql tests serially, fmt, clippy; commit locally

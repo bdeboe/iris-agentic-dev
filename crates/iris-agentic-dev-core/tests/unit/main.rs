@@ -104,6 +104,7 @@ mod test_skills_unit_gaps;
 mod test_sql_power_unit;
 mod test_sql_safety;
 mod test_sql_translate;
+mod test_sql_translate_131;
 mod test_structured_content;
 mod test_suppress_description;
 mod test_system_blocklist;

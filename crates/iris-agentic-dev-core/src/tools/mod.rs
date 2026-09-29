@@ -463,7 +463,7 @@ pub fn translate_sql_macros(code: &str) -> TranslationResult {
                 || sql_upper.starts_with("MERGE")
             {
                 // Translate DML
-                output.push_str(&translate_dml(&sql_content, &rs_var));
+                output.push_str(&translate_dml(&sql_content, &rs_var, &sqlcode_var));
                 // Check next line for SQLCODE / %msg
                 i = rewrite_next_line_sqlcode(
                     chars.as_slice(),
@@ -519,24 +519,6 @@ fn translate_select_into(sql: &str, rs_var: &str, sc_var: &str, sqlcode_var: &st
     } else {
         select_cols_sql.clone()
     };
-    let col_names: Vec<String> = split_csv(&col_list_str)
-        .iter()
-        .map(|c| {
-            // Handle "ColName AS alias" → use alias
-            let upper = c.to_uppercase();
-            if let Some(as_pos) = upper.find(" AS ") {
-                c[as_pos + 4..].trim().to_string()
-            } else {
-                // Strip table qualifier: "t.Name" → "Name"
-                c.trim()
-                    .split('.')
-                    .next_back()
-                    .unwrap_or(c.trim())
-                    .to_string()
-            }
-        })
-        .collect();
-
     // rest_after_into is like ":name, :age FROM table WHERE ..."
     // Split host vars from FROM clause
     let (host_vars_str, from_clause) = split_host_vars_from_rest(&rest_after_into);
@@ -578,21 +560,26 @@ fn translate_select_into(sql: &str, rs_var: &str, sc_var: &str, sqlcode_var: &st
         "",
         exec_args.trim_start_matches(", ")
     ));
-    // Fetch row — use single-line if/else for compatibility with execute_via_generator
-    out.push_str(&format!("if {}.%Next() {{", rs_var));
+    // Fetch the row in one braceless `set`: this output only runs on the docker path, which
+    // refuses block syntax. Columns are read by position, because a name like `COUNT(*)` or
+    // `TOP 1 Name` is not a property of the result (131 US4). No row leaves each host variable
+    // "" and SQLCODE at the result's own code (100), as `&sql` does.
+    let next_var = rs_var.replacen("sqlrs", "sqlnx", 1);
+    out.push_str(&format!("set {} = {}.%Next()", next_var, rs_var));
     for (idx, var) in host_vars.iter().enumerate() {
-        let col = col_names
-            .get(idx)
-            .map(String::as_str)
-            .unwrap_or(var.as_str());
-        out.push_str(&format!(" set {} = {}.%Get(\"{}\")", var, rs_var, col));
+        out.push_str(&format!(
+            ", {} = $Select({}:{}.%GetData({}),1:\"\")",
+            var,
+            next_var,
+            rs_var,
+            idx + 1
+        ));
     }
-    out.push_str(" } else {");
-    for var in &host_vars {
-        out.push_str(&format!(" set {} = \"\"", var));
-    }
-    out.push_str(&format!(" set {} = {}.%SQLCODE", sqlcode_var, rs_var));
-    out.push_str(" }");
+    out.push_str(&format!(
+        ", {} = $Select({}:0,1:{}.%SQLCODE)",
+        sqlcode_var, next_var, rs_var
+    ));
+    out.push_str(&sqlcode_assignments(sqlcode_var, rs_var));
 
     out
 }
@@ -620,7 +607,7 @@ fn translate_select_no_into(sql: &str, rs_var: &str, sc_var: &str, _sqlcode_var:
     out
 }
 
-fn translate_dml(sql: &str, rs_var: &str) -> String {
+fn translate_dml(sql: &str, rs_var: &str, sqlcode_var: &str) -> String {
     let params = extract_where_params(sql);
     let prepared_sql = replace_host_vars_with_positional(sql, &params);
     let exec_args = if params.is_empty() {
@@ -629,11 +616,21 @@ fn translate_dml(sql: &str, rs_var: &str) -> String {
         format!(", {}", params.join(", "))
     };
     format!(
-        "set {} = ##class(%SQL.Statement).%ExecDirect(, \"{}\"{})",
+        "set {} = ##class(%SQL.Statement).%ExecDirect(, \"{}\"{}), {} = {}.%SQLCODE{}, %ROWCOUNT = {}.%ROWCOUNT",
         rs_var,
         prepared_sql.replace('"', "\"\""),
-        exec_args
+        exec_args,
+        sqlcode_var,
+        rs_var,
+        sqlcode_assignments(sqlcode_var, rs_var),
+        rs_var
     )
+}
+
+/// The `SQLCODE` and `%msg` that `&sql` itself would leave behind, as a `set` continuation. Code
+/// on the macro's own line reads them, not only the line after.
+fn sqlcode_assignments(sqlcode_var: &str, rs_var: &str) -> String {
+    format!(", SQLCODE = {}, %msg = {}.%Message", sqlcode_var, rs_var)
 }
 
 /// After a translated &sql, check if the immediately following line contains
@@ -1149,7 +1146,8 @@ pub struct ExecuteParams {
     pub timeout: u64,
     #[serde(default)]
     pub confirmed: bool,
-    /// If true (default), rewrite &sql(...) embedded SQL macros to %SQL.Statement calls before executing.
+    /// If true (default), rewrite &sql(...) embedded SQL macros to %SQL.Statement calls on the docker
+    /// exec path, whose terminal has no &sql. The HTTP path always runs &sql as written.
     /// Set to false to send code as-is for debugging.
     #[serde(default = "default_translate_sql")]
     pub translate_sql: bool,
@@ -4426,7 +4424,7 @@ impl IrisTools {
     }
 
     #[tool(
-        description = "Execute arbitrary ObjectScript code on IRIS and return stdout. Two execution paths: (1) HTTP primary — wraps code in a temporary class method body (CodeMode=objectgenerator), compiles it via Atelier REST, runs it, deletes the class. Block syntax (`{}`) works here because class method bodies support it. (2) docker exec fallback — used when IRIS_CONTAINER env var is set and HTTP fails, or when the connection sets `docker_only = true` in `.iris-agentic-dev.toml` (a config-file key, not a parameter of this tool — passing docker_only in the tool arguments does nothing). This path pipes code into `iris session` stdin, which is a line-by-line terminal interpreter. Block syntax (`{}`) is NOT supported in terminal mode — `If cond { ... }` causes a `<SYNTAX>` error. Use classic terminal-compatible form instead: `If cond Write x`. For complex multi-line scripts that require `{}` on a docker exec path, write a .mac routine with `iris_doc` (mode=put) and compile it with `iris_compile`, then call `iris_execute Do entry^RoutineName`. That needs Atelier REST for `iris_doc`; under `docker_only` the routine must already be on the server. The destructive gate covers tool calls, not the code this tool runs: only a literal `Kill ^global` is checked, so for a hard limit connect as an IRIS user without delete privileges. &sql(...) embedded SQL macros are automatically translated to %SQL.Statement calls (set translate_sql: false to disable). When translation fires, response includes sql_translated: true and translated_code. Example: code='write $ZVERSION,!' returns the IRIS version string. Classes in Security.*, Config.* and SYS.* (web applications, users, roles, namespaces, databases) exist only in %SYS: pass namespace: \"%SYS\" for them. Skill: objectscript-tdd for the compile-execute-fix loop. Session state: set use_session: true to enable the %ctx carrier (%DynamicObject). Store values in %ctx.key between calls — scalars, %DynamicObject, and %Persistent objects (stored as OID stubs and re-opened on restore). The response includes session_state (opaque Base64 token); pass it back as session_state on the next call to restore %ctx. Nothing is written to IRIS — the token is held by the client. Error codes: SESSION_INVALID (bad token), SESSION_RESTORE_FAILED (missing class or bad OID), SESSION_SERIALIZE_FAILED (serialization error), TERMINAL_SYNTAX_UNSUPPORTED (block syntax on docker exec path). `server` (optional): name of a registered IRIS instance. If omitted, uses the default connection. Use `iris_servers` to list available instances.",
+        description = "Execute arbitrary ObjectScript code on IRIS and return stdout. Two execution paths: (1) HTTP primary — wraps code in a temporary class method body (CodeMode=objectgenerator), compiles it via Atelier REST, runs it, deletes the class. Block syntax (`{}`) works here because class method bodies support it. (2) docker exec fallback — used when IRIS_CONTAINER env var is set and HTTP fails, or when the connection sets `docker_only = true` in `.iris-agentic-dev.toml` (a config-file key, not a parameter of this tool — passing docker_only in the tool arguments does nothing). This path pipes code into `iris session` stdin, which is a line-by-line terminal interpreter. Block syntax (`{}`) is NOT supported in terminal mode — `If cond { ... }` causes a `<SYNTAX>` error. Use classic terminal-compatible form instead: `If cond Write x`. For complex multi-line scripts that require `{}` on a docker exec path, write a .mac routine with `iris_doc` (mode=put) and compile it with `iris_compile`, then call `iris_execute Do entry^RoutineName`. That needs Atelier REST for `iris_doc`; under `docker_only` the routine must already be on the server. The destructive gate covers tool calls, not the code this tool runs: only a literal `Kill ^global` is checked, so for a hard limit connect as an IRIS user without delete privileges. &sql(...) embedded SQL runs natively on the HTTP path. The docker exec path has no &sql, so there it is translated to %SQL.Statement calls (set translate_sql: false to disable), and the response includes sql_translated: true and translated_code. Example: code='write $ZVERSION,!' returns the IRIS version string. Classes in Security.*, Config.* and SYS.* (web applications, users, roles, namespaces, databases) exist only in %SYS: pass namespace: \"%SYS\" for them. Skill: objectscript-tdd for the compile-execute-fix loop. Session state: set use_session: true to enable the %ctx carrier (%DynamicObject). Store values in %ctx.key between calls — scalars, %DynamicObject, and %Persistent objects (stored as OID stubs and re-opened on restore). The response includes session_state (opaque Base64 token); pass it back as session_state on the next call to restore %ctx. Nothing is written to IRIS — the token is held by the client. Error codes: SESSION_INVALID (bad token), SESSION_RESTORE_FAILED (missing class or bad OID), SESSION_SERIALIZE_FAILED (serialization error), TERMINAL_SYNTAX_UNSUPPORTED (block syntax on docker exec path). `server` (optional): name of a registered IRIS instance. If omitted, uses the default connection. Use `iris_servers` to list available instances.",
         output_schema = output_schemas::oneof_output_schema::<IrisExecuteResponse>()
     )]
     async fn iris_execute(
@@ -4476,30 +4474,35 @@ impl IrisTools {
             }
         }
 
-        // &sql macro translation — rewrite before sending to IRIS (035)
+        // &sql macro translation (035) applies to the terminal (docker exec) paths only. The HTTP
+        // path compiles the code into a class method, where IRIS expands `&sql` itself; rewriting
+        // it there broke `COUNT(*) INTO` and every other expression column (131 US4).
         let translation = if p.translate_sql {
             let r = translate_sql_macros(&p.code);
             Some(r)
         } else {
             None
         };
-        let base_code = translation
+        let terminal_base = translation
             .as_ref()
             .filter(|r| r.found)
             .map(|r| r.translated_code.as_str())
             .unwrap_or(&p.code);
 
         // Session wrapping: inject preamble before and epilogue after user code.
-        let session_wrapped: String;
-        let code_to_run: &str = if p.use_session {
-            let preamble = execute_session::build_session_preamble(p.session_state.as_deref())
-                .expect("token already validated above");
-            let epilogue = execute_session::build_session_epilogue();
-            session_wrapped = format!("{preamble}{base_code}\n{epilogue}");
-            &session_wrapped
-        } else {
-            base_code
+        let wrap = |base: &str| -> String {
+            if p.use_session {
+                let preamble = execute_session::build_session_preamble(p.session_state.as_deref())
+                    .expect("token already validated above");
+                let epilogue = execute_session::build_session_epilogue();
+                format!("{preamble}{base}\n{epilogue}")
+            } else {
+                base.to_string()
+            }
         };
+        let http_code = wrap(&p.code);
+        let terminal_code = wrap(terminal_base);
+        let code_to_run: &str = &terminal_code;
 
         // NoPWS early-branch: when docker_only or NoPWS build detected, skip Atelier REST
         // and route through docker exec immediately — same pattern as iris_compile (lines ~3245).
@@ -4609,7 +4612,7 @@ impl IrisTools {
         // Try pure-HTTP execution first (write-compile-query via CodeMode=objectgenerator).
         let gen_result = tokio::time::timeout(
             timeout,
-            iris.execute_via_generator(code_to_run, &namespace, client),
+            iris.execute_via_generator(&http_code, &namespace, client),
         )
         .await;
 
@@ -4670,21 +4673,6 @@ impl IrisTools {
                 }
                 if let Some(tok) = session_token {
                     resp["session_state"] = serde_json::Value::String(tok);
-                }
-                if let Some(ref tr) = translation {
-                    if tr.found {
-                        resp["sql_translated"] = serde_json::Value::Bool(true);
-                        resp["translated_code"] =
-                            serde_json::Value::String(tr.translated_code.clone());
-                        if !tr.warnings.is_empty() {
-                            resp["translation_warning"] = serde_json::Value::Array(
-                                tr.warnings
-                                    .iter()
-                                    .map(|w| serde_json::Value::String(w.clone()))
-                                    .collect(),
-                            );
-                        }
-                    }
                 }
                 return json_result(resp);
             }

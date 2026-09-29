@@ -60,6 +60,20 @@ Tom has a local review draft for PR 142 that quotes each verdict and the test be
 1. **Given** `research.md`'s verdict table, **Then** the draft carries the same verdicts.
 2. **Given** the draft, **Then** nothing is posted, pushed or commented until Tom says "post it".
 
+### User Story 5 - `&sql` runs inside `iris_execute` (Priority: P1)
+
+The 131 probe found that `&sql(SELECT COUNT(*) INTO :n FROM ...)` inside `iris_execute` failed with `<PROPERTY DOES NOT EXIST> COUNT(*)`. iad rewrote every `&sql` to `%SQL.Statement` before it picked a path, and the rewrite read each column by its expression text. On the HTTP path the code is compiled into a class method, where IRIS expands `&sql` itself, so the rewrite was never needed there. On the docker exec path the terminal has no `&sql`, so the rewrite is what runs, and it has to behave like `&sql`.
+
+**Independent Test**: The same `&sql` code through a normal connection and through a `docker_only` connection gives the same `SQLCODE` and host variables.
+
+**Acceptance Scenarios**:
+
+1. **Given** `&sql(SELECT COUNT(*) INTO :n ...)` over HTTP, **Then** it runs, `SQLCODE` is 0, and the response has no `sql_translated`.
+2. **Given** a `TOP 1 col AS alias` column over HTTP, **Then** it runs, and a `SQLCODE` check on the macro's own line sees 0.
+3. **Given** a query with no row, **Then** `SQLCODE` is 100 on both paths, and the docker path leaves the host variable `""`.
+4. **Given** DML on a missing table through docker exec, **Then** `SQLCODE` is -30.
+5. **Given** the docker translation, **Then** it contains no block syntax, reads columns by position, and sets `SQLCODE`, `%msg` and (for DML) `%ROWCOUNT`.
+
 ### Edge Cases
 
 - `sa_schema` with no `name` at all: same legible error as a cube name, not an empty result.
@@ -81,6 +95,9 @@ Tom has a local review draft for PR 142 that quotes each verdict and the test be
 - **FR-007**: Each claim test MUST assert what IRIS returned on the fixture. Where that contradicts the claim, the test asserts IRIS and the verdict is "false".
 - **FR-008**: `research.md` MUST have one row per claim: the claim as quoted, what IRIS did, the verdict (holds / false / reworded / unmeasurable), and the test name. Performance and Samples-BI claims get "unmeasurable — cite or cut".
 - **FR-009**: The local review draft MUST be updated with the verdicts and MUST NOT be posted.
+- **FR-011**: `iris_execute` MUST send `&sql` untranslated on the HTTP path and translate it only on the docker exec paths. The HTTP response MUST NOT carry `sql_translated` or `translated_code`.
+- **FR-012**: The docker translation of `SELECT ... INTO` MUST read host variables by column position, set each to `""` when no row comes back, set `SQLCODE` from the result (0 or the result's own code, 100 for no row) and `%msg`, and use no block syntax. DML MUST set `SQLCODE`, `%msg` and `%ROWCOUNT`.
+- **FR-013**: The `iris_execute` description and the `translate_sql` doc MUST say translation applies to the docker exec path only.
 - **FR-010**: Every change MUST pass `cargo fmt --all -- --check`, `cargo clippy -- -D warnings` and the unit suite. The new live tests MUST pass serially against iris-dev-iris.
 
 ### Key Entities
@@ -97,6 +114,7 @@ Tom has a local review draft for PR 142 that quotes each verdict and the test be
 - **SC-003**: Every measurable claim in FR-006 has a passing live test, and every claim has a row in `research.md`.
 - **SC-004**: After the live suite, the fixture package holds zero classes in USER.
 - **SC-005**: The review draft's verdicts match `research.md` row for row. Nothing was posted.
+- **SC-006**: `COUNT(*) INTO`, `TOP 1 ... AS`, no-row and DML-error `&sql` cases each pass live on both execution paths where they apply (`test_exec_sql_131_live`).
 
 ## Assumptions
 

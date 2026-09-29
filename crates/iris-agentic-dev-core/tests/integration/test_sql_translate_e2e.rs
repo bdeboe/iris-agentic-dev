@@ -106,47 +106,44 @@ fn execute(code: &str, translate_sql: Option<bool>) -> serde_json::Value {
     tool_result(&responses, 2)
 }
 
-/// T025: SELECT INTO translates and executes correctly — output is the expected value.
+/// T025: SELECT INTO over HTTP runs as written — IRIS compiles `&sql` in the class method, and
+/// iad leaves it alone (131 US4). `%Dictionary.ClassDefinition` is behind the CODE_EDIT gate, so the
+/// row comes from INFORMATION_SCHEMA.
 #[test]
 #[ignore]
-fn test_e2e_select_into_translates_and_runs() {
+fn test_e2e_select_into_runs_natively_over_http() {
     if iris_host().is_empty() {
         eprintln!("Skipping: IRIS_HOST not set");
         return;
     }
-    let code = "set id=\"%ASQ.AST\"\nset name=\"\"\n&sql(SELECT Name INTO :name FROM %Dictionary.ClassDefinition WHERE ID = :id)\nwrite name,!";
+    let code = "set t=\"\"\n&sql(SELECT TABLE_NAME INTO :t FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'INFORMATION_SCHEMA' AND TABLE_NAME = 'TABLES')\nwrite SQLCODE,\":\",t,!";
     let result = execute(code, None);
     eprintln!("T025: {}", serde_json::to_string_pretty(&result).unwrap());
     assert_eq!(result["success"], true);
-    assert_eq!(result["sql_translated"], true);
     let output = result["output"].as_str().unwrap_or("");
+    assert_eq!(output.trim(), "0:TABLES", "got: {result}");
     assert!(
-        output.contains("%ASQ.AST"),
-        "output should contain %ASQ.AST, got: {output}"
-    );
-    assert!(
-        result["translated_code"].as_str().is_some(),
-        "translated_code should be present"
+        result.get("sql_translated").is_none() && result.get("translated_code").is_none(),
+        "the HTTP path sends &sql untranslated: {result}"
     );
 }
 
-/// T026: INSERT translation fires — sql_translated: true (don't actually execute insert against real table).
-/// Uses a read-only table to verify translation, then checks sql_translated even if INSERT fails.
+/// T026: INSERT over HTTP is not translated either. The target does not exist, so IRIS reports it
+/// through SQLCODE at run time, and the response carries no translation fields.
 #[test]
 #[ignore]
-fn test_e2e_insert_translation_fires() {
+fn test_e2e_insert_is_not_translated_over_http() {
     if iris_host().is_empty() {
         eprintln!("Skipping: IRIS_HOST not set");
         return;
     }
-    // We just verify translation fires — the INSERT may fail due to permissions, but sql_translated should be true
     let code = "set msg=\"test\"\n&sql(INSERT INTO %sqltemp.Test (Message) VALUES (:msg))";
     let result = execute(code, None);
     eprintln!("T026: {}", serde_json::to_string_pretty(&result).unwrap());
-    // Translation should fire regardless of whether INSERT succeeds
-    assert_eq!(
-        result["sql_translated"], true,
-        "sql_translated should be true even if INSERT fails due to permissions"
+    assert!(result.get("success").is_some(), "no response: {result}");
+    assert!(
+        result.get("sql_translated").is_none(),
+        "the HTTP path sends &sql untranslated: {result}"
     );
 }
 
