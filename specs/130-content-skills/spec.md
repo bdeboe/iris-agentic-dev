@@ -89,6 +89,7 @@ The first ladder run found tools alone passing 7 of 7 and tools+skill 4 of 7, wi
 - Content prompts are author-written, and the README says so. Two blind labelling passes decide each item's expected skill.
 - SKILL-21's forced SQL error must not depend on a lock or on `LockTimeout`, which is instance-wide. The corrupt-row recipe (a non-`$LIST` data node plus an index entry that points at it) gives SQLCODE -400 in every process.
 - An eval with no targeted tasks left for a skill skips it by name instead of scoring nothing.
+- If the class listing fails before the session, the run is unscored and no session starts. If it fails after the check, the verdict stands and the runner warns on stderr that the leftovers were not deleted (FR-023).
 
 ## Requirements
 
