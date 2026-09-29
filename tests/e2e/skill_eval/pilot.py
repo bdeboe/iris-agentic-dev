@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import tempfile
 import time
 from dataclasses import asdict, dataclass
@@ -290,6 +291,11 @@ def run_one(
         graded_task.validate_live(task)
         graded_task.reset_documents(fixture_names, task.namespace)
         graded_task.apply_documents(task.fixtures, task.namespace)
+        # FR-023. What is here now is the fixture and whatever was here before; anything new after
+        # the check is this session's, and it goes. `Bench.Q2.CountOther` sat in BENCHMARK for two
+        # days and ended two SKILL-09 sessions at 3 calls because nothing deleted it.
+        prefixes = graded_task.package_prefixes(task.fixtures)
+        snapshot = graded_task.list_classes(prefixes, task.namespace)
     except (CheckBroken, graded_task.CorpusInvalid) as exc:
         return ArmRun(
             task_id=task.id,
@@ -369,12 +375,29 @@ def run_one(
         reason = None
     except CheckBroken as exc:
         passed, reason = None, f"the check did not answer: {exc}"
+    try:
+        graded_task.reset_documents(
+            graded_task.created_classes(
+                snapshot, graded_task.list_classes(prefixes, task.namespace)
+            ),
+            task.namespace,
+        )
+    except CheckBroken as exc:
+        # The verdict stands; the next session's own snapshot will not see this one's leftovers,
+        # so say so where the operator is watching.
+        print(
+            f"{task.id} {arm.name}: session leftovers not cleaned: {exc}",
+            file=sys.stderr,
+        )
     if loaded is False:
         # The check still ran, so IRIS is left as the agent left it, but the answer is not this
         # arm's: a skill the agent never read cannot be credited or blamed.
-        passed, reason = None, (
-            f"the skill arm never loaded {', '.join(arm.skill_names)}, so the run says nothing "
-            "about the skill"
+        passed, reason = (
+            None,
+            (
+                f"the skill arm never loaded {', '.join(arm.skill_names)}, so the run says nothing "
+                "about the skill"
+            ),
         )
 
     # Constructed for its refusals, and for the harness swap: everything above this line is what a

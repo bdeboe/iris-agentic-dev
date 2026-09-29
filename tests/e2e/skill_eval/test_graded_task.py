@@ -358,3 +358,28 @@ def test_every_skill_ladder_task_names_a_shipped_skill():
         assert task.skill in shipped, (
             f"{task.id} names {task.skill!r}, which does not ship"
         )
+
+
+# --- FR-023: a session leaves no class behind ---------------------------------------------------
+
+
+def test_the_snapshot_covers_each_fixture_top_level_package_once():
+    from tests.e2e.skill_eval.graded_task import Document, package_prefixes
+
+    docs = (
+        Document(name="Bench.Q2", content=""),
+        Document(name="Bench.Sub.Item", content=""),
+        Document(name="Other.Thing", content=""),
+    )
+    assert package_prefixes(docs) == ("Bench", "Other")
+
+
+def test_only_classes_new_since_the_snapshot_are_created():
+    """`Bench.Q2.CountOther` is the 2026-09-27 leftover: new after, absent before. A fixture class the
+    session edited was there before and is not the session's to delete."""
+    from tests.e2e.skill_eval.graded_task import created_classes
+
+    before = {"Bench.Q2", "Bench.Sub.Item"}
+    after = {"Bench.Q2", "Bench.Sub.Item", "Bench.Q2.CountOther", "Bench.Helper"}
+    assert created_classes(before, after) == ["Bench.Helper", "Bench.Q2.CountOther"]
+    assert created_classes(before, before) == []

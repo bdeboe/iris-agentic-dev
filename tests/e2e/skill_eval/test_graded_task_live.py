@@ -28,6 +28,9 @@ from tests.e2e.skill_eval.graded_task import (
     GradedTask,
     all_tasks,
     apply_documents,
+    created_classes,
+    list_classes,
+    package_prefixes,
     pilot_tasks,
     reset_documents,
     run_check,
@@ -189,3 +192,22 @@ def test_the_reset_really_puts_the_fixture_back():
     reset_documents([doc.name for doc in task.fixtures], task.namespace)
     apply_documents(task.fixtures, task.namespace)
     assert run_check(task) is False
+
+
+def test_a_session_leftover_is_deleted():
+    """130 FR-023, the way `pilot.run_one` does it. A class the fixture never named appears between
+    the two snapshots, as `Bench.Q2.CountOther` did, and the difference deletes it and nothing else."""
+    fixture = (Document(name="Bench.Q2", content="Class Bench.Q2\n{\n}\n"),)
+    stray = Document(
+        name="Bench.Q2.Leftover130",
+        content="Class Bench.Q2.Leftover130 Extends %RegisteredObject\n{\n}\n",
+    )
+    prefixes = package_prefixes(fixture)
+    reset_documents([stray.name], BENCHMARK_NAMESPACE)
+    before = list_classes(prefixes, BENCHMARK_NAMESPACE)
+    assert stray.name not in before
+    apply_documents((stray,), BENCHMARK_NAMESPACE)
+    after = list_classes(prefixes, BENCHMARK_NAMESPACE)
+    assert created_classes(before, after) == [stray.name]
+    reset_documents(created_classes(before, after), BENCHMARK_NAMESPACE)
+    assert list_classes(prefixes, BENCHMARK_NAMESPACE) == before

@@ -89,6 +89,7 @@ Grilled 2026-09-28 on `sql-patterns-review.md`. Clarifications are in spec.md.
 | Retirement            | Delete `targeted/SQLCODE-SILENT.yaml` and `SQLCODE-CHECK.yaml`; `objectscript-sql-patterns/eval.yaml` gets no `benchmark_tasks` and the skill-eval skips it by name; drop its row from `skill-baseline.json`                                                                                                                                                                                        |
 | Signals               | `iad mcp` selects on SIGTERM and Ctrl-C beside the serve loop (stdio and http) and returns, so `main` flushes and the dropped runtime runs `ScratchGuard`. `testing::stop_server` sends SIGTERM, waits 10 s, and kills only then; every harness the bisect names uses it                                                                                                                            |
 | Run validity          | `scoring.run_validity(per_skill)` gives the run-wide verdict and the excluded skills; `__main__` writes all but those. `shard.item_counts` and `shard.baseline_writes` do the same for `--merge-results --update-baseline` (FR-022)                                                                                                                                                                 |
+| Session leftovers     | `graded_task.package_prefixes(fixtures)`, `list_classes(prefixes, ns)` (raises on a truncated list) and `created_classes(before, after)`; `pilot.run_one` snapshots after the fixture and deletes the difference after the check. `iris_doc list` needs a non-wildcard prefix, so a class outside the fixture's packages is not caught (FR-023)                                                     |
 | Cleanup               | After the telemetry fix lands: delete `IrisDevTmp.IrisDevRun*` in USER with `$System.OBJ.Delete` over `^oddDEF`, and `Kill ^Test130Err.Flag, ^Test130Err.Out`                                                                                                                                                                                                                                       |
 
 ### Tests (first, at every layer)
@@ -100,7 +101,7 @@ Grilled 2026-09-28 on `sql-patterns-review.md`. Clarifications are in spec.md.
 
 ### Billable
 
-Run 1: the SQLCODE judge probe again (cents), then the full re-baseline, about $3, said to Tom before it starts. Run 2, after the §§3/5/9 fixes: the ladder on SKILL-09 and SKILL-21, 2 arms × 3 repeats, about $0.50.
+Run 1: the SQLCODE judge probe again (cents), then the full re-baseline, about $3, said to Tom before it starts. Run 2, after the §§3/5/9 fixes: the ladder on SKILL-09, 2 arms × 3 repeats, about $0.50. SKILL-21 is train and the ladder filters to the holdout, so it is not on the run; it is the task the fix is fitted to.
 
 ## Out of scope
 

@@ -355,6 +355,41 @@ def reset_documents(names, namespace: str = BENCHMARK_NAMESPACE) -> None:
             pass
 
 
+def package_prefixes(documents) -> tuple[str, ...]:
+    """The top-level packages a task's fixture lives in, which is where a session writes its classes.
+
+    `iris_doc list` refuses a bare wildcard, so the snapshot is per package; a class a session writes
+    outside these packages is not seen (130 FR-023).
+    """
+    return tuple(sorted({doc.name.split(".")[0] for doc in documents}))
+
+
+def list_classes(prefixes, namespace: str = BENCHMARK_NAMESPACE) -> set[str]:
+    """Every class under the given packages, without the `.cls`. A truncated list raises: deleting
+    the difference against a partial snapshot would delete classes the session never touched.
+    """
+    names: set[str] = set()
+    for prefix in prefixes:
+        listing = _tool(
+            "iris_doc",
+            {"mode": "list", "category": "CLS", "pattern": f"{prefix}.*"},
+            namespace,
+        )
+        if listing.get("truncated"):
+            raise CheckBroken(
+                f"iris_doc list {prefix}.* came back truncated, so the snapshot is not whole"
+            )
+        names.update(
+            doc["name"].removesuffix(".cls") for doc in listing.get("documents", [])
+        )
+    return names
+
+
+def created_classes(before, after) -> list[str]:
+    """The classes that exist now and did not at the snapshot."""
+    return sorted(set(after) - set(before))
+
+
 def validate_live(task: GradedTask) -> None:
     """FR-004 and FR-022 against real IRIS: false before, true after.
 

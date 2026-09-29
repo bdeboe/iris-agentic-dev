@@ -688,3 +688,63 @@ def test_an_arm_run_with_no_calls_records_an_empty_log():
     from tests.e2e.skill_eval.pilot import ArmRun
 
     assert ArmRun(task_id="CORPUS-01", arm="bare", passed=False).calls == ()
+
+
+def test_a_class_the_session_created_is_deleted_after_the_check(monkeypatch):
+    """FR-023. The check reads IRIS as the agent left it, then everything the session added under the
+    fixture's packages goes, so the next session starts from the fixture and nothing else.
+    """
+    from tests.e2e.skill_eval import graded_task, pilot
+    from tests.e2e.skill_eval.arms import TOOLS
+    from tests.e2e.skill_eval.graded_task import Document, GradedTask
+
+    task = GradedTask(
+        id="FAKE-02",
+        prompt="do the thing",
+        check="write PASS",
+        fixtures=(Document(name="Bench.Q2", content=""),),
+        solution=(Document(name="Bench.Q2", content=""),),
+    )
+    listings = iter([{"Bench.Q2"}, {"Bench.Q2", "Bench.Q2.CountOther"}])
+    order, deleted = [], []
+    monkeypatch.setattr(graded_task, "validate_live", lambda _task: None)
+    monkeypatch.setattr(graded_task, "apply_documents", lambda *a, **k: None)
+    monkeypatch.setattr(
+        graded_task,
+        "list_classes",
+        lambda prefixes, namespace: (order.append(("list", prefixes)), next(listings))[
+            1
+        ],
+    )
+    monkeypatch.setattr(
+        graded_task,
+        "reset_documents",
+        lambda names, namespace=None: (
+            order.append("reset"),
+            deleted.append(list(names)),
+        ),
+    )
+    monkeypatch.setattr(
+        graded_task, "run_check", lambda _task: (order.append("check"), True)[1]
+    )
+
+    run = pilot.run_one(
+        task,
+        TOOLS,
+        openai_api_key="sk-test",
+        skill_names=(),
+        iris_host="localhost",
+        iris_web_port="52780",
+        iris_container="iris-dev-iris",
+        driver=RecordingDriver(),
+    )
+
+    assert run.passed is True
+    assert order == [
+        "reset",
+        ("list", ("Bench",)),
+        "check",
+        ("list", ("Bench",)),
+        "reset",
+    ]
+    assert deleted[-1] == ["Bench.Q2.CountOther"]
