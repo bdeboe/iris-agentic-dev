@@ -41,3 +41,7 @@ What I expected: when a `get`/`head`/`fragment`/`put` name has no document exten
 ## 7. `iris_info what=sa_schema` is described as "SQL Analytics schema"
 
 It calls Atelier `/saschema/<url>`, the Studio Assist grammar for an XData namespace, not a BI cube or SQL schema. On iris-dev-iris, `v6/USER/saschema/http://www.intersystems.com/deepsee` returns the `deepsee:` element grammar (6.7 KB), and `saschema/HoleFoods` returns 404 with an empty result. The tool description reads "what=sa_schema returns SQL Analytics schema", and PR 142's `iris-mdx` skill took it at its word: its discovery workflow calls `iris_info(what=sa_schema, name=<CubeName>)` to list cubes and spec paths. The description should say "Studio Assist schema for an XData namespace URL (`name` is the URL)". BI cube discovery goes through `iris_execute` with `%DeepSee.Utils:%GetCubeList` and `%GetDimensionList`.
+
+## 8. The skill-eval results file does not say why an item went unscored
+
+Run `2026-09-29T031029` left one item in `objectscript-list-patterns` unscored, and the results JSON gives counts per arm but no reason per item: scorer error, timeout, a truncated reply, or a session that never went idle. Someone reading the file cannot tell which, and the fix differs for each. Each unscored item should carry its task id, arm, repeat and the reason the scorer gave up.

@@ -5,34 +5,34 @@
       "comparison": {
         "arm_a": "baseline",
         "arm_b": "skill",
-        "b": 1,
+        "b": 2,
         "c": 0,
-        "discordance": 0.1667,
-        "floor": 37,
+        "discordance": 0.3333,
+        "floor": 63,
         "holes": [],
         "interval": [
-          -0.1315,
-          0.4649
+          -0.0439,
+          0.7105
         ],
-        "lift": 0.1667,
-        "mde": 0.3789,
+        "lift": 0.3333,
+        "mde": 0.5358,
         "n_pairs": 6,
-        "p_value_one_sided": 0.5,
+        "p_value_one_sided": 0.25,
         "publishable": false,
         "purpose": "result",
-        "summary": "baseline -> skill  lift +0.167 [-0.132, +0.465]  n=6 pairs  floor=37  discordance=0.17 (b=1, c=0)  mde=0.379  threshold=0.379  underpowered  p=0.5000 one-sided",
-        "threshold_applied": 0.3789,
+        "summary": "baseline -> skill  lift +0.333 [-0.044, +0.711]  n=6 pairs  floor=63  discordance=0.33 (b=2, c=0)  mde=0.536  threshold=0.536  underpowered  p=0.2500 one-sided",
+        "threshold_applied": 0.5358,
         "underpowered": true,
         "verdict": "underpowered"
       },
       "fire_rate": 1.0,
       "items": {
         "baseline": {
-          "items_passed": 2,
+          "items_passed": 1,
           "items_scored": 6,
           "items_total": 6,
           "items_unscored": 0,
-          "pass_rate": 0.3333333333333333
+          "pass_rate": 0.16666666666666666
         },
         "skill": {
           "items_passed": 3,
@@ -42,8 +42,8 @@
           "pass_rate": 0.5
         }
       },
-      "lift": 0.1667,
-      "pass_rate_baseline": 0.3333,
+      "lift": 0.3333,
+      "pass_rate_baseline": 0.1667,
       "pass_rate_skill": 0.5,
       "provenance": {
         "agent_model": null,
@@ -52,14 +52,14 @@
         "corpus_dirty": null,
         "corpus_task_count": null,
         "driver": "opencode",
-        "harness_commit": "d05fb33",
+        "harness_commit": "2adab5f",
         "harness_version": "1.14.17",
         "image": null,
         "image_digest": null,
         "image_id": null,
         "item_counts": {},
-        "measured_at": "2026-09-27T20:50:52Z",
-        "run_id": "2026-09-27T204612",
+        "measured_at": "2026-09-29T03:15:00Z",
+        "run_id": "2026-09-29T031029",
         "runs": 3,
         "scorer_model": "claude-sonnet-4-6",
         "scorer_model_requested": "us.anthropic.claude-sonnet-4-6",
@@ -75,34 +75,34 @@
       "comparison": {
         "arm_a": "baseline",
         "arm_b": "skill",
-        "b": 5,
-        "c": 2,
-        "discordance": 0.3889,
-        "floor": 74,
+        "b": 8,
+        "c": 4,
+        "discordance": 0.6667,
+        "floor": 129,
         "holes": [],
         "interval": [
-          -0.1109,
-          0.4443
+          -0.1407,
+          0.5852
         ],
-        "lift": 0.1667,
-        "mde": 0.3853,
+        "lift": 0.2222,
+        "mde": 0.5045,
         "n_pairs": 18,
-        "p_value_one_sided": 0.2266,
+        "p_value_one_sided": 0.1938,
         "publishable": false,
         "purpose": "result",
-        "summary": "baseline -> skill  lift +0.167 [-0.111, +0.444]  n=18 pairs  floor=74  discordance=0.39 (b=5, c=2)  mde=0.385  threshold=0.385  underpowered  p=0.2266 one-sided",
-        "threshold_applied": 0.3853,
+        "summary": "baseline -> skill  lift +0.222 [-0.141, +0.585]  n=18 pairs  floor=129  discordance=0.67 (b=8, c=4)  mde=0.505  threshold=0.505  underpowered  p=0.1938 one-sided",
+        "threshold_applied": 0.5045,
         "underpowered": true,
         "verdict": "underpowered"
       },
       "fire_rate": 1.0,
       "items": {
         "baseline": {
-          "items_passed": 8,
+          "items_passed": 7,
           "items_scored": 18,
           "items_total": 18,
           "items_unscored": 0,
-          "pass_rate": 0.4444444444444444
+          "pass_rate": 0.3888888888888889
         },
         "skill": {
           "items_passed": 11,
@@ -112,8 +112,8 @@
           "pass_rate": 0.6111111111111112
         }
       },
-      "lift": 0.1667,
-      "pass_rate_baseline": 0.4444,
+      "lift": 0.2222,
+      "pass_rate_baseline": 0.3889,
       "pass_rate_skill": 0.6111,
       "provenance": {
         "agent_model": null,
@@ -122,14 +122,14 @@
         "corpus_dirty": null,
         "corpus_task_count": null,
         "driver": "opencode",
-        "harness_commit": "d05fb33",
+        "harness_commit": "2adab5f",
         "harness_version": "1.14.17",
         "image": null,
         "image_digest": null,
         "image_id": null,
         "item_counts": {},
-        "measured_at": "2026-09-27T20:59:51Z",
-        "run_id": "2026-09-27T204612",
+        "measured_at": "2026-09-29T03:25:22Z",
+        "run_id": "2026-09-29T031029",
         "runs": 3,
         "scorer_model": "claude-sonnet-4-6",
         "scorer_model_requested": "us.anthropic.claude-sonnet-4-6",
@@ -149,22 +149,22 @@
       "comparison": {
         "arm_a": "baseline",
         "arm_b": "skill",
-        "b": 1,
-        "c": 0,
+        "b": 0,
+        "c": 1,
         "discordance": 0.3333,
         "floor": 63,
         "holes": [],
         "interval": [
-          -0.2001,
-          0.8668
+          -0.8668,
+          0.2001
         ],
-        "lift": 0.3333,
+        "lift": -0.3333,
         "mde": 0.5774,
         "n_pairs": 3,
-        "p_value_one_sided": 0.5,
+        "p_value_one_sided": 1.0,
         "publishable": false,
         "purpose": "result",
-        "summary": "baseline -> skill  lift +0.333 [-0.200, +0.867]  n=3 pairs  floor=63  discordance=0.33 (b=1, c=0)  mde=0.577  threshold=0.577  underpowered  p=0.5000 one-sided",
+        "summary": "baseline -> skill  lift -0.333 [-0.867, +0.200]  n=3 pairs  floor=63  discordance=0.33 (b=0, c=1)  mde=0.577  threshold=0.577  underpowered  p=1.0000 one-sided",
         "threshold_applied": 0.5774,
         "underpowered": true,
         "verdict": "underpowered"
@@ -172,11 +172,11 @@
       "fire_rate": 1.0,
       "items": {
         "baseline": {
-          "items_passed": 1,
+          "items_passed": 3,
           "items_scored": 3,
           "items_total": 3,
           "items_unscored": 0,
-          "pass_rate": 0.3333333333333333
+          "pass_rate": 1.0
         },
         "skill": {
           "items_passed": 2,
@@ -186,8 +186,8 @@
           "pass_rate": 0.6666666666666666
         }
       },
-      "lift": 0.3333,
-      "pass_rate_baseline": 0.3333,
+      "lift": -0.3333,
+      "pass_rate_baseline": 1.0,
       "pass_rate_skill": 0.6667,
       "provenance": {
         "agent_model": null,
@@ -196,14 +196,14 @@
         "corpus_dirty": null,
         "corpus_task_count": null,
         "driver": "opencode",
-        "harness_commit": "d05fb33",
+        "harness_commit": "2adab5f",
         "harness_version": "1.14.17",
         "image": null,
         "image_digest": null,
         "image_id": null,
         "item_counts": {},
-        "measured_at": "2026-09-27T21:05:12Z",
-        "run_id": "2026-09-27T204612",
+        "measured_at": "2026-09-29T03:30:25Z",
+        "run_id": "2026-09-29T031029",
         "runs": 3,
         "scorer_model": "claude-sonnet-4-6",
         "scorer_model_requested": "us.anthropic.claude-sonnet-4-6",
@@ -218,34 +218,34 @@
       "comparison": {
         "arm_a": "baseline",
         "arm_b": "skill",
-        "b": 3,
+        "b": 4,
         "c": 0,
-        "discordance": 0.5,
-        "floor": 96,
+        "discordance": 0.6667,
+        "floor": 129,
         "holes": [],
         "interval": [
-          0.0999,
-          0.9001
+          0.2895,
+          1.0439
         ],
-        "lift": 0.5,
-        "mde": 0.6563,
+        "lift": 0.6667,
+        "mde": 0.7578,
         "n_pairs": 6,
-        "p_value_one_sided": 0.125,
+        "p_value_one_sided": 0.0625,
         "publishable": false,
         "purpose": "result",
-        "summary": "baseline -> skill  lift +0.500 [+0.100, +0.900]  n=6 pairs  floor=96  discordance=0.50 (b=3, c=0)  mde=0.656  threshold=0.656  underpowered  p=0.1250 one-sided",
-        "threshold_applied": 0.6563,
+        "summary": "baseline -> skill  lift +0.667 [+0.289, +1.044]  n=6 pairs  floor=129  discordance=0.67 (b=4, c=0)  mde=0.758  threshold=0.758  underpowered  p=0.0625 one-sided",
+        "threshold_applied": 0.7578,
         "underpowered": true,
         "verdict": "underpowered"
       },
       "fire_rate": 1.0,
       "items": {
         "baseline": {
-          "items_passed": 1,
+          "items_passed": 0,
           "items_scored": 6,
           "items_total": 6,
           "items_unscored": 0,
-          "pass_rate": 0.16666666666666666
+          "pass_rate": 0.0
         },
         "skill": {
           "items_passed": 4,
@@ -255,8 +255,8 @@
           "pass_rate": 0.6666666666666666
         }
       },
-      "lift": 0.5,
-      "pass_rate_baseline": 0.1667,
+      "lift": 0.6667,
+      "pass_rate_baseline": 0.0,
       "pass_rate_skill": 0.6667,
       "provenance": {
         "agent_model": null,
@@ -265,14 +265,14 @@
         "corpus_dirty": null,
         "corpus_task_count": null,
         "driver": "opencode",
-        "harness_commit": "d05fb33",
+        "harness_commit": "2adab5f",
         "harness_version": "1.14.17",
         "image": null,
         "image_digest": null,
         "image_id": null,
         "item_counts": {},
-        "measured_at": "2026-09-27T21:11:01Z",
-        "run_id": "2026-09-27T204612",
+        "measured_at": "2026-09-29T03:36:05Z",
+        "run_id": "2026-09-29T031029",
         "runs": 3,
         "scorer_model": "claude-sonnet-4-6",
         "scorer_model_requested": "us.anthropic.claude-sonnet-4-6",
@@ -397,34 +397,34 @@
       "comparison": {
         "arm_a": "baseline",
         "arm_b": "skill",
-        "b": 1,
+        "b": 0,
         "c": 1,
-        "discordance": 0.6667,
-        "floor": 129,
+        "discordance": 0.3333,
+        "floor": 63,
         "holes": [],
         "interval": [
-          -0.9239,
-          0.9239
+          -0.8668,
+          0.2001
         ],
-        "lift": 0.0,
-        "mde": 0.8165,
+        "lift": -0.3333,
+        "mde": 0.5774,
         "n_pairs": 3,
-        "p_value_one_sided": 0.75,
+        "p_value_one_sided": 1.0,
         "publishable": false,
         "purpose": "result",
-        "summary": "baseline -> skill  lift +0.000 [-0.924, +0.924]  n=3 pairs  floor=129  discordance=0.67 (b=1, c=1)  mde=0.816  threshold=0.816  underpowered  p=0.7500 one-sided",
-        "threshold_applied": 0.8165,
+        "summary": "baseline -> skill  lift -0.333 [-0.867, +0.200]  n=3 pairs  floor=63  discordance=0.33 (b=0, c=1)  mde=0.577  threshold=0.577  underpowered  p=1.0000 one-sided",
+        "threshold_applied": 0.5774,
         "underpowered": true,
         "verdict": "underpowered"
       },
       "fire_rate": 1.0,
       "items": {
         "baseline": {
-          "items_passed": 2,
+          "items_passed": 3,
           "items_scored": 3,
           "items_total": 3,
           "items_unscored": 0,
-          "pass_rate": 0.6666666666666666
+          "pass_rate": 1.0
         },
         "skill": {
           "items_passed": 2,
@@ -434,8 +434,8 @@
           "pass_rate": 0.6666666666666666
         }
       },
-      "lift": 0.0,
-      "pass_rate_baseline": 0.6667,
+      "lift": -0.3333,
+      "pass_rate_baseline": 1.0,
       "pass_rate_skill": 0.6667,
       "provenance": {
         "agent_model": null,
@@ -444,14 +444,14 @@
         "corpus_dirty": null,
         "corpus_task_count": null,
         "driver": "opencode",
-        "harness_commit": "d05fb33",
+        "harness_commit": "2adab5f",
         "harness_version": "1.14.17",
         "image": null,
         "image_digest": null,
         "image_id": null,
         "item_counts": {},
-        "measured_at": "2026-09-27T21:37:29Z",
-        "run_id": "2026-09-27T204612",
+        "measured_at": "2026-09-29T03:52:25Z",
+        "run_id": "2026-09-29T031029",
         "runs": 3,
         "scorer_model": "claude-sonnet-4-6",
         "scorer_model_requested": "us.anthropic.claude-sonnet-4-6",

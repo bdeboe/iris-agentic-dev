@@ -72,7 +72,7 @@ Run 1:
 - [x] T040c Tests first: unit `macro_include_compile_failure`, live `one_broken_include_does_not_hide_the_others`; then `iris_macro` halves the include list on "Failure to compile include files" and drops the includes that fail, naming them (FR-021)
 - [x] T043 fmt, clippy, all suites (unit parallel, integration serial with `--include-ignored`), pytest; local commit
 - [x] T043a Tests first: `run_validity` (one thin skill does not void the run; a run-wide share over the limit does; a skill with nothing scored is excluded), `baseline_writes` for the merge path; then wire both (FR-022)
-- [ ] T044 Billable: tell Tom the cost (~$3), then skill-eval `--update-baseline`
+- [x] T044 Billable: tell Tom the cost (~$3), then skill-eval `--update-baseline`
 
 Run 2:
 

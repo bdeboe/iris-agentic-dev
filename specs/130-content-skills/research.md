@@ -362,3 +362,20 @@ Against the committed baseline (re-baselined 2026-09-12 from run 34707534110), `
 ### Round 3 spend
 
 About $9.70 for the ladder: 114 sessions at about $0.085 each (32 + 6 + 76 across the three files; the r1–r2 run's 76 cost $6.46). The skill-eval took three runs: $2.90 for the invalid 14:48 run, $3.28 for the invalid 15:47 run and about $3.22 for the valid one. Diagnostic probes came to about $0.60 and the SKILL-20 ladder to $0.51. Round 3 total: about $20.20, against the $80 cap.
+
+## Round 4
+
+### Skill-eval re-baseline (T044)
+
+Run `2026-09-29T031029`, after the SQLCODE sets were retired and SKILL-21 moved to train. It cost about $2.78: sessions about $2.03, the scorer $0.75. The run wrote nothing at first. One item out of six in `objectscript-list-patterns` went unscored (in the baseline arm), and `__main__` refused the whole write because it treated any thin skill as voiding the run. Across the run, 1 item of 78 was unscored (1.3%), inside 118's 10% limit. FR-022 fixed the rule, and I wrote the baseline from the saved results file with `shard.baseline_writes`, with no rerun. `objectscript-list-patterns` (1 of 6 unscored, 17%) is left out and keeps its old entry.
+
+| Skill                      | Scored | Pass rate   | Lift  | Pairs | Verdict      |
+| -------------------------- | ------ | ----------- | ----- | ----- | ------------ |
+| iris-vector-ai             | 12/12  | 0.00 → 0.67 | +0.67 | 6     | underpowered |
+| ensemble-production        | 12/12  | 0.17 → 0.50 | +0.33 | 6     | underpowered |
+| iris-ai-hub                | 36/36  | 0.39 → 0.61 | +0.22 | 18    | underpowered |
+| iris-connectivity          | 6/6    | 1.00 → 0.67 | −0.33 | 3     | underpowered |
+| objectscript-review        | 6/6    | 1.00 → 0.67 | −0.33 | 3     | underpowered |
+| objectscript-list-patterns | 5/6    | 0.00 → 0.67 | +1.00 | 2     | not written  |
+
+No lift claim, and no regression either: every skill is far below its MDE (floors of 63 and 129 pairs). The two negative lifts are one session each at 3 pairs. The run record gives no reason for the unscored item, since the results JSON keeps no per-item reason; that is a legibility gap for the drafts list.
