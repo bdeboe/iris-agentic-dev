@@ -38,23 +38,29 @@ IRIS_HOST=localhost IRIS_WEB_PORT=52780 IRIS_USERNAME=_SYSTEM IRIS_PASSWORD=SYS 
 
 Research row numbers follow the original item list. Spec numbering:
 
-| Research | Spec   | Skill(s)                                                                                         | Live assertion                                                                         |
-| -------- | ------ | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| 1        | US1    | `iris-objectscript-eval`                                                                         | Compile/Load with recommended flags keeps rows; `Delete` with `e` empties the extent   |
-| 2        | US2.1  | `objectscript-loop-patterns`, `objectscript-fewshot-fixes`, `iris-sql`                           | Shared-line `Quit:key=""` compiles and runs; `Quit:key = ""` gives #1054               |
-| 3        | US2.2  | `objectscript-tdd`, `objectscript-loop-patterns`                                                 | `Quit 5` in `For` compiles, runtime `<COMMAND>`; inside `Try` compile error #1043      |
-| 4        | US2.3  | `objectscript-mac-routines`                                                                      | `.mac` with Try/Catch + Return compiles and returns `caught:<DIVIDE>`                  |
-| list     | US2.4  | `objectscript-list-patterns`                                                                     | Both forms build the same list; concat is faster than `$LIST(*+1)` at 20k items        |
-| sql      | US2.5  | `objectscript-sql-patterns`                                                                      | Two-level class queries by dotted name; underscore gives -30                           |
-| 6        | US2.6  | `iris-sql`                                                                                       | `%Execute(args...)` with 3 args returns 3 rows                                         |
-| 7        | US2.7  | `objectscript-review`                                                                            | `New $Namespace` compiles and restores; `New x` in a procedure block gives #1038       |
-| 8        | US2.8  | `objectscript-guardrails`, `objectscript-review`                                                 | Callee bare `TROLLBACK` leaves caller at `$TLEVEL` 0; level-recording pattern keeps 1  |
-| 9        | US2.9  | `iris-embedded-python`                                                                           | Unit guard only for wording; live test: none (Python is unsafe on iris-dev-iris)       |
-| prod     | US2.10 | `ensemble-production`                                                                            | Reproduced at implementation time; dropped to `dropped.md` if it will not reproduce    |
-| —        | US3.1  | `objectscript-tdd`, `objectscript-repair`, `iris-objectscript-eval`, `objectscript-mac-routines` | Unit: no skill passes a path to `iris_compile` (FR-005)                                |
-| —        | US3.2  | `ensemble-production`                                                                            | #5477 at compile time for a hand-written Storage; long package name compiles and saves |
-| —        | US3.3  | `iris-docs`                                                                                      | Unit: one DocBook rule, no "never curl" beside a curl recipe                           |
-| —        | US4    | `aihub-eap`                                                                                      | Unit: vendored hash equals fixture; upstream-diff limited to the marked patch          |
+| Research | Spec       | Skill(s)                                                                                         | Live assertion                                                                                       |
+| -------- | ---------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| 1        | US1        | `iris-objectscript-eval`                                                                         | Compile/Load with recommended flags keeps rows; `Delete` with `e` empties the extent                 |
+| 2        | US2.1      | `objectscript-loop-patterns`, `objectscript-fewshot-fixes`, `iris-sql`                           | Shared-line `Quit:key=""` compiles and runs; `Quit:key = ""` gives #1054                             |
+| 3        | US2.2      | `objectscript-tdd`, `objectscript-loop-patterns`                                                 | `Quit 5` in `For` compiles, runtime `<COMMAND>`; inside `Try` compile error #1043                    |
+| 4        | US2.3      | `objectscript-mac-routines`                                                                      | `.mac` with Try/Catch + Return compiles and returns `caught:<DIVIDE>`                                |
+| list     | US2.4      | `objectscript-list-patterns`                                                                     | Both forms build the same list; concat is faster than `$LIST(*+1)` at 20k items                      |
+| sql      | US2.5      | `objectscript-sql-patterns`                                                                      | Two-level class queries by dotted name; underscore gives -30                                         |
+| 6        | US2.6      | `iris-sql`                                                                                       | `%Execute(args...)` with 3 args returns 3 rows                                                       |
+| 7        | US2.7      | `objectscript-review`                                                                            | `New $Namespace` compiles and restores; `New x` in a procedure block gives #1038                     |
+| 8        | US2.8      | `objectscript-guardrails`, `objectscript-review`                                                 | Callee bare `TROLLBACK` leaves caller at `$TLEVEL` 0; level-recording pattern keeps 1                |
+| 9        | US2.9      | `iris-embedded-python`                                                                           | Unit guard only for wording; live test: none (Python is unsafe on iris-dev-iris)                     |
+| prod     | US2.10     | `ensemble-production`                                                                            | Reproduced at implementation time; dropped to `dropped.md` if it will not reproduce                  |
+| —        | US3.1      | `objectscript-tdd`, `objectscript-repair`, `iris-objectscript-eval`, `objectscript-mac-routines` | Unit: no skill passes a path to `iris_compile` (FR-005)                                              |
+| —        | US3.2      | `ensemble-production`                                                                            | #5477 at compile time for a hand-written Storage; long package name compiles and saves               |
+| —        | US3.3      | `iris-docs`                                                                                      | Unit: one DocBook rule, no "never curl" beside a curl recipe                                         |
+| —        | US4        | `aihub-eap`                                                                                      | Unit: vendored hash equals fixture; upstream-diff limited to the marked patch                        |
+| sql-3    | 130 FR-019 | `objectscript-sql-patterns` §3                                                                   | `If SQLCODE` is false on 0 and fires on 100 and on <0; the defect is treating 100 and <0 alike       |
+| sql-5    | 130 FR-019 | `objectscript-sql-patterns` §5                                                                   | A forced -400 is surfaced (throw or status), not returned as `""`                                    |
+| sql-9    | 130 FR-019 | `objectscript-sql-patterns` §9                                                                   | `COUNT(*) INTO :n` with an undefined `n` leaves `n` defined and 0                                    |
+| sql-114  | 130 FR-019 | `objectscript-sql-patterns` §5                                                                   | Under READ COMMITTED a row lock times out with -114 and the INTO variable still holds the row's data |
+
+The four `sql-*` rows come from the 130 round 4 review (`specs/130-content-skills/sql-patterns-review.md`) and are tracked as 130 T045. They land after 130's run 1 is measured, so the skill is not edited mid-measurement, and each gets a live `#[ignore]` test on `Test130.SqlCode` plus a wording test. The -114 probe must restore `LockTimeout` and `IsolationMode`: both are instance-wide.
 
 US4 uses an upstream copy as the fixture instead of a sha256: the core crate has no hash crate in its dev-dependencies, and comparing against the upstream text also proves the diff is limited to the marked patch, which a hash cannot.
 

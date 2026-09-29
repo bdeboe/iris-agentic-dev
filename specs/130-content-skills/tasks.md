@@ -51,3 +51,30 @@ Tests come first in every phase.
 - [x] T029 Tests first in `test_lift.py`: `_reached_idle` accepts a last `step_finish` with `reason: stop` (opencode never emits `session.status`); d05fb33
 - [x] T030 Tests first in `test_reporter.py`: the skill-eval report reads in plain words (no triage jargon, underpowered rows name pairs and floor once, a shared tool-surface note prints once, withdrawn skills name their ladder tasks, uncovered skills split into ladder-only and not graded anywhere); the r5 result file is the fixture
 - [x] T031 Tests first in `test_triage.py`/`test_baseline.py`: 402a740 re-measured seven verdicted skills, and three guards still read the 2026-09-12 state; `triage.verdict_superseded` lets a later run with no withdrawn block stand, and the cured verdicts (iris-connectivity, objectscript-list-patterns, now 0.33 → 0.67) move to `triage_records.SUPERSEDED`
+
+## Phase 7: sql-patterns check, judge limits, three iad bugs (US5, grill round 4)
+
+Run 1:
+
+- [x] T032 Tests first in `test_lift.py`: a 7,000-character tool arg and tool result both reach `judge._format_transcript` and `lift.format_transcript`; a runaway one stops at `TRANSCRIPT_TEXT_LIMIT` (FR-013)
+- [x] T033 Raise the judge's arg and result caps and lift's result cap to `TRANSCRIPT_TEXT_LIMIT`
+- [x] T034 Tests first, Rust unit: `telemetry::flush` waits for a pending durable write and returns at its timeout when one hangs; the telemetry scratch prefix is `IrisDevTmp.IrisDevTel`; bin guard: `std::process::exit` appears only in the flush-then-exit helper (FR-014)
+- [x] T035 `telemetry::PendingWrites` (`DURABLE_WRITES.spawn`) + `flush`/`flush_blocking`; `record_call` spawns through it; bin `exit` helper and end-of-`main` flush; `delete_doc` returns its failure and the executor logs it
+- [x] T036 Live `#[ignore]`: `iad exec 'Write 1'` exits and leaves no `IrisDevTmp.IrisDevTel*` class in USER
+- [x] T037 Tests first, unit: `iris_info` documents drop `result.content`, route `MAC`/`INT`/`INC` to `RTN/<type>` and `ALL` to `*`, hide `IrisDevTmp.*` unless `include_scratch`, and keep a ceiling under `inline=true` with `truncated` and `total_count`; `iris_doc list` routes and hiding; binary: `tools/list` shows `include_scratch` on both (FR-015, FR-016)
+- [x] T038 `iris_info` and `iris_doc list` fixes; live `#[ignore]` tests in USER for both
+- [x] T039 Cleanup on iris-dev-iris: purge `IrisDevTmp.IrisDevRun*` from USER, `Kill ^Test130Err.Flag, ^Test130Err.Out`; docnames filter confirms 0 (FR-020)
+- [x] T040 SKILL-21 on the train side of `split.toml`; shape test and live before/after (fixture fails, solution passes) (FR-017)
+- [x] T041 Tests first: an eval with no `benchmark_tasks` is skipped by name; then delete SQLCODE-SILENT and SQLCODE-CHECK, empty sql-patterns' eval, drop its baseline row with a note (FR-018)
+- [x] T042 127's fact-fix table gets the §§3/5/9 fixes and the -114 fact
+- [x] T040a Harness fixes found on the way, each with a test: `McpSession` drops by closing stdin and waiting up to 5 s before a kill, so a spawned server finishes its telemetry write; the exec leak test compares class names before and after instead of counting; the doc-CLI example test skips `text`/`output` fences; the unit-test skill test forces `^UnitTestRoot` to `/tmp/` and restores it (the container had `"/"`, so RunTest scanned `/`); `ScratchGuard` in `connection.rs` deletes the executor's class when the future is dropped mid-call (runtime shutdown, client cancel), which left 122 `IrisDevTel` and 3 `IrisDevRun` classes after one full run — live test `test_scratch_cancel_130`
+- [x] T040b Tests first: `test_mcp_sigterm_130` (bin integration, live) sends SIGTERM to `iad mcp` right after one tool call and asserts an exit code (not death by signal) and no new `IrisDevTmp.IrisDev*` class; then `iad mcp` selects on SIGTERM/Ctrl-C beside the serve loop and returns so `main` flushes, and `main` shuts its runtime down with a 2 s bound so the parked stdin reader cannot hold the exit; `testing::stop_server` (SIGTERM, 10 s, then kill) replaces the bare `Child::kill` in every harness a per-module leak bisect names (`test_gate_enforcement_live` 39 classes, `test_e2e` 5, `test_fresh_container_setup_live` 3, `test_e2e_all_tools` 1, `test_environment_restriction_live` 1, plus any later module); every harness resolves the binary through `testing::iad_binary_path`, which takes `target/llvm-cov-target` only when `CARGO_LLVM_COV` is set (guard `test_one_binary_resolver_130`); a full credentialed run then leaves 0 (FR-014)
+- [x] T040c Tests first: unit `macro_include_compile_failure`, live `one_broken_include_does_not_hide_the_others`; then `iris_macro` halves the include list on "Failure to compile include files" and drops the includes that fail, naming them (FR-021)
+- [x] T043 fmt, clippy, all suites (unit parallel, integration serial with `--include-ignored`), pytest; local commit
+- [ ] T044 Billable: tell Tom the cost (~$3), then skill-eval `--update-baseline`
+
+Run 2:
+
+- [ ] T045 Tests first: wording tests for sql-patterns §§3/5/9 and the -114 fact, and live `#[ignore]` tests on `Test130.SqlCode`; then the skill edits (FR-019)
+- [ ] T046 Billable: ladder on SKILL-09 and SKILL-21, 3 repeats per arm (~$0.50)
+- [ ] T047 Triage record for sql-patterns: `broken_check`, rubric asserted a false IRIS fact and the judge could not see code; research.md round 4; CLAUDE.md entry; markdown lint; local commit

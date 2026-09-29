@@ -37,3 +37,7 @@ For a one-line XML class export put under its `.cls` name, Atelier answers `resu
 In the 130 round-2 ladder (SKILL-14, skill arm, run 0), the agent made this call 10 times across `get`, `fragment`, `head` and `put`. It concluded the classes were "protected from edits" by a mapping and stopped. The tools arm on the same task used `.cls` and passed.
 
 What I expected: when a `get`/`head`/`fragment`/`put` name has no document extension and matches a class, either add `.cls` or return an error that says "document names need an extension: `Bench.Calc.Math.cls`".
+
+## 7. `iris_info what=sa_schema` is described as "SQL Analytics schema"
+
+It calls Atelier `/saschema/<url>`, the Studio Assist grammar for an XData namespace, not a BI cube or SQL schema. On iris-dev-iris, `v6/USER/saschema/http://www.intersystems.com/deepsee` returns the `deepsee:` element grammar (6.7 KB), and `saschema/HoleFoods` returns 404 with an empty result. The tool description reads "what=sa_schema returns SQL Analytics schema", and PR 142's `iris-mdx` skill took it at its word: its discovery workflow calls `iris_info(what=sa_schema, name=<CubeName>)` to list cubes and spec paths. The description should say "Studio Assist schema for an XData namespace URL (`name` is the URL)". BI cube discovery goes through `iris_execute` with `%DeepSee.Utils:%GetCubeList` and `%GetDimensionList`.

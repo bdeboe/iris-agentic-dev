@@ -66,11 +66,29 @@ The first ladder run found tools alone passing 7 of 7 and tools+skill 4 of 7, wi
 3. **Given** a skill marked for a fix, **Then** the sentence that misled the agent is quoted from a transcript in research.md, reproduced live, rewritten by hand, and guarded by a unit test that fails if the old wording returns.
 4. **Given** a task whose transcript drove a fix, **Then** it moves to the train side of `split.toml`, and a new holdout task tests the same fact another way, failing before the fix and passing after, live. Only the new task's ladder result can carry a lift claim.
 
+### User Story 5 - sql-patterns is measured by a check that is true about IRIS (Priority: P1)
+
+`objectscript-sql-patterns` scored 0 in both arms after every harness fix. The 2026-09-28 review (`sql-patterns-review.md`) found the check was at fault. SQLCODE-SILENT's rubric says `If SQLCODE` fires on success. It does not: 0 is falsy. The rubric also asks for `If SQLCODE '= 0`, which fires on the same values. The judge takes up the rubric's claim, and it cannot see the code at all, because tool args are cut to 120 characters and results to 200. The skill's §3 makes the same false claim. The real session also ran into three iad bugs. Telemetry writes run through a detached task that a CLI process drops at exit, between compile and delete, so its scratch class stays (78,183 in USER). `iris_info what=documents` returns the list twice and `inline=true` skips truncation, so that call returned about 20 MB. And `iris_doc list` with no category asks Atelier for `/docnames/MAC`, which answers 400. Round 4 of the grill (2026-09-28) settled the fix.
+
+**Independent Test**: SKILL-21 fails on its fixture and passes on its solution, live. The judge-limit test fails at a cap under 8000. A live test runs `iad exec` and finds no telemetry scratch class left after the process exits.
+
+**Acceptance Scenarios**:
+
+1. **Given** the judge reads a transcript, **Then** every tool call's args and result reach it up to 8000 characters, the same limit as assistant text.
+2. **Given** a CLI call that records telemetry, **When** the process exits, **Then** no `IrisDevTmp.IrisDevTel*` class is left behind, and a delete that fails is logged, not dropped.
+3. **Given** `iris_info what=documents` with `inline=true`, **Then** the response stays under a fixed ceiling and says `truncated` with the total when it cuts; `IrisDevTmp.*` classes are not listed unless asked for.
+4. **Given** `iris_doc mode=list` with no category or with `MAC`, `INT` or `INC`, **Then** it lists routines through `/docnames/RTN/<type>` and does not fail.
+5. **Given** SKILL-21, **Then** its check passes only when a known MRN returns its name, an unknown MRN returns `""`, and an MRN whose row is corrupt makes `FindPatient` throw. The prompt states that contract and does not mention SQLCODE.
+6. **Given** SQLCODE-SILENT and SQLCODE-CHECK, **Then** both are gone, sql-patterns has no targeted eval, and the report shows its ladder result instead.
+7. **Given** sql-patterns §§3, 5 and 9, **Then** each false claim is gone, a unit test fails if it returns, and a live test shows what IRIS does.
+
 ### Edge Cases
 
 - A ladder check that starts a production must stop it, even when the check fails.
 - If `%BuildIndices` has already run, the index-backfill fixture must reset its state, or "before" passes.
 - Content prompts are author-written, and the README says so. Two blind labelling passes decide each item's expected skill.
+- SKILL-21's forced SQL error must not depend on a lock or on `LockTimeout`, which is instance-wide. The corrupt-row recipe (a non-`$LIST` data node plus an index entry that points at it) gives SQLCODE -400 in every process.
+- An eval with no targeted tasks left for a skill skips it by name instead of scoring nothing.
 
 ## Requirements
 
@@ -86,6 +104,15 @@ The first ladder run found tools alone passing 7 of 7 and tools+skill 4 of 7, wi
 - **FR-010**: The triage rule (skill arm fails at least 2 scored runs where tools passes at least 2; unscored runs count for neither) is code with a unit test, applied to the re-run's records, not judged by hand.
 - **FR-011**: A task used to fix a skill leaves the holdout. The `split.toml` change and the replacement holdout task land in the same commit as the fix.
 - **FR-012**: Round 2 runs no content-descriptions loop. That waits for mined prompts in the content corpus.
+- **FR-013**: The judge reads each tool call's args and result up to the same 8000-character limit as assistant text, and a test fails if either cap is lower.
+- **FR-014**: A process that writes telemetry through a scratch class waits (bounded) for that write, delete included, before it exits, so no `IrisDevTmp.*` class outlives the call that made it; a failed removal is logged. Telemetry scratch classes use their own prefix, `IrisDevTmp.IrisDevTel`. This holds when the process is stopped by SIGTERM or Ctrl-C, the way MCP hosts stop a server: `iad mcp` treats either signal as end of input and exits through the same flush. Test harnesses stop a spawned server the same way (SIGTERM, bounded wait, kill only as fallback). Every harness finds the binary through one resolver, which takes the coverage build only under `cargo llvm-cov`, so a plain run never spawns a stale binary that lacks the handler.
+- **FR-015**: `iris_info what=documents` returns the list once (not also under `result.content`), maps `MAC`/`INT`/`INC` to the `RTN/` routes, has a ceiling that `inline=true` does not lift, reports `truncated` and the total when it cuts, and hides `IrisDevTmp.*` by default. `iris_doc mode=list` hides `IrisDevTmp.*` the same way.
+- **FR-016**: `iris_doc mode=list` reads routines from `/docnames/RTN/MAC`, `RTN/INT` and `RTN/INC`.
+- **FR-017**: SKILL-21 is on the train side of `split.toml` and passes the shape and live before/after tests. SKILL-09 stays on the holdout, unchanged.
+- **FR-018**: SQLCODE-SILENT and SQLCODE-CHECK are deleted; sql-patterns leaves the targeted eval and its stale baseline row goes.
+- **FR-019**: The sql-patterns §§3, 5, 9 fixes and the -114 fact land after run 1 is measured, each with a live test and a wording test, and are listed in 127's fact-fix table.
+- **FR-020**: The leftover `IrisDevTmp.IrisDevRun*` classes and `^Test130Err.*` globals are removed from iris-dev-iris after the leak fix lands.
+- **FR-021**: `iris_macro` with no `includes` still answers when an include in the namespace does not compile. Atelier fails the whole lookup for one such include, so the handler drops the includes that fail and names them: `skipped_includes` on a hit, and the `MACRO_NOT_FOUND` text on a miss.
 
 ## Success Criteria
 
@@ -94,8 +121,29 @@ The first ladder run found tools alone passing 7 of 7 and tools+skill 4 of 7, wi
 - **SC-003**: The unit, Rust live and Python offline suites pass.
 - **SC-004**: One billable content-descriptions run and one 128 drift re-measure together cost $3 or less.
 - **SC-005**: Round 2 costs $3 or less: $1.50 for the 18-session re-run and about $0.50 per replacement holdout task.
+- **SC-006**: After round 4, USER on iris-dev-iris holds no `IrisDevTmp.IrisDevRun*` class, and `iris_info what=documents inline=true` there returns under the ceiling.
+- **SC-007**: Round 4 costs about $3.50: $3 for the re-baseline after the judge fix, cents for the probe re-run, and about $0.50 for the sql-patterns ladder run.
 
 ## Assumptions
 
 - The ladder is small: one to two tasks per skill. Lift figures come with wide intervals, and the report shows the interval.
-- iad bugs found here (research.md R3, R6, R7) are drafted as notes, not fixed in 130 and not filed.
+- iad bugs found here (research.md R3, R6, R7) are drafted as notes, not fixed in 130 and not filed. Round 4 is the exception: the scratch-class leak, the `iris_info` size and the `iris_doc list` route are fixed here, because the re-baseline measures sessions that hit them.
+
+## Clarifications
+
+### Session 2026-09-28 (grill round 4, on `sql-patterns-review.md`)
+
+- Q: Keep the missing table as the task's bug? → A: No. Real table; plant only the conflation of 100 with <0. SQLCODE-CHECK is retired.
+- Q: Judge or deterministic check? → A: A deterministic live check, no judge.
+- Q: How far do the judge caps go? → A: 8000 for every tool call's args and result, test first.
+- Q: Order of runs? → A: Run 1 is the judge cap plus the task rewrite, then a full re-baseline (cost told first). Run 2 is the skill fix, then a sql-patterns ladder run.
+- Q: Where does the task live? → A: On the ladder as SKILL-21, namespace BENCHMARK, with check and solution; the SQLCODE-SILENT id goes.
+- Q: Train or holdout? → A: Train. SKILL-09 stays on the holdout as the test of whether the fix generalises.
+- Q: What does the prompt say? → A: The caller contract (unknown MRN gives `""`, any SQL failure throws), never SQLCODE. Forced error by the -400 corrupt-row recipe.
+- Q: Where are the tasks tracked? → A: Judge cap and SKILL-21 in 130's tasks; the §§3/5/9 fixes and the -114 fact in 127's table.
+- Q: Fix the iad bugs the session hit? → A: Yes, now, test first, before the re-baseline.
+- Q: How is `iris_info documents` bounded? → A: A ceiling `inline=true` does not lift, with `truncated`, the total and a filter hint.
+- Q: The 78,183 leaked scratch classes? → A: Fix the leak, hide `IrisDevTmp.*` by default, keep the ceiling, purge the leftovers once the fix lands.
+- Q: SKILL-21 fixture? → A: `Bench.Q21.Patient` (MRN, Name, index `MRNIdx`) and `Bench.Q21.Lookup.FindPatient`; seeded MRN001/MRN002, corrupt row 3 as MRN666.
+- Q: The retired tasks' references? → A: Delete the two task files, drop sql-patterns from the targeted eval and its baseline row; test comments that tell the history stay.
+- Q: Cleanup on iris-dev-iris? → A: Purge `IrisDevTmp.IrisDevRun*`, kill `^Test130Err.*`, keep `Test130.SqlCode`.
