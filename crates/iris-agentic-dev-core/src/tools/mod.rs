@@ -6539,7 +6539,7 @@ Methods:
     }
 
     #[tool(
-        description = "Discover IRIS namespace contents. what=documents lists all docs, what=modified lists recently changed, what=namespace returns config, what=metadata returns IRIS version, what=jobs lists active jobs, what=csp_apps lists CSP apps, what=csp_debug returns debug ID, what=sa_schema returns SQL Analytics schema. `server` (optional): name of a registered IRIS instance. If omitted, uses the default connection. Use `iris_servers` to list available instances.",
+        description = "Discover IRIS namespace contents. what=documents lists all docs, what=modified lists recently changed, what=namespace returns config, what=metadata returns IRIS version, what=jobs lists active jobs, what=csp_apps lists CSP apps, what=csp_debug returns debug ID, what=sa_schema returns the Studio Assist grammar for an XData namespace URL (name=http://www.intersystems.com/deepsee); it does not list or describe cubes, which %DeepSee.Utils %GetCubeList and %GetDimensionList do through iris_execute. `server` (optional): name of a registered IRIS instance. If omitted, uses the default connection. Use `iris_servers` to list available instances.",
         annotations(read_only_hint = true),
         output_schema = output_schemas::oneof_output_schema::<IrisInfoResponse>()
     )]
@@ -6547,6 +6547,12 @@ Methods:
         &self,
         Parameters(p): Parameters<info::InfoParams>,
     ) -> Result<CallToolResult, McpError> {
+        if let Some(msg) = info::precheck(&p) {
+            self.record_call("iris_info", false);
+            return crate::tools::err_result(
+                serde_json::json!({"success": false, "error_code": "INVALID_PARAMS", "error": msg}),
+            );
+        }
         let iris = self.resolve_server(p.server.as_deref()).await?;
         let result =
             info::handle_iris_info(&iris, self.http_client(), p, Arc::clone(&self.log_store)).await;

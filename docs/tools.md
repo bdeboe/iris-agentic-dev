@@ -755,7 +755,7 @@ Namespace discovery: documents, jobs, CSP apps, metadata.
 | ----------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `what`      | string | —        | **Required.** `"documents"` \| `"modified"` \| `"namespace"` \| `"metadata"` \| `"jobs"` \| `"csp_apps"` \| `"csp_debug"` \| `"sa_schema"` |
 | `doc_type`  | string | —        | `"CLS"` \| `"MAC"` \| `"INT"` \| `"INC"` \| `"CSP"` \| `"ALL"`                                                                             |
-| `name`      | string | —        | For `what=sa_schema`                                                                                                                       |
+| `name`      | string | —        | For `what=sa_schema`: an XData namespace URL, e.g. `http://www.intersystems.com/deepsee`. Not a cube name                                  |
 | `namespace` | string | `"USER"` |                                                                                                                                            |
 | `inline`    | bool   | `false`  |                                                                                                                                            |
 
@@ -763,7 +763,10 @@ Namespace discovery: documents, jobs, CSP apps, metadata.
 iris_info(what="namespace")
 iris_info(what="documents", doc_type="CLS")
 iris_info(what="jobs")
+iris_info(what="sa_schema", name="http://www.intersystems.com/deepsee")
 ```
+
+`what=sa_schema` returns the Studio Assist grammar for that XData namespace. It does not list or describe BI cubes: run `%DeepSee.Utils` `%GetCubeList` and `%GetDimensionList` through `iris_execute` for those. A name that is not a URL is refused with `INVALID_PARAMS`, and a URL with no grammar returns `SA_SCHEMA_NOT_FOUND`.
 
 ---
 

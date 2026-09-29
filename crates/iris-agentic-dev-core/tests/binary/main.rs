@@ -15,6 +15,7 @@ mod macro_130;
 mod nopws_101;
 mod pool_reload_hint;
 mod rejection_message;
+mod sa_schema_131;
 mod schema_batch1;
 mod schema_batch2;
 mod schema_batch3;

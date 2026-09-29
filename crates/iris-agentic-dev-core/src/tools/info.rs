@@ -40,7 +40,8 @@ pub struct InfoParams {
     pub what: String,
     /// Document type filter for what=documents: CLS, MAC, INT, INC, CSP, ALL (default ALL)
     pub doc_type: Option<String>,
-    /// Schema/cube name for what=sa_schema
+    /// XData namespace URL for what=sa_schema, e.g. http://www.intersystems.com/deepsee. Not a cube
+    /// name: cubes are listed by %DeepSee.Utils %GetCubeList through iris_execute.
     pub name: Option<String>,
     /// IRIS namespace. Defaults to the connection namespace (IRIS_NAMESPACE).
     #[serde(default)]
@@ -54,6 +55,61 @@ pub struct InfoParams {
     /// what=documents: include iad's own `IrisDevTmp.*` scratch classes (hidden by default)
     #[serde(default)]
     pub include_scratch: bool,
+}
+
+/// What `sa_schema` takes and where cube discovery lives. Names no skill (129 rule).
+pub const SA_SCHEMA_GUIDANCE: &str = "what=sa_schema returns the Studio Assist grammar for an \
+XData namespace URL, so `name` must be that URL, e.g. http://www.intersystems.com/deepsee. It does \
+not describe cubes. To list cubes run `Do ##class(%DeepSee.Utils).%GetCubeList(.list)` through \
+iris_execute, and for one cube's dimensions and measures \
+`Do ##class(%DeepSee.Utils).%GetDimensionList(\"<cube>\",.info)`.";
+
+/// The error text when `name` cannot be an XData namespace URL, or `None` when it can.
+pub fn sa_schema_name_problem(name: Option<&str>) -> Option<String> {
+    let n = name.unwrap_or("").trim();
+    if n.starts_with("http://") || n.starts_with("https://") {
+        return None;
+    }
+    let got = if n.is_empty() {
+        "no name".to_string()
+    } else {
+        format!("name '{n}'")
+    };
+    Some(format!("sa_schema got {got}. {SA_SCHEMA_GUIDANCE}"))
+}
+
+/// The `what` value `precheck` guards. A const, not a literal: the enum census reads literals in
+/// the handler's call chain as `what`'s values, and this check must not stand in for the match.
+const SA_SCHEMA: &str = "sa_schema";
+
+/// The Atelier path for a `sa_schema` URL. Each segment is encoded and the slashes stay raw:
+/// Atelier answers `/saschema/http%3A//host/x` with the grammar and `/saschema/http%3A%2F%2Fhost%2Fx`
+/// with 404.
+pub fn sa_schema_path(name: &str) -> String {
+    let segments: Vec<String> = name
+        .trim()
+        .split('/')
+        .map(|s| urlencoding::encode(s).into_owned())
+        .collect();
+    format!("/saschema/{}", segments.join("/"))
+}
+
+/// A refusal that needs no IRIS, so it reaches a caller before the server is resolved.
+pub fn precheck(p: &InfoParams) -> Option<String> {
+    (p.what == SA_SCHEMA)
+        .then(|| sa_schema_name_problem(p.name.as_deref()))
+        .flatten()
+}
+
+/// Null, `{}`, `[]` or `""`: IRIS answered but said nothing.
+pub fn is_empty_result(v: &serde_json::Value) -> bool {
+    match v {
+        serde_json::Value::Null => true,
+        serde_json::Value::Object(m) => m.is_empty(),
+        serde_json::Value::Array(a) => a.is_empty(),
+        serde_json::Value::String(t) => t.trim().is_empty(),
+        _ => false,
+    }
 }
 
 /// Most documents one `inline=true` answer carries (`IRIS_INFO_MAX_DOCUMENTS` overrides).
@@ -133,8 +189,10 @@ pub async fn handle_iris_info(
         "csp_apps" => iris.versioned_ns_url(ns, "/cspapps"),
         "csp_debug" => iris.versioned_ns_url(ns, "/cspdebugid"),
         "sa_schema" => {
-            let name = p.name.as_deref().unwrap_or("");
-            iris.versioned_ns_url(ns, &format!("/saschema/{}", urlencoding::encode(name)))
+            if let Some(msg) = sa_schema_name_problem(p.name.as_deref()) {
+                return err_json("INVALID_PARAMS", &msg);
+            }
+            iris.versioned_ns_url(ns, &sa_schema_path(p.name.as_deref().unwrap_or("")))
         }
         other => return err_json("INVALID_PARAM", &format!("Unknown what='{}'. Use: documents, modified, namespace, metadata, jobs, csp_apps, csp_debug, sa_schema", other)),
     };
@@ -146,6 +204,12 @@ pub async fn handle_iris_info(
         .await
         .map_err(|e| rmcp::ErrorData::internal_error(format!("HTTP error: {e}"), None))?;
 
+    if p.what == "sa_schema" && resp.status() == reqwest::StatusCode::NOT_FOUND {
+        return err_json(
+            "SA_SCHEMA_NOT_FOUND",
+            &format!("IRIS has no grammar at {url}. {SA_SCHEMA_GUIDANCE}"),
+        );
+    }
     if !resp.status().is_success() {
         return err_json(
             "IRIS_UNREACHABLE",
@@ -154,6 +218,12 @@ pub async fn handle_iris_info(
     }
 
     let body: serde_json::Value = resp.json().await.unwrap_or_default();
+    if p.what == "sa_schema" && is_empty_result(&body["result"]) {
+        return err_json(
+            "SA_SCHEMA_NOT_FOUND",
+            &format!("IRIS returned an empty grammar for {url}. {SA_SCHEMA_GUIDANCE}"),
+        );
+    }
     let mut result_json = serde_json::json!({"success": true, "what": p.what, "namespace": ns, "result": body["result"]});
 
     // Progressive disclosure (027): for what=documents, truncate the document list.
