@@ -156,21 +156,74 @@ _CEILING_AND_NOISE = [
     ),
 ]
 
+# 130 round 4 — the 2026-09-29T031029 re-baseline. Three sets of 3 and 6 pairs each came back with one
+# arm at an end of the scale. At these sizes one session moves an arm by 0.17 or 0.33, so a flat arm
+# is what small sets do, and the verdicts say that rather than read an effect into it. Each entry is
+# withdrawn in the baseline, so none of these figures is a comparison basis.
+_ROUND_4 = [
+    TriageRecord(
+        skill="iris-connectivity",
+        verdict=TriageVerdict.NOT_HELPED,
+        evidence=(
+            "IRIS-PYTHON-CONNECT, 3/3 baseline against 2/3 with the skill, one discordant pair. "
+            "The 2026-09-27 run read 1/3 against 2/3, the other way round. The floor for this set is "
+            "63 pairs; three cannot tell -0.33 from +0.33, and the two runs did not."
+        ),
+        action=(
+            "No measured effect, and not harm: the -0.33 is withdrawn and never published as a "
+            "regression. The set needs more tasks before it can gate anything."
+        ),
+    ),
+    TriageRecord(
+        skill="objectscript-review",
+        verdict=TriageVerdict.NOT_HELPED,
+        evidence=(
+            "3/3 baseline against 2/3 with the skill, one discordant pair; the 2026-09-27 run read "
+            "2/3 against 2/3. Three pairs against a floor of 63."
+        ),
+        action=(
+            "No measured effect, and not harm: the -0.33 is withdrawn. The set needs more tasks "
+            "before it can gate anything."
+        ),
+    ),
+    TriageRecord(
+        skill="iris-vector-ai",
+        verdict=TriageVerdict.TOO_HARD,
+        evidence=(
+            "Pattern-scored, 0/6 baseline against 4/6 with the skill; the 2026-09-27 run read 1/6 "
+            "against 4/6. The bare arm passes one task in twelve over the two runs, so it sits at "
+            "the floor and a regression in the skill arm below it could not be reported. Too hard "
+            "for the bare arm, not for the skill arm."
+        ),
+        action=(
+            "The +0.67 is withdrawn as a lift claim: six pairs against a floor of 129. The set stays "
+            "in the corpus; it needs tasks the bare arm can sometimes pass before a lift from it "
+            "means anything."
+        ),
+    ),
+]
+
 # The baseline run every verdict above was reached on. An entry measured by a later run with no
 # withdrawn block supersedes its verdict — `triage.verdict_superseded`.
 VERDICTS_REACHED_ON = "2026-09-12T171550"
 
 ALL_RECORDS: dict[str, TriageRecord] = {
-    record.skill: record for record in (*_FLOORS, *_CEILING_AND_NOISE)
+    record.skill: record for record in (*_FLOORS, *_CEILING_AND_NOISE, *_ROUND_4)
 }
 
 # Verdicts a later run cured, with the run that did it. Both sets read 0.00 against 0.00 before the
 # transcript fix and 0.33 against 0.67 on the 2026-09-27 re-baseline, so the check registers the
 # agent now. They stay above as history and leave the live records: a verdict on a set that
 # discriminates is stale, and `validate_corpus` says so.
+#
+# The 2026-09-29 re-baseline read ensemble-production at +0.33 and iris-ai-hub at +0.22, both over the
+# gate, so their not_helped verdicts are stale and go the same way. Neither figure is a lift claim
+# (6 and 18 pairs against floors of 63 and 129). iris-connectivity's 2026-09-27 cure did not hold; it
+# has a round-4 verdict and is live again. A round-4 record replaces its T021 one in ALL_RECORDS.
 SUPERSEDED: dict[str, str] = {
-    "iris-connectivity": "2026-09-27T204612",
     "objectscript-list-patterns": "2026-09-27T204612",
+    "ensemble-production": "2026-09-29T031029",
+    "iris-ai-hub": "2026-09-29T031029",
 }
 
 RECORDS: dict[str, TriageRecord] = {

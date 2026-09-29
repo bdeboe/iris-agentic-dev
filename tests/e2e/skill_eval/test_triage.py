@@ -345,8 +345,10 @@ def test_the_four_floor_skills_are_all_verdicted_broken_check():
     Reference solutions score 3/3/3 through the real judge on every one of these checks, and two of
     the recorded 0.00 items scored a pass on a single live re-run.
     """
-    from tests.e2e.skill_eval.triage_records import ALL_RECORDS as RECORDS
+    # T021's own list: iris-connectivity has a round-4 verdict that replaces this one in ALL_RECORDS.
+    from tests.e2e.skill_eval.triage_records import _FLOORS
 
+    RECORDS = {record.skill: record for record in _FLOORS}
     for skill in (
         "iris-connectivity",
         "objectscript-list-patterns",
@@ -369,7 +371,8 @@ def test_the_two_negative_lifts_are_verdicted_not_helped_with_their_mde():
     Both sets read a lift smaller than the MDE their own item count bought, so neither is
     distinguishable from zero. A verdict that just says "noise" is the state FR-013 exists to end.
     """
-    from tests.e2e.skill_eval.triage_records import RECORDS
+    # History: the 2026-09-29 re-baseline superseded both, so they are no longer live records.
+    from tests.e2e.skill_eval.triage_records import ALL_RECORDS as RECORDS
 
     for skill in ("ensemble-production", "iris-ai-hub"):
         record = RECORDS[skill]
@@ -397,8 +400,9 @@ def test_the_records_carry_no_verdict_for_a_healthy_set():
     """A record on a set that is discriminating is a stale record. Don't pre-emptively file one."""
     from tests.e2e.skill_eval.triage_records import RECORDS
 
-    assert "objectscript-review" not in RECORDS
-    assert "iris-vector-ai" not in RECORDS
+    # Both read over the gate on the 2026-09-29 re-baseline, so their not_helped verdicts went.
+    assert "ensemble-production" not in RECORDS
+    assert "iris-ai-hub" not in RECORDS
 
 
 def test_the_real_baseline_file_triages_without_crashing():
@@ -417,11 +421,19 @@ def test_the_real_baseline_file_triages_without_crashing():
     # The 2026-09-27 re-baseline, both harness fixes in. The two retired sets keep their 2026-09-12
     # entries and stay saturated. SQLCODE-SILENT floored again there with every item scored; 130
     # round 4 found its rubric asserts a false IRIS fact, retired it, and dropped the row (FR-018).
+    # 130 round 4's re-baseline (2026-09-29) leaves three 3- and 6-pair sets with one arm at an end
+    # of the scale; each has a verdict in `triage_records._ROUND_4`.
     assert set(saturated) == {
         "objectscript-unit-test",
         "objectscript-guardrails",
+        "iris-connectivity",
+        "objectscript-review",
+        "iris-vector-ai",
     }
     assert saturated["objectscript-guardrails"] is Saturation.CEILING_CENSORED
+    assert saturated["iris-connectivity"] is Saturation.CEILING_CENSORED
+    assert saturated["objectscript-review"] is Saturation.CEILING_CENSORED
+    assert saturated["iris-vector-ai"] is Saturation.FLOOR_CENSORED
 
 
 # --- a verdict a later run has re-measured past — 130 round 3 --------------------------------
@@ -480,11 +492,16 @@ def test_a_verdict_the_re_baseline_cured_leaves_the_live_records():
     """
     from tests.e2e.skill_eval.triage_records import ALL_RECORDS, RECORDS, SUPERSEDED
 
-    assert set(SUPERSEDED) == {"iris-connectivity", "objectscript-list-patterns"}
-    for skill, run_id in SUPERSEDED.items():
+    # iris-connectivity was cured on 2026-09-27 and re-verdicted in round 4 (`_ROUND_4`), so it is in
+    # the live records again under a new verdict rather than superseded.
+    assert SUPERSEDED == {
+        "objectscript-list-patterns": "2026-09-27T204612",
+        "ensemble-production": "2026-09-29T031029",
+        "iris-ai-hub": "2026-09-29T031029",
+    }
+    for skill in SUPERSEDED:
         assert skill not in RECORDS, skill
         assert skill in ALL_RECORDS, skill
-        assert run_id == "2026-09-27T204612", skill
 
 
 def test_every_superseded_verdict_was_superseded_by_the_committed_baseline():

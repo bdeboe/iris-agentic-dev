@@ -212,6 +212,11 @@
           "IRIS-PYTHON-CONNECT"
         ],
         "tool_surface": "1.4.2+fa0b694f8725"
+      },
+      "withdrawn": {
+        "reason": "3 pairs, baseline arm at the ceiling; one discordant pair, opposite in sign to the 2026-09-27 run",
+        "recorded_by": "130 round 4 T044 — see specs/130-content-skills/research.md § Round 4",
+        "verdict": "not_helped"
       }
     },
     "iris-vector-ai": {
@@ -282,6 +287,11 @@
           "VECTOR-TOVECTOR-MISMATCH"
         ],
         "tool_surface": "1.4.2+fa0b694f8725"
+      },
+      "withdrawn": {
+        "reason": "6 pairs, baseline arm at the floor; the skill arm's lead is not a lift claim against a floor of 129",
+        "recorded_by": "130 round 4 T044 — see specs/130-content-skills/research.md § Round 4",
+        "verdict": "too_hard"
       }
     },
     "objectscript-guardrails": {
@@ -460,6 +470,11 @@
           "STATUS-CHECK"
         ],
         "tool_surface": "1.4.2+fa0b694f8725"
+      },
+      "withdrawn": {
+        "reason": "3 pairs, baseline arm at the ceiling; one discordant pair against a floor of 63",
+        "recorded_by": "130 round 4 T044 — see specs/130-content-skills/research.md § Round 4",
+        "verdict": "not_helped"
       }
     },
     "objectscript-unit-test": {
