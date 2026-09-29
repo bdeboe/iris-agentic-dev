@@ -575,3 +575,38 @@ def test_merge_results_is_still_the_result_list(tmp_path):
     assert [r.skill for r in merge_results(str(tmp_path))] == [
         r.skill for r in merge_shards(str(tmp_path)).results
     ]
+
+
+# ── baseline writes from a merge (130 FR-022) ────────────────────────────────
+
+
+def test_item_counts_reads_both_arms_of_each_skill():
+    from tests.e2e.skill_eval.shard import item_counts
+
+    counts = item_counts([_measured("alpha", unscored=1), _measured("beta")])
+    assert counts == {"alpha": (1, 24), "beta": (0, 24)}
+
+
+def test_a_merge_writes_no_skill_over_the_limit():
+    """The merge path used to write every measured result, however thinly scored."""
+    from tests.e2e.skill_eval.shard import baseline_writes
+
+    thin = _measured("alpha", unscored=12)  # 12 of 24: half the skill unscored
+    kept = [r.skill for r in baseline_writes([thin, _measured("beta")] + [
+        _measured(f"s{i}") for i in range(8)
+    ])]
+    assert "alpha" not in kept
+    assert "beta" in kept
+
+
+def test_a_merge_over_the_run_wide_limit_writes_nothing():
+    from tests.e2e.skill_eval.shard import baseline_writes
+
+    assert baseline_writes([_measured("alpha", unscored=12), _measured("beta")]) == []
+
+
+def test_a_merge_writes_no_unmeasured_skill():
+    from tests.e2e.skill_eval.shard import baseline_writes
+
+    kept = [r.skill for r in baseline_writes([_measured("alpha"), _measured("beta", lift=None)])]
+    assert kept == ["alpha"]

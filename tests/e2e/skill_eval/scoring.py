@@ -163,6 +163,25 @@ def run_is_valid(items: Iterable[Item]) -> bool:
     return unscored_share(items) <= UNSCORED_LIMIT
 
 
+def run_validity(per_skill: "dict[str, tuple[int, int]]") -> "tuple[bool, list[str]]":
+    """Run-wide validity, and the skills too thinly scored to compare or write.
+
+    `per_skill` maps a skill to `(items_unscored, items_total)`. The run is valid when the
+    unscored share across all skills is within the limit (118 contracts/scoring.md). A skill
+    over the limit on its own, or with nothing scored, is excluded from comparison and from the
+    baseline write; it does not void the other skills' measurements (130 FR-022).
+    """
+    excluded = sorted(
+        name
+        for name, (unscored, total) in per_skill.items()
+        if total == 0 or unscored == total or unscored / total > UNSCORED_LIMIT
+    )
+    unscored = sum(u for u, _ in per_skill.values())
+    total = sum(t for _, t in per_skill.values())
+    valid = total > unscored and unscored / total <= UNSCORED_LIMIT
+    return valid, excluded
+
+
 @dataclass
 class ArmResult:
     """The four counts and the rate for one arm, so a report can show its denominator."""

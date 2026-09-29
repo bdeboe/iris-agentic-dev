@@ -19,6 +19,7 @@ from tests.e2e.skill_eval.evaluator import (
     discover_skills,
     load_eval_config,
 )
+from tests.e2e.skill_eval.scoring import run_validity
 
 
 def covered_skills(skills_pack_dir: str, tasks_skills_dir: str) -> list[str]:
@@ -168,3 +169,29 @@ def merge_shards(results_dir: str) -> MergedShards:
 def merge_results(results_dir: str) -> list[SkillResult]:
     """Just the result list, for callers that need nothing else about the merge."""
     return merge_shards(results_dir).results
+
+
+def item_counts(results: list[SkillResult]) -> dict[str, tuple[int, int]]:
+    """`(items_unscored, items_total)` per skill, both arms, from each result's `arms`."""
+    counts: dict[str, tuple[int, int]] = {}
+    for result in results:
+        scored = total = 0
+        for name in ("baseline", "skill"):
+            arm = (result.arms or {}).get(name) or {}
+            scored += arm.get("items_scored") or 0
+            total += arm.get("items_total") or 0
+        counts[result.skill] = (total - scored, total)
+    return counts
+
+
+def baseline_writes(results: list[SkillResult]) -> list[SkillResult]:
+    """The results a merged `--update-baseline` may write (130 FR-022).
+
+    Nothing when the run-wide unscored share is over the limit; otherwise every measured skill
+    except those too thinly scored on their own. The merge path used to write all of them.
+    """
+    measured = [r for r in results if r.lift is not None]
+    valid, excluded = run_validity(item_counts(measured))
+    if not valid:
+        return []
+    return [r for r in measured if r.skill not in excluded]

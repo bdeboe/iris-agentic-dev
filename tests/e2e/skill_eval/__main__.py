@@ -44,8 +44,10 @@ from tests.e2e.skill_eval.scoring import (
     EXIT_MEASURED,
     EXIT_PREFLIGHT,
     baseline_write_allowed,
+    run_validity,
 )
 from tests.e2e.skill_eval.shard import (
+    baseline_writes,
     covered_skills,
     merge_shards,
     missing_shard_result,
@@ -297,7 +299,10 @@ def _merge_and_report(args) -> int:
     print(f"\nCombined results written to: {path}")
 
     if args.update_baseline:
-        measured = [r for r in results if r.lift is not None]
+        measured = baseline_writes(results)
+        if not measured:
+            print("\nBaseline not written: too much of the merged run went unscored.")
+            return 1 if regressions else 0
         baseline = load_baseline(_DEFAULT_BASELINE)
         diff = compute_diff(baseline, measured)
         save_baseline(measured, _DEFAULT_BASELINE)
@@ -451,6 +456,7 @@ def _main():
     run_id = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H%M%S")
     results: list[SkillResult] = []
     invalid_skills: list[str] = []
+    item_counts: dict[str, tuple[int, int]] = {}
     cost_records: list[dict] = []
     for cfg in configs:
         result, lift_data = _run_skill(
@@ -467,18 +473,25 @@ def _main():
         result.provenance = _provenance(run_id, lift_data, probe, args.runs)
         if lift_data.get("scorer_cost"):
             cost_records.append(lift_data["scorer_cost"])
+        counts = (
+            int(lift_data.get("items_unscored") or 0),
+            int(lift_data.get("items_total") or 0),
+        )
+        if "items_total" in lift_data:
+            item_counts[cfg.skill] = counts
         if lift_data.get("run_valid", True):
             result = compare_to_baseline(
                 result, baseline, threshold=args.regression_threshold
             )
         else:
             # Too much of this skill went unscored to compare it to anything. A Δ against a
-            # rate computed over three of twenty-four items is noise wearing a number.
+            # rate computed over three of twenty-four items is noise wearing a number. The other
+            # skills' measurements stand; only this one stays out of the baseline (130 FR-022).
             invalid_skills.append(cfg.skill)
             print(
                 f"  [{cfg.skill}] {lift_data.get('items_unscored')} of "
                 f"{lift_data.get('items_total')} items unscored "
-                f"({lift_data.get('unscored_share')}) — no comparison, no baseline write",
+                f"({lift_data.get('unscored_share')}) — no comparison, not written to the baseline",
                 flush=True,
             )
         results.append(result)
@@ -494,7 +507,9 @@ def _main():
     ]
     uncovered_names = [r.skill for r in results if r.no_task_coverage]
 
-    run_valid = not invalid_skills
+    # Run-wide, as 118 contracts/scoring.md says: one thin skill does not void the others.
+    run_valid, _ = run_validity(item_counts) if item_counts else (not invalid_skills, [])
+    written = [r for r in results if r.skill not in invalid_skills]
     actual_cost = merge_scorer_costs(cost_records)
     run = EvalRun(
         run_id=run_id,
@@ -529,21 +544,23 @@ def _main():
     # checked whether it had measured anything.
     if not run_valid:
         print(
-            f"\nBaseline not written: {', '.join(invalid_skills)} scored too little to be a "
-            "reference measurement."
+            "\nBaseline not written: more than one item in ten went unscored across the run, "
+            "so it is not a reference measurement."
         )
     elif not os.path.exists(_DEFAULT_BASELINE):
-        save_baseline(results, _DEFAULT_BASELINE)
+        save_baseline(written, _DEFAULT_BASELINE)
         print("No baseline found — created from this run.")
     elif baseline_write_allowed(run_valid, args.update_baseline):
-        diff = compute_diff(baseline, results)
-        save_baseline(results, _DEFAULT_BASELINE)
+        diff = compute_diff(baseline, written)
+        save_baseline(written, _DEFAULT_BASELINE)
         print("\nBaseline updated. Changes:")
         if diff:
             for d in diff:
                 print(format_diff_line(d))
         else:
             print("  (no changes)")
+        if invalid_skills:
+            print(f"  not written, too thinly scored: {', '.join(invalid_skills)}")
 
     # 1 covers both an integrity failure and a regression; only the message distinguishes
     # them. A reported regression is not yet blocking on its own (research R12) — it becomes

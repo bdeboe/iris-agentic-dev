@@ -113,6 +113,7 @@ The first ladder run found tools alone passing 7 of 7 and tools+skill 4 of 7, wi
 - **FR-019**: The sql-patterns §§3, 5, 9 fixes and the -114 fact land after run 1 is measured, each with a live test and a wording test, and are listed in 127's fact-fix table.
 - **FR-020**: The leftover `IrisDevTmp.IrisDevRun*` classes and `^Test130Err.*` globals are removed from iris-dev-iris after the leak fix lands.
 - **FR-021**: `iris_macro` with no `includes` still answers when an include in the namespace does not compile. Atelier fails the whole lookup for one such include, so the handler drops the includes that fail and names them: `skipped_includes` on a hit, and the `MACRO_NOT_FOUND` text on a miss.
+- **FR-022**: A skill-eval run is valid when no more than one item in ten went unscored across the whole run, as 118's scoring contract states. A skill over that share on its own, or with nothing scored, gets no comparison and is left out of the baseline write; it does not void the other skills. The shard-merge `--update-baseline` applies the same rule, and it used to write every measured result with no check at all.
 
 ## Success Criteria
 

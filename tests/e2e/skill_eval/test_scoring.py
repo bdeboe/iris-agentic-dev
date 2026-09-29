@@ -230,3 +230,41 @@ def test_exit_code_says_whether_money_was_spent():
     assert scoring.EXIT_MEASURED == 0
     assert scoring.EXIT_INTEGRITY == 1
     assert scoring.EXIT_PREFLIGHT == 2
+
+
+# ---------------------------------------------------------------------------
+# Run validity is run-wide; a shaky skill is left out, not the whole run (130 FR-022)
+# ---------------------------------------------------------------------------
+
+
+def test_one_unscored_item_in_one_skill_does_not_void_the_run():
+    """2026-09-29: 1 of 78 items unscored (1.3%), all in list-patterns (1 of 6), and the old
+    per-skill rule refused the whole baseline write. 118's contract is run-wide."""
+    per_skill = {
+        "objectscript-list-patterns": (1, 6),
+        "iris-ai-hub": (0, 36),
+        "iris-vector-ai": (0, 12),
+        "ensemble-production": (0, 12),
+        "iris-connectivity": (0, 6),
+        "objectscript-review": (0, 6),
+    }
+    valid, excluded = scoring.run_validity(per_skill)
+    assert valid is True
+    assert excluded == ["objectscript-list-patterns"]
+
+
+def test_a_run_wide_share_over_the_limit_voids_the_run():
+    valid, excluded = scoring.run_validity({"a": (3, 10), "b": (0, 10)})
+    assert valid is False
+    assert excluded == ["a"]
+
+
+def test_a_skill_with_nothing_scored_is_excluded():
+    valid, excluded = scoring.run_validity({"a": (0, 0), "b": (0, 30)})
+    assert valid is True
+    assert excluded == ["a"]
+
+
+def test_a_run_that_scored_nothing_is_invalid():
+    assert scoring.run_validity({})[0] is False
+    assert scoring.run_validity({"a": (4, 4)})[0] is False
