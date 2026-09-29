@@ -400,3 +400,27 @@ FR-023 fixes this. After the fixture goes on, `pilot.run_one` lists the classes 
 The misreading itself happened in both arms: tools r0 on this run asked for `Bench.Q2.CountOther` too and got a 400. SKILL-09's prompt names the method `Bench.Q2.CountOther(pCode)`, which reads as a class path. The prompt is left as it is, because changing a holdout task after looking at its results is what the split forbids. A new holdout task should name the class and the method separately.
 
 Triage: sql-patterns gets a round-4 `broken_check` record (the rubric's false `If SQLCODE` claim, and a judge that saw 120 characters of tool args and 200 of results), and it replaces T021's killed-session record.
+
+### sql-patterns ladder after FR-023 (T048)
+
+Run `ladder-20260929T023344`, SKILL-09 only, 3 repeats per arm, about $0.51, with FR-023's cleanup on.
+
+| Arm         | r0            | r1            | r2            | Passed |
+| ----------- | ------------- | ------------- | ------------- | ------ |
+| tools       | FAIL 5 calls  | PASS 35 calls | FAIL 32 calls | 1/3    |
+| tools+skill | FAIL 20 calls | PASS 8 calls  | FAIL 24 calls | 1/3    |
+
+`b=0 c=0`, underpowered, no lift claim, and `needs_fix` does not fire because tools passed 1 of 3. The skill arm loaded its skill in all three sessions.
+
+FR-023 held. No session found a class left by an earlier one, and `iris_generate_class` returned `LLM_UNAVAILABLE` in the two sessions that tried it, so no session wrote a stray class. Two skill-arm sessions opened with `Bench.Q2.CountOther.cls` or `Bench.Q2.*` and found nothing, then edited the real `Bench.Q2`.
+
+All four FAILs have the same cause, the SQL table name. The check needs `Bench_Sub.Item`.
+
+- tools r0 wrote `&sql(... FROM Bench_Sub_Item ...)`. It compiled, because embedded SQL is resolved late, and returned -1 at runtime (SQLCODE -30). The session never ran the method.
+- tools r2 used the same name, ran the method, got -1, and spent about 20 calls on data and `INSERT` without trying `Bench_Sub.Item`.
+- skill r0 prepared `FROM Bench_Sub_Item` "due to underscore rule", which misapplies the skill: §1 keeps the last dot as the schema/table separator.
+- skill r2 used the class name `Bench.Sub.Item`, which IRIS reads as schema `Bench`, table `Sub.Item`. SQLCODE -30.
+
+None of the four ran a query against the table that succeeded. Both passes did. skill r1 used `Bench_Sub.Item` from the start, citing the skill, and checked it with `iris_query`. tools r1 got the name from the tool's hint and from `Bench.Look`, SKILL-12's fixture class, which queries `Bench_Sub.Item`. Fixture classes from other tasks stay in BENCHMARK between tasks, so a task can find another task's answer there. FR-023 covers classes a session writes, not other tasks' fixtures.
+
+The skill's text is right, so the verdict does not move. §1 gives two-level and four-level examples but no three-level one, which is the case SKILL-09 tests (`Bench.Sub.Item` → `Bench_Sub.Item`). A three-level example is the one edit this points to, and it is left for a round with a new holdout task to measure it on.
