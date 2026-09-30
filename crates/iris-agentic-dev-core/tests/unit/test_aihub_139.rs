@@ -532,3 +532,133 @@ fn skill_names_only_held_classes() {
         "skill names these with no holds/reworded row: {unbacked:?}"
     );
 }
+
+// ── US4: doc mismatches recorded, ready for upstream ─────────────────────────
+
+/// One `## D<n>` / `## B<n>` entry of drafts.md: heading and body.
+fn drafts() -> Vec<(String, String)> {
+    let text = read("specs/132-aihub-139/drafts.md");
+    text.split("\n## ")
+        .skip(1)
+        .map(|e| {
+            let (h, b) = e.split_once('\n').unwrap_or((e, ""));
+            (h.trim().to_string(), b.to_string())
+        })
+        .collect()
+}
+
+/// The value after `- <key>: ` in an entry body.
+fn field<'a>(heading: &str, body: &'a str, key: &str) -> &'a str {
+    body.lines()
+        .find_map(|l| l.strip_prefix(&format!("- {key}: ")))
+        .unwrap_or_else(|| panic!("{heading}: no `- {key}:` line"))
+        .trim()
+}
+
+fn backticked<'a>(heading: &str, cell: &'a str) -> &'a str {
+    cell.strip_prefix('`')
+        .and_then(|c| c.split_once('`'))
+        .map(|(inner, _)| inner)
+        .unwrap_or_else(|| panic!("{heading}: {cell:?} does not start with a backticked value"))
+}
+
+#[test]
+fn drafts_entries_are_complete() {
+    let entries = drafts();
+    let live = read("crates/iris-agentic-dev-core/tests/integration/test_aihub_139_live.rs");
+    let mismatches: Vec<_> = entries.iter().filter(|(h, _)| h.starts_with('D')).collect();
+    assert!(
+        mismatches.len() >= 7,
+        "want one D entry per reproduced mismatch, got {}",
+        mismatches.len()
+    );
+    for (h, b) in &entries {
+        assert!(
+            b.lines().any(|l| l.trim() == "- Status: drafted"),
+            "{h}: every entry is `Status: drafted`; nothing is filed"
+        );
+        assert!(
+            b.contains("Draft upstream text:") && b.lines().any(|l| l.starts_with("> ")),
+            "{h}: needs `Draft upstream text:` and a quoted draft"
+        );
+    }
+    for (h, b) in &mismatches {
+        let doc = backticked(h, field(h, b, "Doc"));
+        if !h.contains("FR-008") {
+            let (file, line) = doc
+                .rsplit_once(':')
+                .unwrap_or_else(|| panic!("{h}: Doc {doc:?} is not file:line"));
+            assert!(file.ends_with(".md"), "{h}: Doc {doc:?} names a .md file");
+            assert!(
+                line.parse::<u32>().is_ok(),
+                "{h}: Doc {doc:?} line is a number"
+            );
+        }
+        assert!(
+            !field(h, b, "Doc says").is_empty(),
+            "{h}: Doc says is empty"
+        );
+        assert!(
+            !field(h, b, "139 does").is_empty(),
+            "{h}: 139 does is empty"
+        );
+        let test = backticked(h, field(h, b, "Test"));
+        assert!(
+            live.contains(&format!("fn {test}(")),
+            "{h}: no fn {test} in test_aihub_139_live.rs"
+        );
+    }
+}
+
+/// Every mismatch has one correction line in skill section 6, found by doc file name and line.
+#[test]
+fn skill_corrections_match_drafts() {
+    let t = ai_hub_skill();
+    let s = section(&t, SECTIONS[5]);
+    let lines: Vec<&str> = s.lines().filter(|l| l.starts_with("- ")).collect();
+    for (h, b) in drafts()
+        .iter()
+        .filter(|(h, _)| h.starts_with('D') && !h.contains("FR-008"))
+    {
+        let doc = backticked(h, field(h, b, "Doc"));
+        let (path, line) = doc.rsplit_once(':').unwrap();
+        let file = path.rsplit('/').next().unwrap();
+        let hit = lines.iter().find(|l| l.contains(file) && l.contains(line));
+        let hit = hit.unwrap_or_else(|| panic!("{h}: no section 6 line names {file} and {line}"));
+        assert!(
+            hit.contains(" says ") && hit.contains("; on 2026.3 it is "),
+            "{h}: section 6 line reads `… says X; on 2026.3 it is Y`: {hit}"
+        );
+    }
+    assert_eq!(
+        lines.len(),
+        drafts()
+            .iter()
+            .filter(|(h, _)| h.starts_with('D') && !h.contains("FR-008"))
+            .count(),
+        "one section 6 line per mismatch entry"
+    );
+}
+
+/// FR-008: upstream has no iris-agentic-dev.toml, so drafts.md asks for one.
+#[test]
+fn drafts_has_the_fr008_toml_request() {
+    let (_, paths) = upstream_files();
+    assert!(
+        !paths.iter().any(|p| p.ends_with("iris-agentic-dev.toml")),
+        "upstream now has an iris-agentic-dev.toml; FR-008's draft is stale"
+    );
+    let entries = drafts();
+    let (h, b) = entries
+        .iter()
+        .find(|(h, _)| h.contains("FR-008"))
+        .expect("drafts.md has an FR-008 entry");
+    assert!(
+        b.contains("iris-agentic-dev.toml"),
+        "{h}: names the file it asks for"
+    );
+    assert!(
+        b.contains("skill_community"),
+        "{h}: says what the file enables"
+    );
+}

@@ -46,6 +46,22 @@ cargo test --features testing --test integration test_aihub_139 -- --include-ign
 
 With the container stopped, this panics naming `iad-aihub-iris`. To skip instead, add `IAD_ALLOW_SKIP=1`.
 
+## License units
+
+Each iad process leaves three CSP sessions open on `/api/atelier` for an hour (drafts.md B1). One live-suite run costs about 30 of the key's 128 license units. Check before a run:
+
+```bash
+printf 'Write "consumed=",$System.License.LUConsumed(),!\nhalt\n' \
+  | docker exec -i iad-aihub-iris iris session IRIS -U %SYS | grep consumed=
+```
+
+Above about 90, or when requests start failing with a license error, restart and wait for the gateway:
+
+```bash
+docker restart iad-aihub-iris
+until curl -sf -o /dev/null -u _SYSTEM:SYS http://localhost:52781/api/atelier/; do sleep 2; done
+```
+
 ## Real agent turn (spends a few cents)
 
 ```bash

@@ -55,11 +55,11 @@ Independent test: every claim row names a live test that passes on 139; a claim 
 
 Independent test: one `drafts.md` entry per reproduced mismatch, each with doc file:line, 139 behaviour, test name; the skill states each correction.
 
-- [ ] T026 [US4] Unit test in `core/tests/unit/test_aihub_139.rs`: parse `specs/132-aihub-139/drafts.md`; every entry has a doc `file:line`, what the doc says, what 139 does, a test name that exists in `test_aihub_139_live.rs`, draft upstream text, and `Status: drafted`; every entry has a matching "the guide says X; on 2026.3 it is Y" line in skill section 6; the FR-008 `iris-agentic-dev.toml` draft is present
-- [ ] T027 [US4] Live tests for R5 candidates in `core/tests/integration/test_aihub_139_live.rs`: `configstore_get_signature` (M1), `configstore_delete_signature` (M2), `providerconfig_forms` (M3), `agent_new_without_init` (M4), `console_audit_with_mcp` (M5); each asserts what 139 does, not what the doc says
-- [ ] T028 [US4] Write `specs/132-aihub-139/drafts.md`: one entry per reproduced mismatch plus the FR-008 draft; a candidate the test does not reproduce is dropped with a note in research.md R5 and no drafts entry
-- [ ] T029 [US4] Write skill section 6 in `skills/skills/iris-ai-hub/SKILL.md`, one line per drafts entry
-- [ ] T030 [US4] Gate: T026 unit and T027 live pass; nothing filed, pushed or commented
+- [x] T026 [US4] Unit test in `core/tests/unit/test_aihub_139.rs`: parse `specs/132-aihub-139/drafts.md`; every entry has a doc `file:line`, what the doc says, what 139 does, a test name that exists in `test_aihub_139_live.rs`, draft upstream text, and `Status: drafted`; every entry has a matching "the guide says X; on 2026.3 it is Y" line in skill section 6; the FR-008 `iris-agentic-dev.toml` draft is present
+- [x] T027 [US4] Live tests for R5 candidates in `core/tests/integration/test_aihub_139_live.rs`: `configstore_get_signature` (M1), `configstore_delete_signature` (M2), `providerconfig_forms` (M3), `agent_new_without_init` (M4), `console_audit_with_mcp` (M5); each asserts what 139 does, not what the doc says Done inside the existing fns, not as separately named ones: M1, M2, M3, M4 and M6 in `aihub_139_agent_providerconfig`, M5 and M7 in `aihub_139_mcp_bridge`, M8 in `aihub_139_policies`.
+- [x] T028 [US4] Write `specs/132-aihub-139/drafts.md`: one entry per reproduced mismatch plus the FR-008 draft; a candidate the test does not reproduce is dropped with a note in research.md R5 and no drafts entry D1–D7 (M1–M4, M6–M8), D8 (FR-008), B1 (iad license leak). M5 is dropped: not reproduced.
+- [x] T029 [US4] Write skill section 6 in `skills/skills/iris-ai-hub/SKILL.md`, one line per drafts entry
+- [x] T030 [US4] Gate: T026 unit and T027 live pass; nothing filed, pushed or commented Passed 2026-09-30: 23/23 unit; the four live tests pass; nothing filed.
 
 ## Phase 7: US5 — ladder evidence decides skill vs tool (P2)
 

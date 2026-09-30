@@ -108,6 +108,16 @@ Each fact below has a live test on build 139 (`crates/iris-agentic-dev-core/test
 
 ## Corrections
 
+Where the ai-hub-eap docs and 2026.3 disagree, trust these lines. Each one is a live test on build 139.
+
+- `Config_Store_Guide.md:154` says `Get("AI","LLM","","openai")` returns the object; on 2026.3 it is `Get("AI.LLM.openai", .config)`, which returns a `%Status`. Four arguments raise `<PARAMETER>`.
+- `Config_Store_Guide.md:175` says `Delete` also takes four parts; on 2026.3 it is `Delete("AI.LLM.openai")` only. Four arguments raise `<PARAMETER>` and the entry stays.
+- `ObjectScript_SDK_Guide.md:250` says `Parameter PROVIDERCONFIG = "MyConfigName"`; on 2026.3 it is `"@{config:MyConfigName}"` (or `"@{config:AI.LLM.MyConfigName}"`). A bare name, or `@{config.MyConfigName}` with a dot, fails `%Init()` with `PROVIDERCONFIG is invalid`.
+- `ObjectScript_SDK_Guide.md:713` says `%New()` is enough when the class names its provider; on 2026.3 it is `%New()` then `%Init()`. `Provider` stays empty until `%Init()` runs.
+- Upstream's own skill, `SKILL.md:148`, says `If ..Provider = "" && ..#MODELCONFIGNAME '= ""`; on 2026.3 it is always true, because ObjectScript reads left to right, so it replaces a provider passed to `%New()`. Write `If (..Provider = "") && (..#MODELCONFIGNAME '= "")`.
+- `MCP_Server_Guide.md:136` says to create the MCP server in the Management Portal; on 2026.3 it is also scriptable with `Security.Applications`, but only with `Type` 18. Type 16 is refused (no CSP bit), and Type 2 saves but serves no tools ("failed identity checking").
+- `ObjectScript_SDK_Advanced.md:364` says repeated child elements fill a policy's list property; on 2026.3 it is true for two or more, but a single child loads an empty list. A deny policy with one `<Blocked>` tool blocks nothing. Add a second item or set the list in code.
+
 ## Upstream's own skill
 
 ai-hub-eap carries its own agent skill. Read it raw: `https://raw.githubusercontent.com/intersystems-community/ai-hub-eap/master/skills/aihub-eap/SKILL.md`. It describes build 162; check what it says against the installed classes as in the workflow above.
