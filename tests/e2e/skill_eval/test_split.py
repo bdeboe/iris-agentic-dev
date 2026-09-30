@@ -204,8 +204,15 @@ def test_every_skill_ladder_task_is_on_the_holdout_side():
 #: Skill tasks moved to train because a skill was edited while reading their transcripts. Each one
 #: has a replacement on the holdout for the same skill. SKILL-21 was written on train from the start:
 #: 130 round 4 fits `objectscript-sql-patterns` to it, and SKILL-09 is the holdout that says whether
-#: the fix generalises.
-TUNED_SKILL_TASKS = {"SKILL-13": "SKILL-20", "SKILL-21": "SKILL-09"}
+#: the fix generalises. SKILL-22 and SKILL-23 (132, `iris-ai-hub`) are train from the day written too,
+#: for the same reason: a `needs_fix` edit reads their transcripts, and SKILL-25 and SKILL-24 are the
+#: holdout that says whether the edit carries over.
+TUNED_SKILL_TASKS = {
+    "SKILL-13": "SKILL-20",
+    "SKILL-21": "SKILL-09",
+    "SKILL-22": "SKILL-25",
+    "SKILL-23": "SKILL-24",
+}
 
 
 def test_a_tuned_skill_task_is_on_train_and_its_replacement_on_the_holdout():
@@ -226,3 +233,24 @@ def test_the_gate_task_is_on_the_train_side():
     whatever it was called at the time, so a figure published off it would be measured on a task the
     harness was fitted to."""
     assert "PILOT-01" in default_split().train
+
+
+def test_the_ai_hub_tasks_sit_on_the_sides_132_gave_them():
+    split = default_split()
+    assert {"SKILL-22", "SKILL-23"} <= set(split.train)
+    assert {"SKILL-24", "SKILL-25"} <= set(split.holdout)
+    tasks = {task.id: task for task in skill_corpus()}
+    assert {tasks[i].skill for i in ("SKILL-22", "SKILL-23", "SKILL-24", "SKILL-25")} == {
+        "iris-ai-hub"
+    }
+
+
+def test_a_record_marked_train_is_refused_whatever_its_id():
+    """`--side train` marks every record. A train record carrying a holdout id is still a train
+    session: the id says where the task sits, the mark says which run produced the figure."""
+    split = Split(train=("SKILL-22",), holdout=("SKILL-24",))
+    assert_holdout_only(split, [{"task_id": "SKILL-24", "side": "holdout"}])
+    with pytest.raises(SplitLeak, match="SKILL-24.*train"):
+        assert_holdout_only(split, [{"task_id": "SKILL-24", "side": "train"}])
+    with pytest.raises(SplitLeak, match="SKILL-22"):
+        assert_holdout_only(split, [{"task_id": "SKILL-22"}])

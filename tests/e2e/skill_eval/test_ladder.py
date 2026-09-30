@@ -16,6 +16,9 @@ Nothing here starts a session. The subject is the bookkeeping between `pilot.run
 publishable table.
 """
 
+import json
+import os
+
 import pytest
 
 from tests.e2e.skill_eval.arms import BARE, TOOLS, TOOLS_SKILLS, skill_ladder
@@ -613,10 +616,11 @@ def test_the_pooled_task_set_is_every_holdout_skill_task_and_each_one_names_a_sk
     from tests.e2e.skill_eval import ladder
 
     tasks = ladder.pooled_skill_tasks()
-    # 121's twelve over four skills, plus 130's SKILL-13 to SKILL-19.
-    assert len(tasks) == 19
+    # 121's twelve over four skills, plus 130's SKILL-13 to SKILL-19, plus 132's holdout pair
+    # SKILL-24/25 for iris-ai-hub. SKILL-22/23 are train and stay out.
+    assert len(tasks) == 21
     assert all(task.skill for task in tasks)
-    assert len({task.skill for task in tasks}) == 9
+    assert len({task.skill for task in tasks}) == 10
 
 
 # --- the dead-environment abort --------------------------------------------------------------------
@@ -944,3 +948,157 @@ def test_start_repeat_is_a_cli_flag_defaulting_to_zero():
 
     assert ladder.parse_args([]).start_repeat == 0
     assert ladder.parse_args(["--start-repeat", "1"]).start_repeat == 1
+
+
+# --- the train side and the web port (132 US5) -----------------------------------------------------
+# SKILL-22 and SKILL-23 are train from the day they were written, so `holdout_only` drops them and no
+# flag could run them. `--side train` runs them and marks every record, so no train figure can reach
+# the publish gate unmarked. `--web-port` is 139's gateway, 52781, which the tools arm and the check
+# CLI both have to reach.
+
+
+def side_split():
+    return a_split(holdout=("SKILL-24", "SKILL-25"), train=("SKILL-22", "SKILL-23"))
+
+
+AIHUB_TASKS = [
+    FakeSkillTask(task_id, "iris-ai-hub")
+    for task_id in ("SKILL-22", "SKILL-23", "SKILL-24", "SKILL-25")
+]
+
+
+def test_side_train_selects_only_the_train_tasks(monkeypatch):
+    from tests.e2e.skill_eval import graded_task, ladder
+
+    monkeypatch.setattr(graded_task, "skill_corpus", lambda: tuple(AIHUB_TASKS))
+    train = ladder.skill_ladder_tasks("iris-ai-hub", split=side_split(), side="train")
+    assert [task.id for task in train] == ["SKILL-22", "SKILL-23"]
+    holdout = ladder.skill_ladder_tasks("iris-ai-hub", split=side_split())
+    assert [task.id for task in holdout] == ["SKILL-24", "SKILL-25"]
+
+
+def test_side_only_still_refuses_an_id_the_split_does_not_know():
+    from tests.e2e.skill_eval import ladder
+
+    with pytest.raises(SplitLeak):
+        ladder.side_only([FakeTask("SKILL-99")], "train", split=side_split())
+
+
+def test_the_cli_side_defaults_to_holdout_and_takes_train():
+    from tests.e2e.skill_eval import ladder
+
+    assert ladder.parse_args([]).side == "holdout"
+    assert ladder.parse_args(["--side", "train"]).side == "train"
+    with pytest.raises(SystemExit):
+        ladder.parse_args(["--side", "both"])
+
+
+def test_the_cli_web_port_defaults_to_none_so_the_env_then_52780_decide():
+    from tests.e2e.skill_eval import ladder
+
+    assert ladder.parse_args([]).web_port is None
+    assert ladder.parse_args(["--web-port", "52781"]).web_port == "52781"
+
+
+def _cli(monkeypatch, tmp_path, argv, tasks=AIHUB_TASKS):
+    """`_main` with the corpus, the split and the sessions stubbed. Returns the exit code, what
+    `run_ladder` was called with, and the records written."""
+    from tests.e2e.skill_eval import graded_task, ladder, split as split_mod
+
+    monkeypatch.setattr(graded_task, "skill_corpus", lambda: tuple(tasks))
+    monkeypatch.setattr(split_mod, "default_split", side_split)
+    monkeypatch.setattr(ladder, "default_split", side_split)
+    monkeypatch.setattr(ladder, "RESULTS_DIR", str(tmp_path))
+    seen = {}
+
+    def fake_run_ladder(tasks, arms, **kwargs):
+        seen["tasks"] = [task.id for task in tasks]
+        seen["kwargs"] = kwargs
+        seen["env_port"] = os.environ.get("IRIS_WEB_PORT")
+        seen["env_host"] = os.environ.get("IRIS_HOST")
+        seen["env_container"] = os.environ.get("IRIS_CONTAINER")
+        runs = [run(task.id, arm.name, True) for task in tasks for arm in arms]
+        for one in runs:
+            kwargs["on_run"](one)
+        return runs
+
+    monkeypatch.setattr(ladder, "run_ladder", fake_run_ladder)
+    monkeypatch.setattr(ladder, "report", lambda runs, **kw: {"comparisons": [], "side": kw.get("side")})
+    monkeypatch.setattr(ladder, "write_report", lambda written, out=None: str(tmp_path / "r.json"))
+    code = ladder._main(["--ladder", "skill", "--skill", "iris-ai-hub", *argv])
+    records = []
+    for name in os.listdir(tmp_path):
+        if name.endswith(".runs.jsonl"):
+            with open(tmp_path / name, encoding="utf-8") as handle:
+                records += [json.loads(line) for line in handle]
+    return code, seen, records
+
+
+def test_a_train_run_writes_side_train_into_every_record(monkeypatch, tmp_path):
+    code, seen, records = _cli(monkeypatch, tmp_path, ["--side", "train"])
+    assert code == 0
+    assert seen["tasks"] == ["SKILL-22", "SKILL-23"]
+    assert records and {record["side"] for record in records} == {"train"}
+
+
+def test_a_holdout_run_writes_side_holdout(monkeypatch, tmp_path):
+    code, seen, records = _cli(monkeypatch, tmp_path, [])
+    assert code == 0
+    assert seen["tasks"] == ["SKILL-24", "SKILL-25"]
+    assert {record["side"] for record in records} == {"holdout"}
+
+
+def test_a_task_on_the_other_side_names_the_side_and_exits_2(monkeypatch, tmp_path, capsys):
+    code, seen, _ = _cli(monkeypatch, tmp_path, ["--task", "SKILL-22"])
+    assert code == 2
+    assert "no holdout task matches ['SKILL-22']" in capsys.readouterr().out
+    assert "tasks" not in seen
+    code, _, _ = _cli(monkeypatch, tmp_path, ["--side", "train", "--task", "SKILL-24"])
+    assert code == 2
+    assert "no train task matches ['SKILL-24']" in capsys.readouterr().out
+
+
+def test_the_web_port_reaches_the_sessions_and_the_check_cli(monkeypatch, tmp_path):
+    for name in ("IRIS_WEB_PORT", "IRIS_HOST", "IRIS_CONTAINER"):
+        # set, then delete, so monkeypatch records the variable and removes what `_main` writes
+        monkeypatch.setenv(name, "unset")
+        monkeypatch.delenv(name)
+    _, seen, _ = _cli(
+        monkeypatch, tmp_path, ["--web-port", "52781", "--container", "iad-aihub-iris"]
+    )
+    assert seen["kwargs"]["iris_web_port"] == "52781"
+    # The check runs `iris-agentic-dev exec` as a subprocess, which reads the port from the env. The
+    # repo's `.iris-agentic-dev.toml` names iris-dev-iris:52780 and wins over a bare port, so the host
+    # has to be set too: an explicit IRIS_HOST is the only thing that outranks the workspace file.
+    assert seen["env_port"] == "52781"
+    assert seen["env_host"] == "localhost"
+    assert seen["env_container"] == "iad-aihub-iris"
+
+
+def test_no_web_port_leaves_the_env_default_to_run_ladder(monkeypatch, tmp_path):
+    monkeypatch.setenv("IRIS_WEB_PORT", "52790")
+    _, seen, _ = _cli(monkeypatch, tmp_path, [])
+    assert seen["kwargs"]["iris_web_port"] is None
+    assert seen["env_port"] == "52790"
+
+
+def test_a_train_report_publishes_nothing_and_says_train(monkeypatch):
+    """The strict publish step raises on train ids, which is right for a holdout run. A train run is
+    for reading transcripts, so its report carries no published figure rather than raising."""
+    from tests.e2e.skill_eval import ladder
+
+    runs = [
+        run(task, arm.name, passed)
+        for task in ("SKILL-22", "SKILL-23")
+        for arm, passed in zip(skill_ladder("iris-ai-hub"), (False, True))
+    ]
+    written = ladder.report(
+        runs,
+        arms=skill_ladder("iris-ai-hub"),
+        split=side_split(),
+        container="iad-aihub-iris",
+        side="train",
+    )
+    assert written["side"] == "train"
+    assert written["published"] == []
+    assert {record["side"] for record in written["runs"]} == {"train"}

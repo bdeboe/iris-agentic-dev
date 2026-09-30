@@ -1,0 +1,86 @@
+id: SKILL-23
+prompt: |
+  In the USER namespace, IadAihub139.Q23.Setup.Configure() is meant to set up the LLM provider for
+  the AI Hub agent IadAihub139.Q23.Agent: an OpenAI provider, model gpt-4.1-mini, with the API key
+  kept in the IRIS Wallet (collection IadAihub139, key IadAihub139.Q23, secret field api_key, value
+  sk-fake-not-a-key; UseResource and EditResource %DB_USER) and a ConfigStore LLM configuration named
+  IadAihub139Q23 that refers to that secret rather than holding the key. The agent should get its
+  provider from that configuration. Neither works: Configure() returns an error, and the agent's
+  %Init() fails. Fix both. Configure() must succeed when it is run again. Leave the classes compiled
+  on the server. No LLM call is needed and none will be made.
+
+  IRIS: host localhost, web port 52781, username _SYSTEM, password SYS, namespace USER.
+  The instance runs in the Docker container iad-aihub-iris (IRIS 2026.3.0AI build 139, with AI Hub).
+skill: iris-ai-hub
+namespace: USER
+fixtures:
+  - name: IadAihub139.Q23.Setup
+    content: |
+      Class IadAihub139.Q23.Setup Extends %RegisteredObject
+      {
+
+      /// Create the ConfigStore LLM configuration IadAihub139Q23 if it is not there yet.
+      ClassMethod Configure() As %Status
+      {
+          Set tSC = $$$OK
+          Try {
+              Set tConfig = ##class(%ConfigStore.Configuration).Get("AI", "LLM", "", "IadAihub139Q23")
+              If tConfig = "" {
+                  Set tSC = ##class(%ConfigStore.Configuration).Create("AI", "LLM", "", "IadAihub139Q23", {"model_provider":"openai","model":"gpt-4.1-mini","api_key":"secret://IadAihub139.Q23#api_key"})
+              }
+          } Catch ex {
+              Set tSC = ex.AsStatus()
+          }
+          Quit tSC
+      }
+
+      }
+  - name: IadAihub139.Q23.Agent
+    content: |
+      Class IadAihub139.Q23.Agent Extends %AI.Agent
+      {
+
+      Parameter PROVIDERCONFIG = "IadAihub139Q23";
+
+      }
+check: |
+  try { set ok=0, sc=##class(IadAihub139.Q23.Setup).Configure(), sc2=##class(IadAihub139.Q23.Setup).Configure(), sc3=##class(%ConfigStore.Configuration).GetDetails("AI.LLM.IadAihub139Q23",.d), sc4=##class(%ConfigStore.Configuration).GetDetails("AI.LLM.IadAihub139Q23",.r,1,1), a=##class(IadAihub139.Q23.Agent).%New(), sc5=a.%Init() set ok=$system.Status.IsOK(sc)&&$system.Status.IsOK(sc2)&&$system.Status.IsOK(sc3)&&$system.Status.IsOK(sc4)&&($extract(d."api_key",1,9)="secret://")&&(r."api_key"="sk-fake-not-a-key")&&$system.Status.IsOK(sc5)&&$isobject(a.Provider)&&(a.Model="gpt-4.1-mini") } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: IadAihub139.Q23.Setup
+    content: |
+      Class IadAihub139.Q23.Setup Extends %RegisteredObject
+      {
+
+      /// Create the wallet secret and the ConfigStore LLM configuration IadAihub139Q23. Safe to run again.
+      ClassMethod Configure() As %Status
+      {
+          Set tSC = $$$OK
+          Try {
+              If '##class(%Wallet.Collection).Exists("IadAihub139") {
+                  $$$ThrowOnError(##class(%Wallet.Collection).Create("IadAihub139", {"UseResource":"%DB_USER","EditResource":"%DB_USER"}))
+              }
+              Do ##class(%Wallet.KeyValue).Delete("IadAihub139.Q23")
+              $$$ThrowOnError(##class(%Wallet.KeyValue).Create("IadAihub139.Q23", {"Usage":"CUSTOM","Secret":{"api_key":"sk-fake-not-a-key"}}))
+              Do ##class(%ConfigStore.Configuration).Delete("AI.LLM.IadAihub139Q23")
+              $$$ThrowOnError(##class(%ConfigStore.Configuration).Create("AI", "LLM", "", "IadAihub139Q23", {"model_provider":"openai","model":"gpt-4.1-mini","api_key":"secret://IadAihub139.Q23#api_key"}))
+          } Catch ex {
+              Set tSC = ex.AsStatus()
+          }
+          Quit tSC
+      }
+
+      }
+  - name: IadAihub139.Q23.Agent
+    content: |
+      Class IadAihub139.Q23.Agent Extends %AI.Agent
+      {
+
+      Parameter PROVIDERCONFIG = "@{config:IadAihub139Q23}";
+
+      }
+teardown: |
+  do ##class(%ConfigStore.Configuration).Delete("AI.LLM.IadAihub139Q23"), ##class(%ConfigStore.Configuration).Delete("AI.LLM.IadAihub139Q25"), ##class(%Wallet.KeyValue).Delete("IadAihub139.Q23"), ##class(%Wallet.KeyValue).Delete("IadAihub139.Q25"), ##class(%Wallet.Collection).Delete("IadAihub139") if ##class(%Wallet.Collection).Exists("IadAihub139") { throw ##class(%Exception.General).%New("wallet collection IadAihub139 still exists, so a key outside IadAihub139.Q23/Q25 is in it") } new $namespace set $namespace="%SYS" if ##class(Security.Applications).Exists("/mcp/iadaihub139") { set sc=##class(Security.Applications).Delete("/mcp/iadaihub139") throw:$system.Status.IsError(sc) ##class(%Exception.StatusException).CreateFromStatus(sc) } write "teardown done"
+tags:
+  - ai-hub
+  - config-store
+  - wallet

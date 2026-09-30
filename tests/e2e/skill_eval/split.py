@@ -149,9 +149,20 @@ def assert_holdout_only(split: Split, task_ids) -> None:
 
     An ID the split has never heard of raises too. It is a figure over something the split cannot
     vouch for, which is the same problem as a leak wearing a better disguise.
+
+    An entry may be a run record (a dict with `task_id`). A record that says `side: train` is refused
+    whatever its id: it came from a `--side train` run, and the mark is what keeps it out (132).
     """
-    leaked = sorted({task for task in task_ids if split.side_of(task) == TRAIN})
-    unknown = sorted({task for task in task_ids if split.side_of(task) is None})
+    ids, marked = [], set()
+    for entry in task_ids:
+        if isinstance(entry, dict):
+            ids.append(entry["task_id"])
+            if entry.get("side") == TRAIN:
+                marked.add(entry["task_id"])
+        else:
+            ids.append(entry)
+    leaked = sorted({task for task in ids if split.side_of(task) == TRAIN} | marked)
+    unknown = sorted({task for task in ids if split.side_of(task) is None})
     problems = []
     if leaked:
         problems.append(

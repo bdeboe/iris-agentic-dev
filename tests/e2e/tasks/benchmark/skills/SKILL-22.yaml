@@ -1,0 +1,64 @@
+id: SKILL-22
+prompt: |
+  In the USER namespace, IadAihub139.Q22.Agent is an AI Hub agent (it extends %AI.Agent) and
+  IadAihub139.Q22.Words has a class method WordCount(text) that counts the words in a string. The
+  agent cannot use WordCount: it has no tools. Make WordCount a tool of IadAihub139.Q22.Agent, with a
+  description a model can read, so the agent's tool manager lists it and can run it. Leave the
+  classes compiled on the server. No LLM call is needed and none will be made.
+
+  IRIS: host localhost, web port 52781, username _SYSTEM, password SYS, namespace USER.
+  The instance runs in the Docker container iad-aihub-iris (IRIS 2026.3.0AI build 139, with AI Hub).
+skill: iris-ai-hub
+namespace: USER
+fixtures:
+  - name: IadAihub139.Q22.Words
+    content: |
+      Class IadAihub139.Q22.Words Extends %RegisteredObject
+      {
+
+      ClassMethod WordCount(text As %String) As %Integer
+      {
+          Return $Length($ZStrip(text, "<=>W"), " ")
+      }
+
+      }
+  - name: IadAihub139.Q22.Agent
+    content: |
+      Class IadAihub139.Q22.Agent Extends %AI.Agent
+      {
+
+      Parameter DESCRIPTION = "Answers questions about text";
+
+      }
+check: |
+  try { set ok=0, p=##class(%AI.Provider).Create("openai",{"api_key":"sk-fake-not-a-key"}), a=##class(IadAihub139.Q22.Agent).%New(p), sc=a.%Init(), d=a.ToolManager.%Discover(), desc="", tn="", it=d.%GetIterator() while it.%GetNext(,.t) { if $extract(t.name,*-8,*)="WordCount" { set tn=t.name, desc=t.description } } set r=$select(tn="":"",1:a.ToolManager.ExecuteTool(tn,{"text":"one two  three"})) set ok=$system.Status.IsOK(sc)&&($zstrip(desc,"<>W")'="")&&$isobject(r)&&(r.value=3) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: IadAihub139.Q22.Words
+    content: |
+      Class IadAihub139.Q22.Words Extends %AI.Tool
+      {
+
+      /// Count the words in a text.
+      /// text: the text to count
+      ClassMethod WordCount(text As %String) As %Integer
+      {
+          Return $Length($ZStrip(text, "<=>W"), " ")
+      }
+
+      }
+  - name: IadAihub139.Q22.Agent
+    content: |
+      Class IadAihub139.Q22.Agent Extends %AI.Agent [ DependsOn = IadAihub139.Q22.Words ]
+      {
+
+      Parameter DESCRIPTION = "Answers questions about text";
+
+      Parameter TOOLSETS = "IadAihub139.Q22.Words";
+
+      }
+teardown: |
+  do ##class(%ConfigStore.Configuration).Delete("AI.LLM.IadAihub139Q23"), ##class(%ConfigStore.Configuration).Delete("AI.LLM.IadAihub139Q25"), ##class(%Wallet.KeyValue).Delete("IadAihub139.Q23"), ##class(%Wallet.KeyValue).Delete("IadAihub139.Q25"), ##class(%Wallet.Collection).Delete("IadAihub139") if ##class(%Wallet.Collection).Exists("IadAihub139") { throw ##class(%Exception.General).%New("wallet collection IadAihub139 still exists, so a key outside IadAihub139.Q23/Q25 is in it") } new $namespace set $namespace="%SYS" if ##class(Security.Applications).Exists("/mcp/iadaihub139") { set sc=##class(Security.Applications).Delete("/mcp/iadaihub139") throw:$system.Status.IsError(sc) ##class(%Exception.StatusException).CreateFromStatus(sc) } write "teardown done"
+tags:
+  - ai-hub
+  - agent
+  - tools

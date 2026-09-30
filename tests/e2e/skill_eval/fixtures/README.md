@@ -27,3 +27,7 @@ Two edits to the 142-event stream, and nothing else:
 
 So the shapes are real and the field names are real; the long text is not. Assert on structure here,
 never on a truncated string's tail.
+
+## `tool_calls_session.jsonl`
+
+A hand-trimmed opencode `run --format json` stream for spec 132 T034, with six events: a `step_start`, three `tool_use` calls, a `text` and a `step_finish` with `reason: stop`. The calls are a completed `skill` load of `iris-ai-hub`, a completed `iris_execute`, and an `iris_doc` that failed with a two-line `COMPILE_ERROR`, so the ⏎ rendering of a multi-line error has something to show. The tool names carry the `iris-agentic-dev_` MCP prefix, as opencode writes them. It was written by hand, not captured, and the output strings are short stand-ins.

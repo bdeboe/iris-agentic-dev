@@ -296,6 +296,9 @@ def run_one(
         # days and ended two SKILL-09 sessions at 3 calls because nothing deleted it.
         prefixes = graded_task.package_prefixes(task.fixtures)
         snapshot = graded_task.list_classes(prefixes, task.namespace)
+        # 132: the reference left ConfigStore, Wallet or web-app state behind that no class reset
+        # removes; the session must not start on it.
+        graded_task.run_teardown(task)
     except (CheckBroken, graded_task.CorpusInvalid) as exc:
         return ArmRun(
             task_id=task.id,
@@ -389,6 +392,12 @@ def run_one(
             f"{task.id} {arm.name}: session leftovers not cleaned: {exc}",
             file=sys.stderr,
         )
+    try:
+        graded_task.run_teardown(task)
+    except CheckBroken as exc:
+        # Unlike a class leftover, this state is invisible to the next snapshot and would decide the
+        # next session's check, so the run is not scored.
+        passed, reason = None, str(exc)
     if loaded is False:
         # The check still ran, so IRIS is left as the agent left it, but the answer is not this
         # arm's: a skill the agent never read cannot be credited or blamed.

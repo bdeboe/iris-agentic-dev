@@ -328,8 +328,14 @@ def test_every_committed_task_passes_shape_validation():
 
 
 def test_every_committed_check_runs_in_the_benchmark_namespace():
+    """Except the AI Hub tasks (132): they run on build 139, where %AI is in USER and there is no
+    BENCHMARK namespace to drop. Their teardown does the cleanup the namespace drop does here."""
     for task in all_tasks():
-        assert task.namespace == BENCHMARK_NAMESPACE
+        if task.skill == "iris-ai-hub":
+            assert task.namespace == "USER", task.id
+            assert task.teardown, task.id
+        else:
+            assert task.namespace == BENCHMARK_NAMESPACE, task.id
 
 
 def test_the_two_ladders_partition_the_corpus():

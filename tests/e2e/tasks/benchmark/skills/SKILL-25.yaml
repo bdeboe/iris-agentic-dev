@@ -1,0 +1,71 @@
+id: SKILL-25
+prompt: |
+  In the USER namespace, the AI Hub agent IadAihub139.Q25.Agent builds its LLM provider in %OnInit
+  from the ConfigStore LLM configuration named by its MODELCONFIGNAME parameter, but only when the
+  caller did not pass a provider. Callers that pass their own provider to %New() find it replaced by
+  the configured one after %Init(). Fix the agent so a provider passed to %New() is kept, and an
+  agent created with no provider still gets one from the configuration after %Init(). Leave the class
+  compiled on the server. No LLM call is needed and none will be made.
+
+  IRIS: host localhost, web port 52781, username _SYSTEM, password SYS, namespace USER.
+  The instance runs in the Docker container iad-aihub-iris (IRIS 2026.3.0AI build 139, with AI Hub).
+skill: iris-ai-hub
+namespace: USER
+fixtures:
+  - name: IadAihub139.Q25.Agent
+    content: |
+      Class IadAihub139.Q25.Agent Extends %AI.Agent
+      {
+
+      Parameter MODELCONFIGNAME = "IadAihub139Q25";
+
+      Method %OnInit() As %Status
+      {
+          Set sc = $$$OK
+          Try {
+              If ..Provider = "" && ..#MODELCONFIGNAME '= "" {
+                  Do ##class(%AI.Utils.SettingStore).RegisterDefaults()
+                  Set settings = {}.%FromJSON(##class(%AI.Utils.SettingStore).Expand("@{config:" _ ..#MODELCONFIGNAME _ "}"))
+                  Set ..Provider = ##class(%AI.Provider).Create(settings."model_provider", settings)
+                  Set ..Model = settings.model
+              }
+          } Catch ex {
+              Set sc = ex.AsStatus()
+          }
+          Return sc
+      }
+
+      }
+check: |
+  try { set ok=0 do ##class(%ConfigStore.Configuration).Delete("AI.LLM.IadAihub139Q25"), ##class(%Wallet.KeyValue).Delete("IadAihub139.Q25") if '##class(%Wallet.Collection).Exists("IadAihub139") { do ##class(%Wallet.Collection).Create("IadAihub139",{"UseResource":"%DB_USER","EditResource":"%DB_USER"}) } do ##class(%Wallet.KeyValue).Create("IadAihub139.Q25",{"Usage":"CUSTOM","Secret":{"api_key":"sk-fake-not-a-key"}}), ##class(%ConfigStore.Configuration).Create("AI","LLM","","IadAihub139Q25",{"model_provider":"openai","model":"gpt-4.1-mini","api_key":"secret://IadAihub139.Q25#api_key"}) set p=##class(%AI.Provider).Create("openai",{"api_key":"sk-other-not-a-key"}), a=##class(IadAihub139.Q25.Agent).%New(p), sc=a.%Init(), b=##class(IadAihub139.Q25.Agent).%New(), sc2=b.%Init() set ok=$system.Status.IsOK(sc)&&(a.Provider=p)&&$system.Status.IsOK(sc2)&&$isobject(b.Provider)&&(b.Provider'=p)&&(b.Model="gpt-4.1-mini") } catch { set ok=0 } do ##class(%ConfigStore.Configuration).Delete("AI.LLM.IadAihub139Q25"), ##class(%Wallet.KeyValue).Delete("IadAihub139.Q25") write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: IadAihub139.Q25.Agent
+    content: |
+      Class IadAihub139.Q25.Agent Extends %AI.Agent
+      {
+
+      Parameter MODELCONFIGNAME = "IadAihub139Q25";
+
+      Method %OnInit() As %Status
+      {
+          Set sc = $$$OK
+          Try {
+              If (..Provider = "") && (..#MODELCONFIGNAME '= "") {
+                  Do ##class(%AI.Utils.SettingStore).RegisterDefaults()
+                  Set settings = {}.%FromJSON(##class(%AI.Utils.SettingStore).Expand("@{config:" _ ..#MODELCONFIGNAME _ "}"))
+                  Set ..Provider = ##class(%AI.Provider).Create(settings."model_provider", settings)
+                  Set ..Model = settings.model
+              }
+          } Catch ex {
+              Set sc = ex.AsStatus()
+          }
+          Return sc
+      }
+
+      }
+teardown: |
+  do ##class(%ConfigStore.Configuration).Delete("AI.LLM.IadAihub139Q23"), ##class(%ConfigStore.Configuration).Delete("AI.LLM.IadAihub139Q25"), ##class(%Wallet.KeyValue).Delete("IadAihub139.Q23"), ##class(%Wallet.KeyValue).Delete("IadAihub139.Q25"), ##class(%Wallet.Collection).Delete("IadAihub139") if ##class(%Wallet.Collection).Exists("IadAihub139") { throw ##class(%Exception.General).%New("wallet collection IadAihub139 still exists, so a key outside IadAihub139.Q23/Q25 is in it") } new $namespace set $namespace="%SYS" if ##class(Security.Applications).Exists("/mcp/iadaihub139") { set sc=##class(Security.Applications).Delete("/mcp/iadaihub139") throw:$system.Status.IsError(sc) ##class(%Exception.StatusException).CreateFromStatus(sc) } write "teardown done"
+tags:
+  - ai-hub
+  - agent
+  - operator-precedence

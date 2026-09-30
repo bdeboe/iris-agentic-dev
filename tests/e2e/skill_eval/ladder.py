@@ -88,6 +88,15 @@ UNSCORED_ABORT = 3
 # --- before the money ------------------------------------------------------------------------------
 
 
+def side_only(tasks, side: str, split: Split | None = None):
+    """Keep one side's tasks and refuse on an ID the split does not know (132: `--side train`)."""
+    split = split or default_split()
+    unknown = [task.id for task in tasks if split.side_of(task.id) is None]
+    if unknown:
+        assert_holdout_only(split, unknown)  # raises SplitLeak, naming them
+    return [task for task in tasks if split.side_of(task.id) == side]
+
+
 def holdout_only(tasks, split: Split | None = None):
     """Keep the holdout-side tasks and refuse on an ID the split does not know.
 
@@ -95,11 +104,7 @@ def holdout_only(tasks, split: Split | None = None):
     and the runner's job is to run the publishable side. An ID in neither side is different — nobody
     decided which side it is on, so nothing vouches for it either way.
     """
-    split = split or default_split()
-    unknown = [task.id for task in tasks if split.side_of(task.id) is None]
-    if unknown:
-        assert_holdout_only(split, unknown)  # raises SplitLeak, naming them
-    return [task for task in tasks if split.side_of(task.id) == "holdout"]
+    return side_only(tasks, "holdout", split=split)
 
 
 def assert_publishable_corpus(tasks, floor: int | None = MINIMUM_FLOOR):
@@ -503,6 +508,7 @@ def report(
     pooled: bool = False,
     tasks=None,
     transcripts: str | None = None,
+    side: str = "holdout",
 ) -> dict:
     """The whole graded run in one shape, with everything a re-measurement needs (FR-020).
 
@@ -519,7 +525,11 @@ def report(
     # Strict: the runner filtered to the holdout side before spending anything, so a leaked ID here is
     # a bug in the harness and not a fact about the corpus. Raising costs nothing — `run_ladder`'s
     # `on_run` has already written every session to disk, so the report can be rebuilt after the fix.
-    published = publishable(comparisons, split=split, strict=True)
+    # A train run (132 `--side train`) is for reading transcripts: it publishes nothing, and the strict
+    # step, which would rightly raise on its ids, does not run.
+    published = (
+        [] if side == "train" else publishable(comparisons, split=split, strict=True)
+    )
     task_ids = sorted({run.task_id for run in runs})
     binary = provenance.resolve_binary()
 
@@ -573,7 +583,8 @@ def report(
         "failure_modes": failure_modes(runs),
         "comparisons": [comparison.to_dict() for comparison in comparisons],
         "published": [comparison.summary() for comparison in published],
-        "runs": [asdict(run) for run in runs],
+        "side": side,
+        "runs": [{**asdict(run), "side": side} for run in runs],
         "transcripts": transcripts,
         **(
             {
@@ -725,27 +736,27 @@ def write_report(written: dict, out: str | None = None) -> str:
     return path
 
 
-def tools_ladder_tasks(split: Split | None = None):
-    """The holdout side of the tools corpus, checked against the publication floor."""
-    return assert_publishable_corpus(
-        holdout_only(list(graded_task.tools_corpus()), split=split)
-    )
+def tools_ladder_tasks(split: Split | None = None, side: str = "holdout"):
+    """One side of the tools corpus. The holdout side is checked against the publication floor; the
+    train side publishes nothing, so it has none."""
+    tasks = side_only(list(graded_task.tools_corpus()), side, split=split)
+    return assert_publishable_corpus(tasks, floor=MINIMUM_FLOOR if side == "holdout" else None)
 
 
-def skill_ladder_tasks(skill: str, split: Split | None = None):
-    """The holdout-side tasks that name one skill. Exempt from the floor — see
+def skill_ladder_tasks(skill: str, split: Split | None = None, side: str = "holdout"):
+    """One side's tasks that name one skill. Exempt from the floor — see
     `assert_publishable_corpus`."""
     tasks = [task for task in graded_task.skill_corpus() if task.skill == skill]
-    return assert_publishable_corpus(holdout_only(tasks, split=split), floor=None)
+    return assert_publishable_corpus(side_only(tasks, side, split=split), floor=None)
 
 
-def pooled_skill_tasks(split: Split | None = None):
+def pooled_skill_tasks(split: Split | None = None, side: str = "holdout"):
     """Every holdout skill task, for the pooled rung. Each runs against its own skill's arm.
 
     A task here with no skill named would run against an arm holding nothing and still be counted as a
     pair, so it is refused rather than skipped.
     """
-    tasks = holdout_only(list(graded_task.skill_corpus()), split=split)
+    tasks = side_only(list(graded_task.skill_corpus()), side, split=split)
     unnamed = [task.id for task in tasks if not getattr(task, "skill", None)]
     if unnamed:
         raise LadderRefused(
@@ -790,10 +801,22 @@ def parse_args(argv=None):
     parser.add_argument("--timeout", type=int, default=SESSION_TIMEOUT)
     parser.add_argument("--container", default="iris-dev-iris")
     parser.add_argument(
+        "--side",
+        choices=("holdout", "train"),
+        default="holdout",
+        help="which side of the split to run; a train run is marked and publishes nothing",
+    )
+    parser.add_argument(
+        "--web-port",
+        default=None,
+        help="the instance's web port (139 is 52781); sets IRIS_HOST/IRIS_WEB_PORT/IRIS_CONTAINER "
+        "for the check CLI too",
+    )
+    parser.add_argument(
         "--task",
         action="append",
         default=None,
-        help="run only these task ids (repeatable); the holdout filter still applies",
+        help="run only these task ids (repeatable); the --side filter still applies",
     )
     parser.add_argument(
         "--dry-run",
@@ -834,22 +857,22 @@ def _main(argv=None) -> int:
     pooled = args.ladder == "skill" and args.skill == "all"
     if pooled:
         arms = pooled_skill_arms
-        tasks = pooled_skill_tasks()
+        tasks = pooled_skill_tasks(side=args.side)
         arm_names = [TOOLS.name, POOLED_ARM]
     elif args.ladder == "skill":
         arms = skill_ladder(args.skill)
-        tasks = skill_ladder_tasks(args.skill)
+        tasks = skill_ladder_tasks(args.skill, side=args.side)
         arm_names = [arm.name for arm in arms]
     else:
         arms = ARMS
-        tasks = tools_ladder_tasks()
+        tasks = tools_ladder_tasks(side=args.side)
         arm_names = [arm.name for arm in arms]
 
     if args.task:
         wanted = set(args.task)
         tasks = [task for task in tasks if task.id in wanted]
         if not tasks:
-            print(f"no holdout task matches {sorted(wanted)}")
+            print(f"no {args.side} task matches {sorted(wanted)}")
             return 2
 
     estimate = estimate_ladder(len(tasks), arm_names, runs=args.repeats)
@@ -867,9 +890,17 @@ def _main(argv=None) -> int:
 
     def record(run):
         with open(incremental, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps(asdict(run)) + "\n")
+            handle.write(json.dumps({**asdict(run), "side": args.side}) + "\n")
 
     transcripts = os.path.join(RESULTS_DIR, f"{run_id}.transcripts")
+
+    if args.web_port:
+        # The sessions get the port from `run_ladder`; the check does not. It runs
+        # `iris-agentic-dev exec` as a subprocess, and the repo's `.iris-agentic-dev.toml` names
+        # iris-dev-iris:52780. An env port alone loses to that file; an explicit IRIS_HOST outranks it.
+        os.environ["IRIS_WEB_PORT"] = args.web_port
+        os.environ.setdefault("IRIS_HOST", "localhost")
+        os.environ["IRIS_CONTAINER"] = args.container
 
     driver = None
     try:
@@ -880,6 +911,7 @@ def _main(argv=None) -> int:
             start_repeat=args.start_repeat,
             model=args.model,
             timeout=args.timeout,
+            iris_web_port=args.web_port,
             iris_container=args.container,
             binary=os.environ.get("IAD_BINARY"),
             driver=driver,
@@ -908,6 +940,7 @@ def _main(argv=None) -> int:
         pooled=pooled,
         tasks=tasks,
         transcripts=os.path.relpath(transcripts),
+        side=args.side,
     )
     for record_ in written["comparisons"]:
         print(

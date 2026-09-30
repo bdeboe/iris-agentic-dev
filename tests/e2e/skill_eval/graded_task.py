@@ -122,6 +122,9 @@ class GradedTask:
     namespace: str = BENCHMARK_NAMESPACE
     skill: str | None = None
     tags: tuple[str, ...] = field(default_factory=tuple)
+    # ObjectScript that removes state no class cleanup reaches: ConfigStore entries, Wallet secrets, a
+    # %SYS web app (132). Run before validation, before the session and after the check.
+    teardown: str | None = None
 
 
 def check_verdict(output: str) -> bool:
@@ -175,6 +178,7 @@ def load_task(path: str) -> GradedTask:
         namespace=str(raw.get("namespace", BENCHMARK_NAMESPACE)),
         skill=raw.get("skill"),
         tags=tuple(raw.get("tags") or ()),
+        teardown=str(raw["teardown"]) if str(raw.get("teardown") or "").strip() else None,
     )
     validate_shape(task)
     return task
@@ -390,13 +394,27 @@ def created_classes(before, after) -> list[str]:
     return sorted(set(after) - set(before))
 
 
+def run_teardown(task: GradedTask) -> None:
+    """Run the task's teardown, if it has one. A teardown that errors raises `CheckBroken` naming the
+    task, because the next session would start on whatever it failed to remove."""
+    if not task.teardown:
+        return
+    try:
+        _iad(["exec", task.teardown], task.namespace)
+    except CheckBroken as exc:
+        raise CheckBroken(f"{task.id} teardown failed: {exc}") from exc
+
+
 def validate_live(task: GradedTask) -> None:
     """FR-004 and FR-022 against real IRIS: false before, true after.
 
     Order matters. The fixture goes on first and the check must fail; then the reference goes over it
     and the same check must pass. The other order would leave the reference in place and prove
     nothing about the precondition.
+
+    The teardown goes first, so state a previous run left behind cannot make the fixture pass.
     """
+    run_teardown(task)
     reset_documents([doc.name for doc in task.fixtures], task.namespace)
     apply_documents(task.fixtures, task.namespace)
     if run_check(task):

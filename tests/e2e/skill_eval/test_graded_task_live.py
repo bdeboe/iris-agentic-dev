@@ -34,6 +34,7 @@ from tests.e2e.skill_eval.graded_task import (
     pilot_tasks,
     reset_documents,
     run_check,
+    run_teardown,
     validate_live,
 )
 
@@ -92,7 +93,25 @@ def iris_connection():
             os.environ[key] = value
 
 
-@pytest.mark.parametrize("task", all_tasks(), ids=lambda task: task.id)
+AI_HUB_SKILL = "iris-ai-hub"
+AI_HUB_CONTAINER = "iad-aihub-iris"
+AI_HUB_WEB_PORT = "52781"
+
+
+def _running(name: str) -> bool:
+    names = subprocess.run(
+        ["docker", "ps", "--filter", f"name={name}", "--format", "{{.Names}}"],
+        capture_output=True,
+        text=True,
+    ).stdout.split()
+    return name in names
+
+
+@pytest.mark.parametrize(
+    "task",
+    [task for task in all_tasks() if task.skill != AI_HUB_SKILL],
+    ids=lambda task: task.id,
+)
 def test_every_committed_task_is_false_before_and_true_after(task):
     """FR-004 and FR-022 for one task, which is the whole of what makes it gradeable.
 
@@ -196,7 +215,8 @@ def test_the_reset_really_puts_the_fixture_back():
 
 def test_a_session_leftover_is_deleted():
     """130 FR-023, the way `pilot.run_one` does it. A class the fixture never named appears between
-    the two snapshots, as `Bench.Q2.CountOther` did, and the difference deletes it and nothing else."""
+    the two snapshots, as `Bench.Q2.CountOther` did, and the difference deletes it and nothing else.
+    """
     fixture = (Document(name="Bench.Q2", content="Class Bench.Q2\n{\n}\n"),)
     stray = Document(
         name="Bench.Q2.Leftover130",
@@ -211,3 +231,75 @@ def test_a_session_leftover_is_deleted():
     assert created_classes(before, after) == [stray.name]
     reset_documents(created_classes(before, after), BENCHMARK_NAMESPACE)
     assert list_classes(prefixes, BENCHMARK_NAMESPACE) == before
+
+
+# --- the AI Hub tasks, on build 139 — 132 T040 -------------------------------------------------------
+
+# What a teardown must leave behind: nothing. `write` prints one line per leftover, so an empty answer
+# is a clean instance. Classes go through `list_classes`, since `exec` may not touch code storage.
+AI_HUB_LEFTOVERS = (
+    'for n="AI.LLM.IadAihub139Q23","AI.LLM.IadAihub139Q25" { set c="" '
+    'if $$$ISOK(##class(%ConfigStore.Configuration).Get(n,.c)) write "config ",n,! } '
+    'if ##class(%Wallet.Collection).Exists("IadAihub139") write "wallet IadAihub139",! '
+    'new $namespace set $namespace="%SYS" '
+    'if ##class(Security.Applications).Exists("/mcp/iadaihub139") write "webapp /mcp/iadaihub139",!'
+)
+
+
+@pytest.fixture
+def ai_hub_connection():
+    """139, not iris-dev-iris. Explicit host and port, because the repo's `.iris-agentic-dev.toml`
+    pins iris-dev-iris and only an explicit IRIS_HOST outranks it."""
+    if not _running(AI_HUB_CONTAINER):
+        pytest.skip(f"{AI_HUB_CONTAINER} is not running")
+    keys = ("IRIS_HOST", "IRIS_WEB_PORT", "IRIS_CONTAINER", "IRIS_NAMESPACE")
+    previous = {key: os.environ.get(key) for key in keys}
+    os.environ.update(
+        {
+            "IRIS_HOST": "localhost",
+            "IRIS_WEB_PORT": AI_HUB_WEB_PORT,
+            "IRIS_CONTAINER": AI_HUB_CONTAINER,
+            "IRIS_NAMESPACE": "USER",
+        }
+    )
+    yield
+    for key, value in previous.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
+
+
+def _ai_hub_leftovers(task: GradedTask) -> list[str]:
+    from tests.e2e.skill_eval.graded_task import _iad
+
+    classes = [
+        f"class {name}"
+        for name in sorted(list_classes(("IadAihub139",), task.namespace))
+    ]
+    return classes + [
+        line.strip()
+        for line in _iad(["exec", AI_HUB_LEFTOVERS], task.namespace).splitlines()
+        if line.strip()
+    ]
+
+
+@pytest.mark.parametrize(
+    "task",
+    [task for task in all_tasks() if task.skill == AI_HUB_SKILL],
+    ids=lambda task: task.id,
+)
+def test_every_ai_hub_task_is_false_before_true_after_and_cleans_up(
+    task, ai_hub_connection
+):
+    """FR-004 and FR-022 on 139, twice, and then the teardown and class reset leave no `IadAihub139`
+    state. Leftover ConfigStore, Wallet or web app state would pass SKILL-23 or SKILL-24 for the next
+    arm before its agent ran."""
+    try:
+        validate_live(task)
+        validate_live(task)
+    finally:
+        run_teardown(task)
+        names = {doc.name for doc in task.fixtures + task.solution}
+        reset_documents(sorted(names), task.namespace)
+    assert _ai_hub_leftovers(task) == []

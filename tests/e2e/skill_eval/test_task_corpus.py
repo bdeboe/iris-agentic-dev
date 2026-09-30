@@ -16,6 +16,7 @@ import yaml
 
 # Imported rather than re-derived so a move of the benchmark corpus can't leave
 # this test asserting against a path nothing else uses.
+from tests.e2e.skill_eval.graded_task import SKILL_TASK_DIR
 from tests.e2e.skill_eval.lift import _BENCHMARK_TASKS_DIR
 
 _TASKS_SKILLS_DIR = os.path.abspath(
@@ -135,3 +136,54 @@ def test_referenced_tasks_are_committed(path):
             f"it is tracked by git (looked for {candidates}). It may exist on your disk; it "
             f"will not exist on a CI checkout."
         )
+
+
+# --- the AI Hub tasks (132 T035) ---------------------------------------------------------------------
+#
+# SKILL-22..25 run on iad-aihub-iris (build 139), not iris-dev-iris, and in USER: %AI is not mapped
+# into BENCHMARK there. Their state lives outside any class — ConfigStore entries, a Wallet collection,
+# a %SYS web app — so FR-023's class cleanup cannot remove it and each task carries a teardown.
+
+_AIHUB_TASKS = ("SKILL-22", "SKILL-23", "SKILL-24", "SKILL-25")
+
+
+def _aihub_task(task_id):
+    path = os.path.join(SKILL_TASK_DIR, f"{task_id}.yaml")
+    with open(path) as f:
+        return yaml.safe_load(f)
+
+
+@pytest.mark.parametrize("task_id", _AIHUB_TASKS)
+def test_an_ai_hub_task_names_its_skill_namespace_and_container(task_id):
+    task = _aihub_task(task_id)
+
+    assert task["id"] == task_id
+    assert task["skill"] == "iris-ai-hub"
+    assert task["namespace"] == "USER"
+    assert "iad-aihub-iris" in task["prompt"]
+    assert "52781" in task["prompt"]
+    assert "IadAihub139" in task["prompt"]
+
+
+@pytest.mark.parametrize("task_id", _AIHUB_TASKS)
+def test_an_ai_hub_check_is_structural_and_answers_pass_or_fail(task_id):
+    check = _aihub_task(task_id)["check"]
+
+    assert '$select(ok:"PASS",1:"FAIL")' in check
+    # A check that asks a model would bill every grading and pass or fail on the model's mood. The
+    # provider in a check is always the fake key; nothing in it may start a chat.
+    for call in ("Chat(", "ChatStream(", "%Run(", "Invoke("):
+        assert call not in check, f"{task_id} check calls {call}"
+    assert "OPENAI_API_KEY" not in check
+
+
+@pytest.mark.parametrize("task_id", _AIHUB_TASKS)
+def test_an_ai_hub_task_has_a_solution_and_a_teardown_for_its_state(task_id):
+    task = _aihub_task(task_id)
+
+    assert task["solution"], f"{task_id} has no solution"
+    teardown = task["teardown"]
+    assert "%ConfigStore.Configuration" in teardown
+    assert "%Wallet" in teardown
+    assert "IadAihub139" in teardown
+    assert "Security.Applications" in teardown and "/mcp/iadaihub139" in teardown

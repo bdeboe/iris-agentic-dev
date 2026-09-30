@@ -1,0 +1,148 @@
+id: SKILL-24
+prompt: |
+  In the USER namespace, IadAihub139.Q24.MCP is an AI Hub MCP service (it extends %AI.MCP.Service)
+  exposing the tools in IadAihub139.Q24.ToolSet. IadAihub139.Q24.Setup.Register() is meant to
+  register it as the MCP server at /mcp/iadaihub139: a web application dispatching to
+  IadAihub139.Q24.MCP, in namespace USER, enabled, that iris-mcp-server can serve tools from.
+  Register() returns an error and nothing is registered. Fix it. Register() must succeed when it is
+  run again. Leave the classes compiled on the server.
+
+  IRIS: host localhost, web port 52781, username _SYSTEM, password SYS, namespace USER.
+  The instance runs in the Docker container iad-aihub-iris (IRIS 2026.3.0AI build 139, with AI Hub).
+skill: iris-ai-hub
+namespace: USER
+fixtures:
+  - name: IadAihub139.Q24.Tool
+    content: |
+      Class IadAihub139.Q24.Tool Extends %AI.Tool
+      {
+
+      /// Return the text reversed.
+      /// text: the string to reverse
+      ClassMethod Reverse(text As %String) As %String
+      {
+          Return $Reverse(text)
+      }
+
+      }
+  - name: IadAihub139.Q24.ToolSet
+    content: |
+      Class IadAihub139.Q24.ToolSet Extends %AI.ToolSet [ DependsOn = IadAihub139.Q24.Tool ]
+      {
+
+      XData Definition [ MimeType = application/xml ]
+      {
+      <ToolSet Name="IadAihub139Q24">
+        <Description>Spec 132 task tools</Description>
+        <Include Class="IadAihub139.Q24.Tool" />
+      </ToolSet>
+      }
+
+      }
+  - name: IadAihub139.Q24.MCP
+    content: |
+      Class IadAihub139.Q24.MCP Extends %AI.MCP.Service [ DependsOn = IadAihub139.Q24.ToolSet ]
+      {
+
+      Parameter SPECIFICATION As STRING = "IadAihub139.Q24.ToolSet";
+
+      }
+  - name: IadAihub139.Q24.Setup
+    content: |
+      Class IadAihub139.Q24.Setup Extends %RegisteredObject
+      {
+
+      /// Register IadAihub139.Q24.MCP as the MCP server /mcp/iadaihub139.
+      ClassMethod Register() As %Status
+      {
+          Set tSC = $$$OK
+          New $Namespace
+          Set $Namespace = "%SYS"
+          Set tApp = "/mcp/iadaihub139"
+          Set tProps("DispatchClass") = "IadAihub139.Q24.MCP"
+          Set tProps("NameSpace") = "USER"
+          Set tProps("Enabled") = 1
+          Set tProps("AutheEnabled") = 32
+          Set tProps("MatchRoles") = ":%All"
+          Set tProps("Type") = 16
+          If ##class(Security.Applications).Exists(tApp) {
+              Set tSC = ##class(Security.Applications).Modify(tApp, .tProps)
+          } Else {
+              Set tSC = ##class(Security.Applications).Create(tApp, .tProps)
+          }
+          Quit tSC
+      }
+
+      }
+check: |
+  try { set ok=0, sc=##class(IadAihub139.Q24.Setup).Register(), sc2=##class(IadAihub139.Q24.Setup).Register() new $namespace set $namespace="%SYS" set sc3=##class(Security.Applications).Get("/mcp/iadaihub139",.p) set ok=$system.Status.IsOK(sc)&&$system.Status.IsOK(sc2)&&$system.Status.IsOK(sc3)&&($get(p("DispatchClass"))="IadAihub139.Q24.MCP")&&($zboolean(+$get(p("Type")),18,1)=18)&&(+$get(p("Enabled"))=1)&&($zconvert($get(p("NameSpace")),"U")="USER") } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
+solution:
+  - name: IadAihub139.Q24.Tool
+    content: |
+      Class IadAihub139.Q24.Tool Extends %AI.Tool
+      {
+
+      /// Return the text reversed.
+      /// text: the string to reverse
+      ClassMethod Reverse(text As %String) As %String
+      {
+          Return $Reverse(text)
+      }
+
+      }
+  - name: IadAihub139.Q24.ToolSet
+    content: |
+      Class IadAihub139.Q24.ToolSet Extends %AI.ToolSet [ DependsOn = IadAihub139.Q24.Tool ]
+      {
+
+      XData Definition [ MimeType = application/xml ]
+      {
+      <ToolSet Name="IadAihub139Q24">
+        <Description>Spec 132 task tools</Description>
+        <Include Class="IadAihub139.Q24.Tool" />
+      </ToolSet>
+      }
+
+      }
+  - name: IadAihub139.Q24.MCP
+    content: |
+      Class IadAihub139.Q24.MCP Extends %AI.MCP.Service [ DependsOn = IadAihub139.Q24.ToolSet ]
+      {
+
+      Parameter SPECIFICATION As STRING = "IadAihub139.Q24.ToolSet";
+
+      }
+  - name: IadAihub139.Q24.Setup
+    content: |
+      Class IadAihub139.Q24.Setup Extends %RegisteredObject
+      {
+
+      /// Register IadAihub139.Q24.MCP as the MCP server /mcp/iadaihub139. Type 18 is CSP (2) plus
+      /// MCP (16); 16 alone is refused.
+      ClassMethod Register() As %Status
+      {
+          Set tSC = $$$OK
+          New $Namespace
+          Set $Namespace = "%SYS"
+          Set tApp = "/mcp/iadaihub139"
+          Set tProps("DispatchClass") = "IadAihub139.Q24.MCP"
+          Set tProps("NameSpace") = "USER"
+          Set tProps("Enabled") = 1
+          Set tProps("AutheEnabled") = 32
+          Set tProps("MatchRoles") = ":%All"
+          Set tProps("Type") = 18
+          If ##class(Security.Applications).Exists(tApp) {
+              Set tSC = ##class(Security.Applications).Modify(tApp, .tProps)
+          } Else {
+              Set tSC = ##class(Security.Applications).Create(tApp, .tProps)
+          }
+          Quit tSC
+      }
+
+      }
+teardown: |
+  do ##class(%ConfigStore.Configuration).Delete("AI.LLM.IadAihub139Q23"), ##class(%ConfigStore.Configuration).Delete("AI.LLM.IadAihub139Q25"), ##class(%Wallet.KeyValue).Delete("IadAihub139.Q23"), ##class(%Wallet.KeyValue).Delete("IadAihub139.Q25"), ##class(%Wallet.Collection).Delete("IadAihub139") if ##class(%Wallet.Collection).Exists("IadAihub139") { throw ##class(%Exception.General).%New("wallet collection IadAihub139 still exists, so a key outside IadAihub139.Q23/Q25 is in it") } new $namespace set $namespace="%SYS" if ##class(Security.Applications).Exists("/mcp/iadaihub139") { set sc=##class(Security.Applications).Delete("/mcp/iadaihub139") throw:$system.Status.IsError(sc) ##class(%Exception.StatusException).CreateFromStatus(sc) } write "teardown done"
+tags:
+  - ai-hub
+  - mcp
+  - web-application

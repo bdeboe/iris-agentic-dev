@@ -29,6 +29,9 @@
 # - **SKILL-21 is train from the day it was written, in 130 round 4.** It exists so the
 #   `objectscript-sql-patterns` fix has a task to be fitted to; SKILL-09 stays on the holdout for the
 #   same skill and says whether the fix generalises.
+# - **SKILL-22 and SKILL-23 are train from the day they were written, in 132.** They are the
+#   `iris-ai-hub` tasks a skill edit may be fitted to (`--side train`); SKILL-24 and SKILL-25 stay on
+#   the holdout for the same skill. All four run on iad-aihub-iris (build 139) in USER.
 #
 # One caveat that the split cannot fix and the report has to carry instead: I wrote the 42 corpus
 # tasks knowing what iad's 81 tools can do. Authoring is not tuning — no description, prompt or skill
@@ -47,6 +50,8 @@ train = [
   "CORPUS-42",
   "SKILL-13",
   "SKILL-21",
+  "SKILL-22",
+  "SKILL-23",
 ]
 
 holdout = [
@@ -110,4 +115,6 @@ holdout = [
   "SKILL-18",
   "SKILL-19",
   "SKILL-20",
+  "SKILL-24",
+  "SKILL-25",
 ]

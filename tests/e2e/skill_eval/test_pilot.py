@@ -18,6 +18,7 @@ import os
 import pytest
 
 from tests.e2e.skill_eval.arms import BARE, TOOLS, TOOLS_SKILLS
+from tests.e2e.skill_eval.graded_task import CheckBroken
 from tests.e2e.skill_eval.pilot import (
     PILOT_MODEL,
     PILOT_PURPOSE,
@@ -308,10 +309,12 @@ def test_the_committed_pilot_is_not_publishable():
     assert list(written["arms"]) == [BARE.name, TOOLS.name, TOOLS_SKILLS.name]
     # The pilot installed the pack as it was. A skill added since is named here, so the record and the
     # pack can only drift apart by a visible edit.
+    # 132 dropped the vendored `aihub-eap` for `iris-ai-hub`, so the record names one the pack lost.
     added_after_pilot = {"iris-query-plans"}
-    assert written["skills_installed"] == [
-        s for s in shipped_skills() if s not in added_after_pilot
-    ]
+    removed_after_pilot = {"aihub-eap"}
+    assert [
+        s for s in written["skills_installed"] if s not in removed_after_pilot
+    ] == [s for s in shipped_skills() if s not in added_after_pilot]
 
 
 # --- the pilot runs through the boundary — 120 T004/T005, Phase 1 gate ---------------------------
@@ -748,3 +751,126 @@ def test_a_class_the_session_created_is_deleted_after_the_check(monkeypatch):
         "reset",
     ]
     assert deleted[-1] == ["Bench.Q2.CountOther"]
+
+
+# --- teardown: state that is not a class (132 US5) --------------------------------------------------
+# FR-023 deletes the classes a session made. An AI Hub task also leaves ConfigStore entries, Wallet
+# secrets and a web application, and the next session would find them already there. `teardown` is
+# the task's own ObjectScript for that, run before the session and after the check.
+
+
+def teardown_task(task_id="FAKE-TD", teardown="do ##class(X).Clean()"):
+    from tests.e2e.skill_eval.graded_task import GradedTask
+
+    return GradedTask(
+        id=task_id,
+        prompt="do the thing",
+        check="write PASS",
+        fixtures=(),
+        solution=(),
+        teardown=teardown,
+    )
+
+
+def _stub_live(monkeypatch, order, *, teardown_exit=None):
+    """Stubs every IRIS call `run_one` makes and records the order. `teardown_exit` names which
+    teardown call (1 or 2) raises, the way `_iad` raises on a non-zero exit."""
+    from tests.e2e.skill_eval import graded_task
+
+    monkeypatch.setattr(graded_task, "validate_live", lambda _t: order.append("validate"))
+    monkeypatch.setattr(graded_task, "reset_documents", lambda *a, **k: order.append("reset"))
+    monkeypatch.setattr(graded_task, "apply_documents", lambda *a, **k: order.append("apply"))
+    monkeypatch.setattr(graded_task, "list_classes", lambda *a, **k: [])
+
+    def check(_task):
+        order.append("check")
+        return True
+
+    monkeypatch.setattr(graded_task, "run_check", check)
+    calls = []
+
+    def fake_iad(args, namespace):
+        calls.append((args, namespace))
+        order.append("teardown")
+        if teardown_exit == len(calls):
+            raise CheckBroken("`iris-agentic-dev exec -n USER …` exited 1: <UNDEFINED>")
+        return ""
+
+    monkeypatch.setattr(graded_task, "_iad", fake_iad)
+    return calls
+
+
+def _run(task, driver):
+    from tests.e2e.skill_eval import pilot
+
+    return pilot.run_one(
+        task,
+        TOOLS,
+        openai_api_key="sk-test",
+        iris_host="localhost",
+        iris_web_port="52781",
+        iris_container="iad-aihub-iris",
+        driver=driver,
+    )
+
+
+def test_the_teardown_field_is_parsed(tmp_path):
+    from tests.e2e.skill_eval.graded_task import load_task
+
+    path = tmp_path / "SKILL-98.yaml"
+    path.write_text(
+        "id: SKILL-98\n"
+        "prompt: p\n"
+        "namespace: USER\n"
+        "fixtures:\n  - name: A.B\n    content: x\n"
+        "solution:\n  - name: A.B\n    content: y\n"
+        'check: write $select(1:"PASS",1:"FAIL")\n'
+        "teardown: |\n  do ##class(%ConfigStore.Configuration).Delete(\"AI.LLM.IadAihub139\")\n"
+    )
+    task = load_task(str(path))
+    assert "Delete(\"AI.LLM.IadAihub139\")" in task.teardown
+    path.write_text(path.read_text().split("teardown:")[0])
+    assert load_task(str(path)).teardown is None
+
+
+def test_teardown_runs_before_the_session_and_after_the_check(monkeypatch):
+    order = []
+    calls = _stub_live(monkeypatch, order)
+    driver = RecordingDriver()
+    driver.collect_events = lambda prompt, env_vars, **kw: order.append("session") or []
+    run = _run(teardown_task(), driver)
+    assert run.passed is True
+    assert order.count("teardown") == 2
+    assert order.index("teardown") < order.index("session")
+    assert order.index("check") < len(order) - 1 - order[::-1].index("teardown")
+    # Through the CLI, in the task's own namespace, the same path the check takes.
+    assert calls[0] == (["exec", "do ##class(X).Clean()"], "BENCHMARK")
+
+
+def test_a_teardown_that_fails_before_the_session_leaves_it_unscored(monkeypatch):
+    order = []
+    _stub_live(monkeypatch, order, teardown_exit=1)
+    driver = RecordingDriver()
+    run = _run(teardown_task("SKILL-24"), driver)
+    assert run.passed is None
+    assert "SKILL-24" in run.reason and "teardown" in run.reason
+    assert driver.collected == []
+
+
+def test_a_teardown_that_fails_after_the_check_leaves_it_unscored(monkeypatch):
+    """The verdict is over state the next session will inherit, so it cannot stand either."""
+    order = []
+    _stub_live(monkeypatch, order, teardown_exit=2)
+    run = _run(teardown_task("SKILL-25"), RecordingDriver())
+    assert order.count("check") == 1
+    assert run.passed is None
+    assert "SKILL-25" in run.reason and "teardown" in run.reason
+
+
+def test_no_teardown_field_changes_nothing(monkeypatch):
+    order = []
+    calls = _stub_live(monkeypatch, order)
+    run = _run(teardown_task(teardown=None), RecordingDriver())
+    assert run.passed is True
+    assert calls == []
+    assert "teardown" not in order
