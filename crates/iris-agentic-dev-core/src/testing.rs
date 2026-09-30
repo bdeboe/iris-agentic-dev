@@ -1400,6 +1400,136 @@ pub fn live_env() -> Vec<(String, String)> {
         .collect()
 }
 
+// ── 132 aihub-139: the licensed 2026.3.0AI.139 instance ──────────────────────
+//
+// A second live target next to iris-dev-iris. It is reached the same way, over Atelier, through the
+// `iad-aihub-webgateway` sidecar (the image ships no web server). `live_env` names iris-dev-iris in
+// its panic, so this has its own reader rather than reusing it.
+
+/// Where the 139 instance is. Every field has a default that matches quickstart.md.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AihubEnv {
+    pub container: String,
+    pub host: String,
+    pub web_port: u16,
+    pub namespace: String,
+}
+
+impl AihubEnv {
+    /// Read the four `IAD_AIHUB_*` variables through `get`, so a unit test can pass a map.
+    pub fn from_vars(get: impl Fn(&str) -> Option<String>) -> Result<Self, String> {
+        let or = |k: &str, d: &str| get(k).filter(|v| !v.is_empty()).unwrap_or_else(|| d.into());
+        let port = or("IAD_AIHUB_WEB_PORT", "52781");
+        let web_port = port
+            .parse::<u16>()
+            .map_err(|_| format!("IAD_AIHUB_WEB_PORT={port:?} is not a port number"))?;
+        Ok(Self {
+            container: or("IAD_AIHUB_CONTAINER", "iad-aihub-iris"),
+            host: or("IAD_AIHUB_HOST", "localhost"),
+            web_port,
+            namespace: or("IAD_AIHUB_NAMESPACE", "USER"),
+        })
+    }
+
+    /// What a developer reads when the instance does not answer: which containers, how to start
+    /// them, and how to skip on purpose.
+    pub fn unreachable_message(&self, cause: &str) -> String {
+        format!(
+            "AI Hub 139 instance not reachable at {host}:{port}/api/atelier/ ({cause}).\n\
+             These tests measure AI Hub claims on {container}; without it they assert nothing, so \
+             they fail instead of passing quietly.\n\
+             Start it:  docker start {container} iad-aihub-webgateway\n\
+             First time: the docker run recipes are in specs/132-aihub-139/quickstart.md\n\
+             Or opt into skipping deliberately: IAD_ALLOW_SKIP=1",
+            host = self.host,
+            port = self.web_port,
+            container = self.container,
+        )
+    }
+}
+
+/// `GET /api/atelier/` on the gateway with the test credentials; `Ok` only on HTTP 200.
+///
+/// A raw socket rather than reqwest so the probe stays synchronous and adds no feature flag; the
+/// error is always `unreachable_message`, so a caller can print or panic with it as it stands.
+pub fn aihub_probe(env: &AihubEnv) -> Result<(), String> {
+    use base64::Engine as _;
+    use std::io::Read as _;
+    use std::net::ToSocketAddrs as _;
+
+    let timeout = std::time::Duration::from_secs(5);
+    let fail = |cause: String| env.unreachable_message(&cause);
+    let addr = (env.host.as_str(), env.web_port)
+        .to_socket_addrs()
+        .map_err(|e| fail(format!("{}:{}: {e}", env.host, env.web_port)))?
+        .next()
+        .ok_or_else(|| fail(format!("{}:{} resolved to nothing", env.host, env.web_port)))?;
+    let mut stream = std::net::TcpStream::connect_timeout(&addr, timeout)
+        .map_err(|e| fail(format!("{}:{}: {e}", env.host, env.web_port)))?;
+    stream.set_read_timeout(Some(timeout)).ok();
+    let user = std::env::var("IRIS_USERNAME").unwrap_or_else(|_| "_SYSTEM".into());
+    let pass = std::env::var("IRIS_PASSWORD").unwrap_or_else(|_| "SYS".into());
+    let auth = base64::engine::general_purpose::STANDARD.encode(format!("{user}:{pass}"));
+    write!(
+        stream,
+        "GET /api/atelier/ HTTP/1.1\r\nHost: {}:{}\r\nAuthorization: Basic {auth}\r\n\
+         Connection: close\r\n\r\n",
+        env.host, env.web_port
+    )
+    .map_err(|e| fail(format!("write: {e}")))?;
+    let mut head = [0u8; 64];
+    let n = stream
+        .read(&mut head)
+        .map_err(|e| fail(format!("read: {e}")))?;
+    let status_line = String::from_utf8_lossy(&head[..n]);
+    let status_line = status_line.lines().next().unwrap_or_default();
+    if status_line.split_whitespace().nth(1) == Some("200") {
+        Ok(())
+    } else {
+        Err(fail(format!("answered {status_line:?}, want 200")))
+    }
+}
+
+/// The 139 instance, or a panic saying how to start it. `IAD_ALLOW_SKIP=1` prints the same text and
+/// returns `None`.
+///
+/// ```text
+/// let Some(env) = aihub_env() else { return };
+/// ```
+pub fn aihub_env() -> Option<AihubEnv> {
+    let env = AihubEnv::from_vars(|k| std::env::var(k).ok()).unwrap_or_else(|e| panic!("{e}"));
+    match aihub_probe(&env) {
+        Ok(()) => Some(env),
+        Err(msg) if std::env::var("IAD_ALLOW_SKIP").is_ok() => {
+            eprintln!("SKIP (IAD_ALLOW_SKIP set): {msg}");
+            None
+        }
+        Err(msg) => panic!("{msg}"),
+    }
+}
+
+/// The connection variables iad needs to reach the 139 instance over HTTP.
+pub fn aihub_vars(env: &AihubEnv) -> Vec<(String, String)> {
+    let user = std::env::var("IRIS_USERNAME").unwrap_or_else(|_| "_SYSTEM".into());
+    let pass = std::env::var("IRIS_PASSWORD").unwrap_or_else(|_| "SYS".into());
+    [
+        ("IRIS_HOST", env.host.clone()),
+        ("IRIS_WEB_PORT", env.web_port.to_string()),
+        ("IRIS_CONTAINER", env.container.clone()),
+        ("IRIS_NAMESPACE", env.namespace.clone()),
+        ("IRIS_USERNAME", user),
+        ("IRIS_PASSWORD", pass),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v))
+    .collect()
+}
+
+/// One iad session against the 139 instance, over HTTP, like `live_env` gives for iris-dev-iris.
+pub fn aihub_session(env: &AihubEnv) -> McpSession {
+    McpSession::start(&aihub_vars(env))
+}
+
 /// The text of a `tools/call` answer, whichever shape it arrived in.
 ///
 /// Refusals, successes and JSON-RPC errors all get flattened to one string so a test can assert on

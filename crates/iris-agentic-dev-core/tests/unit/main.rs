@@ -10,6 +10,7 @@
 //! thing that pulls these in.
 
 mod handler_keys;
+mod test_aihub_139;
 mod test_audit_log;
 mod test_audit_phi_scrub;
 mod test_benchmark_run_task_errors;

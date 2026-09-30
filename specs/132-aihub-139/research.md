@@ -21,6 +21,21 @@ Measured 2026-09-30 on `iad-aihub-iris` unless marked otherwise. Anything not me
 - `docker network create` fails on this host (`all predefined address pools have been fully subnetted`), so the sidecar reaches IRIS through `host.docker.internal` rather than a shared network.
 - After recreating the container, `_SYSTEM` gets 401 until `Security.Users.UnExpireUserPasswords("*")` runs; the first try right after "Enabling logons" can be early, so retry.
 
+**Loud skip, measured** (T009, gateway stopped with `docker stop iad-aihub-webgateway`):
+
+```text
+thread 'test_aihub_139_live::aihub_version_is_139' panicked at crates/iris-agentic-dev-core/src/testing.rs:1507:21:
+AI Hub 139 instance not reachable at localhost:52781/api/atelier/ (localhost:52781: Connection refused (os error 61)).
+These tests measure AI Hub claims on iad-aihub-iris; without it they assert nothing, so they fail instead of passing quietly.
+Start it:  docker start iad-aihub-iris iad-aihub-webgateway
+First time: the docker run recipes are in specs/132-aihub-139/quickstart.md
+Or opt into skipping deliberately: IAD_ALLOW_SKIP=1
+```
+
+With `IAD_ALLOW_SKIP=1`, the same run prints `SKIP (IAD_ALLOW_SKIP set): AI Hub 139 instance not reachable …` and the test reports ok. With the gateway back up, all three US1 tests pass. None of this touches the iris-dev-iris suite: `live_env` and its tests are unchanged.
+
+- `iris_execute` refuses code that names `%Dictionary.ClassDefinition` (`CODE_EDIT_BLOCKED`, the non-configurable code-edit gate), reads included. `%Dictionary.CompiledClass` through `iris_query` works, and the US1 tests use that.
+
 **Alternatives**:
 
 - `docker_only`. Rejected: `apply_documents`, `list_classes` and `reset_documents` in `graded_task.py` call `iris_doc`, which the docker path lacks. The skill still covers this path, because Enterprise AI builds may ship with no gateway (DPP-1192).

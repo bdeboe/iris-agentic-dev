@@ -6,23 +6,23 @@ Live runs use `--features testing -- --include-ignored --test-threads=1` against
 
 ## Phase 1: Setup
 
-- [ ] T001 Check the instance per `specs/132-aihub-139/quickstart.md`: `iad-aihub-iris` and `iad-aihub-webgateway` running, `curl -u _SYSTEM:SYS http://localhost:52781/api/atelier/` returns 200, `python -m tools.lab_manager.iris_registry_verify` (run from `~/ws/productivity-framework`) exits 0
-- [ ] T002 [P] Record the upstream file list: `gh api repos/intersystems-community/ai-hub-eap/git/trees/72749d6dbf0b856a60775378fa88d346bb79d4e4?recursive=1`, blobs only, sorted, header `# ai-hub-eap master 72749d6dbf0b856a60775378fa88d346bb79d4e4 2026-09-09`, written to `core/tests/fixtures/aihub139/upstream-files.txt` (expect 56 paths)
+- [X] T001 Check the instance per `specs/132-aihub-139/quickstart.md`: `iad-aihub-iris` and `iad-aihub-webgateway` running, `curl -u _SYSTEM:SYS http://localhost:52781/api/atelier/` returns 200, `python -m tools.lab_manager.iris_registry_verify` (run from `~/ws/productivity-framework`) exits 0
+- [X] T002 [P] Record the upstream file list: `gh api repos/intersystems-community/ai-hub-eap/git/trees/72749d6dbf0b856a60775378fa88d346bb79d4e4?recursive=1`, blobs only, sorted, header `# ai-hub-eap master 72749d6dbf0b856a60775378fa88d346bb79d4e4 2026-09-09`, written to `core/tests/fixtures/aihub139/upstream-files.txt` (expect 56 paths)
 
 ## Phase 2: Foundational (test helpers every story uses)
 
-- [ ] T003 Unit tests in `core/tests/unit/test_aihub_139.rs` (new, plus `mod` line): `AihubEnv::from_vars` defaults (`iad-aihub-iris`, `localhost`, 52781, `USER`) and overrides from `IAD_AIHUB_CONTAINER`/`IAD_AIHUB_HOST`/`IAD_AIHUB_WEB_PORT`/`IAD_AIHUB_NAMESPACE`; a non-numeric port is an error naming the variable; the unreachable message names `iad-aihub-iris` and the quickstart start command; `clean_mcp_command` removes `OPENAI_API_KEY` from the child env
-- [ ] T004 Implement `AihubEnv`, `AihubEnv::from_vars`, `aihub_env() -> Option<AihubEnv>` (probe `GET /api/atelier/` on `host:web_port`; panic with the message unless `IAD_ALLOW_SKIP=1`, then print it and return `None`) and `aihub_session(&AihubEnv) -> McpSession` (spawns through `clean_mcp_command` with `IRIS_HOST`/`IRIS_WEB_PORT`/`IRIS_CONTAINER`/`IRIS_NAMESPACE`) in `core/src/testing.rs`, next to `live_env`
-- [ ] T005 Gate: `cargo test --features testing --test unit test_aihub_139` passes
+- [X] T003 Unit tests in `core/tests/unit/test_aihub_139.rs` (new, plus `mod` line): `AihubEnv::from_vars` defaults (`iad-aihub-iris`, `localhost`, 52781, `USER`) and overrides from `IAD_AIHUB_CONTAINER`/`IAD_AIHUB_HOST`/`IAD_AIHUB_WEB_PORT`/`IAD_AIHUB_NAMESPACE`; a non-numeric port is an error naming the variable; the unreachable message names `iad-aihub-iris` and the quickstart start command; `clean_mcp_command` removes `OPENAI_API_KEY` from the child env
+- [X] T004 Implement `AihubEnv`, `AihubEnv::from_vars`, `aihub_env() -> Option<AihubEnv>` (probe `GET /api/atelier/` on `host:web_port`; panic with the message unless `IAD_ALLOW_SKIP=1`, then print it and return `None`) and `aihub_session(&AihubEnv) -> McpSession` (spawns through `clean_mcp_command` with `IRIS_HOST`/`IRIS_WEB_PORT`/`IRIS_CONTAINER`/`IRIS_NAMESPACE`) in `core/src/testing.rs`, next to `live_env`
+- [X] T005 Gate: `cargo test --features testing --test unit test_aihub_139` passes
 
 ## Phase 3: US1 — a 139 instance the tests can reach (P1)
 
 Independent test: the instance reports 2026.3.0AI.139, has `%AI`, and the registry verifier accepts iad's entry.
 
-- [ ] T006 [US1] Unit test in `core/tests/unit/test_aihub_139.rs`: `aihub_probe` against `localhost:1` returns an error whose text names `iad-aihub-iris` and how to start it (no IRIS needed)
-- [ ] T007 [US1] Live tests in `core/tests/integration/test_aihub_139_live.rs` (new, plus `mod` line), all `#[ignore = "live iad-aihub-iris"]`: `aihub_version_is_139` (`iris_info` / `$ZVERSION` contains `2026.3.0AI` and `Build 139`), `aihub_has_ai_package` (`%Dictionary.CompiledClass` count under `%AI.` ≥ 60, read from USER), `aihub_http_path` (`iris_doc` put+compile+delete of a throwaway `IadAihub139.Probe` returns `compiled: true`, `iris_execute` reports `execution_path: atelier`)
-- [ ] T008 [US1] Split `aihub_probe` out of `aihub_env` in `core/src/testing.rs` so T006 can call it without panicking
-- [ ] T009 [US1] Gate: T006 passes; T007 passes on 139; with the gateway stopped, T007 panics naming the container and `IAD_ALLOW_SKIP=1` turns it into a skip (record both outputs in `specs/132-aihub-139/research.md` R1); `iris-dev-iris` suite untouched (FR-002)
+- [X] T006 [US1] Unit test in `core/tests/unit/test_aihub_139.rs`: `aihub_probe` against `localhost:1` returns an error whose text names `iad-aihub-iris` and how to start it (no IRIS needed)
+- [X] T007 [US1] Live tests in `core/tests/integration/test_aihub_139_live.rs` (new, plus `mod` line), all `#[ignore = "live iad-aihub-iris"]`: `aihub_version_is_139` (`iris_info` / `$ZVERSION` contains `2026.3.0AI` and `Build 139`), `aihub_has_ai_package` (`%Dictionary.CompiledClass` count under `%AI.` ≥ 60, read from USER), `aihub_http_path` (`iris_doc` put+compile+delete of a throwaway `IadAihub139.Probe` returns `compiled: true`, `iris_execute` reports `execution_path: atelier`)
+- [X] T008 [US1] Split `aihub_probe` out of `aihub_env` in `core/src/testing.rs` so T006 can call it without panicking
+- [X] T009 [US1] Gate: T006 passes; T007 passes on 139; with the gateway stopped, T007 panics naming the container and `IAD_ALLOW_SKIP=1` turns it into a skip (record both outputs in `specs/132-aihub-139/research.md` R1); `iris-dev-iris` suite untouched (FR-002)
 
 ## Phase 4: US2 — one skill that knows where the docs are (P1)
 
