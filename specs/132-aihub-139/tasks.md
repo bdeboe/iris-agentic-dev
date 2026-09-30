@@ -84,7 +84,7 @@ Independent test: a ladder run over SKILL-22..25 gives per-arm results, `needs_f
 - [x] T044 [P] `cargo llvm-cov --features testing -- --include-ignored` against both containers; confirm core line coverage is ≥ 88% (the enforced number) or record the shortfall against the 85.00% baseline with the reason; record the delta in `specs/132-aihub-139/research.md`
 - [x] T045 [P] CLAUDE.md Recent Changes entry for 132; `docs/skills.md` entry for `iris-ai-hub` 0.2.0; `markdownlint-cli2 --fix` and `prettier --write` on every edited `.md`
 - [x] T046 `cargo fmt --all -- --check`, `cargo clippy -- -D warnings`, `cargo test --features testing`, the full serial live suite on iris-dev-iris (SC-007) and on 139, `pytest tests/e2e/skill_eval`
-- [ ] T047 Local commit (`git -c user.email=tdyar@intersystems.com`); no push; `iris.key`, `CSP.ini`, `CSP.conf` and `OPENAI_API_KEY` never staged
+- [x] T047 Local commit (`git -c user.email=tdyar@intersystems.com`); no push; `iris.key`, `CSP.ini`, `CSP.conf` and `OPENAI_API_KEY` never staged
 
 ## Dependencies
 
