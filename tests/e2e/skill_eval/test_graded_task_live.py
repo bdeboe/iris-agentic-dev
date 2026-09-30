@@ -18,6 +18,7 @@ would cost 30 seconds per task to prove something the reset already proves.
 
 import os
 import subprocess
+import sys
 
 import pytest
 
@@ -246,12 +247,28 @@ AI_HUB_LEFTOVERS = (
 )
 
 
+def _ai_hub_binary_missing() -> str | None:
+    """Why the 139 checks cannot run on this binary, or None. A binary from PATH may be a release
+    without the B1 fix, which leaks a CSP session per call into 139's 128-user key."""
+    binary = os.environ.get("IAD_BINARY")
+    if not binary:
+        return (
+            "IAD_BINARY is not set, and a binary from PATH may leak 139's license units"
+        )
+    if not os.path.isfile(binary):
+        return f"IAD_BINARY names {binary}, which does not exist"
+    return None
+
+
 @pytest.fixture
 def ai_hub_connection():
     """139, not iris-dev-iris. Explicit host and port, because the repo's `.iris-agentic-dev.toml`
     pins iris-dev-iris and only an explicit IRIS_HOST outranks it."""
     if not _running(AI_HUB_CONTAINER):
         pytest.skip(f"{AI_HUB_CONTAINER} is not running")
+    missing = _ai_hub_binary_missing()
+    if missing:
+        pytest.skip(missing)
     keys = ("IRIS_HOST", "IRIS_WEB_PORT", "IRIS_CONTAINER", "IRIS_NAMESPACE")
     previous = {key: os.environ.get(key) for key in keys}
     os.environ.update(
@@ -303,3 +320,15 @@ def test_every_ai_hub_task_is_false_before_true_after_and_cleans_up(
         names = {doc.name for doc in task.fixtures + task.solution}
         reset_documents(sorted(names), task.namespace)
     assert _ai_hub_leftovers(task) == []
+
+
+def test_the_139_tests_refuse_a_binary_from_path(monkeypatch):
+    """132: with no IAD_BINARY the checks ran `iris-agentic-dev` from PATH, the released 1.4.2 that
+    predates B1. It leaks a CSP session per call, and one pytest run put 139's 128-user key into
+    `<LICENSE LIMIT EXCEEDED>`. The 139 fixture skips instead."""
+    monkeypatch.delenv("IAD_BINARY", raising=False)
+    assert "IAD_BINARY" in _ai_hub_binary_missing()
+    monkeypatch.setenv("IAD_BINARY", "/nonexistent/iris-agentic-dev")
+    assert "/nonexistent/iris-agentic-dev" in _ai_hub_binary_missing()
+    monkeypatch.setenv("IAD_BINARY", sys.executable)
+    assert _ai_hub_binary_missing() is None

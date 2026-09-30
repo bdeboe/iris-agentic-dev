@@ -625,6 +625,8 @@ def run_ladder(
     driver=None,
     on_run=None,
     on_events=None,
+    cap: float | None = None,
+    spent: float = 0.0,
 ) -> list:
     """Every task in every arm, `repeats` times, one session at a time.
 
@@ -637,7 +639,12 @@ def run_ladder(
     `on_run` is called with each `ArmRun` as it completes, which is how a long run gets written down
     incrementally instead of existing only in memory for ten hours. `on_events(task, arm, repeat,
     events)` gets each session's raw stream, which is what `transcript_writer` puts on disk.
+
+    `cap` bounds the dollars: each session's measured cost (`session_cost`) is added to `spent`, and
+    once `spent` reaches `cap` the run raises `LadderAborted` before the next session starts. 132's
+    holdout was estimated at $1.02 and cost $12.29, so the estimate alone cannot be the bound.
     """
+    from tests.e2e.skill_eval.cost_estimator import session_cost
     from tests.e2e.skill_eval.pilot import run_one
 
     key = openai_api_key or os.environ.get("OPENAI_API_KEY")
@@ -654,9 +661,17 @@ def run_ladder(
     # ends up as a hole, and the run keeps paying for more of them. Three in a row is the environment.
     unscored_streak: list = []
     unloaded_streak: list = []
+    # Every session's stream passes through here, so its cost counts whether or not it is written.
+    streams: list = []
     for repeat in range(start_repeat, start_repeat + repeats):
         for task in tasks:
             for arm in arms_for_task(arms, task):
+
+                def take_events(events, t=task, a=arm, r=repeat):
+                    streams.append(events)
+                    if on_events is not None:
+                        on_events(t, a, r, events)
+
                 run = run_one(
                     task,
                     arm,
@@ -669,22 +684,16 @@ def run_ladder(
                     iris_container=iris_container,
                     binary=binary,
                     driver=driver,
-                    on_events=(
-                        None
-                        if on_events is None
-                        else (
-                            lambda events, t=task, a=arm, r=repeat: on_events(
-                                t, a, r, events
-                            )
-                        )
-                    ),
+                    on_events=take_events,
                 )
+                cost = session_cost(streams.pop()) if streams else 0.0
+                spent += cost
                 run = type(run)(**{**asdict(run), "run_index": repeat})
                 runs.append(run)
                 print(
                     f"{run.task_id:<12} {run.arm:<34} "
                     f"{'—' if run.passed is None else ('PASS' if run.passed else 'FAIL'):<5} "
-                    f"{run.tool_calls:>3} calls {run.session_seconds:6.1f}s"
+                    f"{run.tool_calls:>3} calls {run.session_seconds:6.1f}s ${cost:.2f}"
                     + ("  TIMEOUT" if run.timed_out else "")
                     + (
                         ""
@@ -725,6 +734,11 @@ def run_ladder(
                         )
                 else:
                     unscored_streak.clear()
+                if cap is not None and spent >= cap:
+                    raise LadderAborted(
+                        f"measured spend ${spent:.2f} reached the cap of ${cap:.2f} after "
+                        f"{run.task_id} {run.arm} r{run.run_index}, so no further session starts"
+                    )
     return runs
 
 
@@ -740,7 +754,9 @@ def tools_ladder_tasks(split: Split | None = None, side: str = "holdout"):
     """One side of the tools corpus. The holdout side is checked against the publication floor; the
     train side publishes nothing, so it has none."""
     tasks = side_only(list(graded_task.tools_corpus()), side, split=split)
-    return assert_publishable_corpus(tasks, floor=MINIMUM_FLOOR if side == "holdout" else None)
+    return assert_publishable_corpus(
+        tasks, floor=MINIMUM_FLOOR if side == "holdout" else None
+    )
 
 
 def skill_ladder_tasks(skill: str, split: Split | None = None, side: str = "holdout"):
@@ -829,6 +845,12 @@ def parse_args(argv=None):
         default=0.0,
         help="dollars already spent in this program, so the estimate projects against the cap",
     )
+    parser.add_argument(
+        "--cap",
+        type=float,
+        default=None,
+        help="stop once --spent plus each session's measured cost reaches this many dollars",
+    )
     parser.add_argument("--out", default=None)
     args = parser.parse_args(argv)
     if args.ladder == "skill" and not args.skill:
@@ -878,6 +900,8 @@ def _main(argv=None) -> int:
     estimate = estimate_ladder(len(tasks), arm_names, runs=args.repeats)
     print(format_ladder_estimate(estimate, already_spent=args.spent))
     assert_within_budget(estimate, already_spent=args.spent)
+    if args.cap is not None:
+        assert_within_budget(estimate, already_spent=args.spent, budget=args.cap)
     if args.dry_run:
         for task in tasks:
             print(f"  {task.id}")
@@ -917,6 +941,8 @@ def _main(argv=None) -> int:
             driver=driver,
             on_run=record,
             on_events=transcript_writer(transcripts),
+            cap=args.cap,
+            spent=args.spent,
         )
     except LadderAborted as aborted:
         # No report. A report over a run that stopped early would print a lift whose denominator is an

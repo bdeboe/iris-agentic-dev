@@ -199,6 +199,9 @@ BENCHMARK_BUDGET_USD = 80.0
 #: Derived from the pilot's own bill: 24 opencode sessions against `openai/gpt-4.1` for about $2.
 #: Not a published rate — the driver bills through opencode and `pilot-121.json` records no token
 #: counts, so this is the only grounded number available. It is deliberately rounded up.
+#: 132 measured it 3 to 35 times too low: the AI Hub holdout's 12 sessions cost $12.29 by opencode's
+#: own `step_finish.cost` ($0.24 to $2.99 a session, skill arm dearest). Treat this as a floor, and
+#: bound a run with `--cap`, which counts the measured cost.
 COST_PER_SESSION_USD = 0.085
 
 #: `tests/e2e/results/pilot-121.json`, mean wall seconds per session over all 24: 124.5. Six of the
@@ -213,6 +216,18 @@ SECONDS_PER_SESSION_BY_ARM = {
     "tools": 90.7,
     "tools+skills": 63.8,
 }
+
+
+def session_cost(events) -> float:
+    """Dollars one opencode session billed: the sum of `part.cost` over its `step_finish` events."""
+    total = 0.0
+    for event in events:
+        if event.get("type") != "step_finish":
+            continue
+        cost = (event.get("part") or {}).get("cost")
+        if isinstance(cost, (int, float)):
+            total += cost
+    return total
 
 
 class BudgetExceeded(RuntimeError):
