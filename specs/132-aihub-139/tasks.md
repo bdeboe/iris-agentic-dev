@@ -75,15 +75,15 @@ Independent test: a ladder run over SKILL-22..25 gives per-arm results, `needs_f
 - [x] T038 [US5] Implement `tests/e2e/skill_eval/tool_calls.py` (`list <run_id>`)
 - [x] T039 [US5] Write `tests/e2e/tasks/benchmark/skills/SKILL-22.yaml` (train, agent with one tool), `SKILL-23.yaml` (train, ConfigStore provider), `SKILL-24.yaml` (holdout, MCP server definition), `SKILL-25.yaml` (holdout, broken `%OnInit` provider); add them to `tests/e2e/tasks/benchmark/split.toml`; add the pairs to `TUNED_SKILL_TASKS` in `tests/e2e/skill_eval/test_split.py` with a comment that they are train from the day written, as SKILL-21 is
 - [x] T040 [US5] Live before/after test in `tests/e2e/skill_eval/test_graded_task_live.py`: for each of SKILL-22..25 on `iad-aihub-iris`/52781, the check fails on the empty state, passes after `solution`, and teardown leaves no `IadAihub139*` state
-- [ ] T041 [US5] Billable ladder, cap $3 with `--spent`: holdout `--container iad-aihub-iris --web-port 52781 --repeats 3`, then `--side train` with the same flags (commands in quickstart.md)
-- [ ] T042 [US5] `python -m tests.e2e.skill_eval.tool_calls list <run_id>` for both runs; per task in `specs/132-aihub-139/research.md`: arm results, `needs_fix`, and the FR-016 decision (skill edit / tool proposal / none) citing transcript lines, with each failed repeat's tool calls assigned by hand to a step (call-number ranges from `tool_calls.py`); a skill edit draws only on train failures and gets a unit guard test in `test_aihub_139.rs`; a tool proposal goes to a follow-up spec note, not code
-- [ ] T043 [US5] Gate: all Python tests pass (`pytest tests/e2e/skill_eval`); each task has 3 scored repeats per arm (re-run unscored repeats with `--start-repeat` inside the $3 cap; if the cap stops it, record SC-006 as unmet with the count and reasons, not as met); 139 left clean
+- [x] T041 [US5] Billable ladder, cap $3 with `--spent`: holdout `--container iad-aihub-iris --web-port 52781 --repeats 3`, then `--side train` with the same flags (commands in quickstart.md)
+- [x] T042 [US5] `python -m tests.e2e.skill_eval.tool_calls list <run_id>` for both runs; per task in `specs/132-aihub-139/research.md`: arm results, `needs_fix`, and the FR-016 decision (skill edit / tool proposal / none) citing transcript lines, with each failed repeat's tool calls assigned by hand to a step (call-number ranges from `tool_calls.py`); a skill edit draws only on train failures and gets a unit guard test in `test_aihub_139.rs`; a tool proposal goes to a follow-up spec note, not code
+- [x] T043 [US5] Gate: all Python tests pass (`pytest tests/e2e/skill_eval`); each task has 3 scored repeats per arm (re-run unscored repeats with `--start-repeat` inside the $3 cap; if the cap stops it, record SC-006 as unmet with the count and reasons, not as met); 139 left clean
 
 ## Phase 8: Polish
 
-- [ ] T044 [P] `cargo llvm-cov --features testing -- --include-ignored` against both containers; confirm core line coverage is ≥ 88% (the enforced number) or record the shortfall against the 85.00% baseline with the reason; record the delta in `specs/132-aihub-139/research.md`
-- [ ] T045 [P] CLAUDE.md Recent Changes entry for 132; `docs/skills.md` entry for `iris-ai-hub` 0.2.0; `markdownlint-cli2 --fix` and `prettier --write` on every edited `.md`
-- [ ] T046 `cargo fmt --all -- --check`, `cargo clippy -- -D warnings`, `cargo test --features testing`, the full serial live suite on iris-dev-iris (SC-007) and on 139, `pytest tests/e2e/skill_eval`
+- [x] T044 [P] `cargo llvm-cov --features testing -- --include-ignored` against both containers; confirm core line coverage is ≥ 88% (the enforced number) or record the shortfall against the 85.00% baseline with the reason; record the delta in `specs/132-aihub-139/research.md`
+- [x] T045 [P] CLAUDE.md Recent Changes entry for 132; `docs/skills.md` entry for `iris-ai-hub` 0.2.0; `markdownlint-cli2 --fix` and `prettier --write` on every edited `.md`
+- [x] T046 `cargo fmt --all -- --check`, `cargo clippy -- -D warnings`, `cargo test --features testing`, the full serial live suite on iris-dev-iris (SC-007) and on 139, `pytest tests/e2e/skill_eval`
 - [ ] T047 Local commit (`git -c user.email=tdyar@intersystems.com`); no push; `iris.key`, `CSP.ini`, `CSP.conf` and `OPENAI_API_KEY` never staged
 
 ## Dependencies

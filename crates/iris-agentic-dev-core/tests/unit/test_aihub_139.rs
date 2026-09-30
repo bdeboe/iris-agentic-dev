@@ -574,14 +574,40 @@ fn drafts_entries_are_complete() {
         "want one D entry per reproduced mismatch, got {}",
         mismatches.len()
     );
-    for (h, b) in &entries {
+    for (h, b) in &mismatches {
         assert!(
             b.lines().any(|l| l.trim() == "- Status: drafted"),
-            "{h}: every entry is `Status: drafted`; nothing is filed"
+            "{h}: every upstream entry is `Status: drafted`; nothing is filed"
         );
         assert!(
             b.contains("Draft upstream text:") && b.lines().any(|l| l.starts_with("> ")),
             "{h}: needs `Draft upstream text:` and a quoted draft"
+        );
+    }
+    // B entries are iad's own bugs, fixed on this branch, so there is nothing to file upstream.
+    let bugs: Vec<_> = entries.iter().filter(|(h, _)| h.starts_with('B')).collect();
+    assert!(bugs.len() >= 3, "want B1 to B3, got {}", bugs.len());
+    for (h, b) in &bugs {
+        assert!(
+            field(h, b, "Status").starts_with("fixed in iad, 132."),
+            "{h}: a B entry says `Status: fixed in iad, 132.` and how"
+        );
+        assert!(
+            !b.contains("Draft upstream text:"),
+            "{h}: an iad bug has no upstream draft"
+        );
+        let test = backticked(h, field(h, b, "Test"));
+        let found = ["iris-agentic-dev-core", "iris-agentic-dev-bin"]
+            .iter()
+            .flat_map(|c| ["unit", "integration"].map(|d| (c, d)))
+            .any(|(c, d)| {
+                repo()
+                    .join(format!("crates/{c}/tests/{d}/{test}.rs"))
+                    .is_file()
+            });
+        assert!(
+            found,
+            "{h}: Test names `{test}`, which is no test file in either crate"
         );
     }
     for (h, b) in &mismatches {

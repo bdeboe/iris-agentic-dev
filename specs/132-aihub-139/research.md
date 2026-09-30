@@ -163,6 +163,57 @@ A candidate the test does not reproduce is dropped and noted here. It does not g
 - Pass the key in the `iris_execute` code. Rejected: it would be logged in `agent_history`.
 - `@{env:OPENAI_API_KEY}` in ConfigStore. Rejected unless tested: the variable must be in the IRIS process environment, and `docker exec -e` sets it only for that session, not for the instance.
 
+## R10: Ladder results (T041–T043)
+
+Both runs used the pre-fix binary (B2 and B3 were still in it). Model `openai/gpt-4.1`, container `iad-aihub-iris`, web port 52781. Per-session costs are opencode's own `step_finish.cost`.
+
+### Cost: the $3 cap was blown
+
+Tom's cap was $3. Actual spend was **$12.40**: $12.29 for the holdout run and $0.11 for the one train session before I stopped it.
+
+- The estimate used `COST_PER_SESSION_USD = 0.085` from the 121 pilot, which put the 12 holdout sessions at $1.02. Measured costs ran from $0.24 to $2.99 a session, with a mean of $1.02. The skill arm on SKILL-24 was the most expensive, at 54 to 94 steps.
+- `--spent` only projected that estimate against the $80 programme budget. Nothing in the ladder measured cost or knew about a $3 cap.
+- Fix: `cost_estimator.session_cost` sums `step_finish.cost`. `run_ladder(cap=, spent=)` adds each session's measured cost and raises `LadderAborted` once the total reaches the cap. `--cap` is a new flag, and the estimate must also fit under it. Tests are in `tests/e2e/skill_eval/test_ladder_cap.py`.
+
+### Holdout run `ladder-20260930T143937`
+
+| task     | arm               | r0   | r1   | r2   | cost r0/r1/r2     |
+| -------- | ----------------- | ---- | ---- | ---- | ----------------- |
+| SKILL-24 | tools             | FAIL | FAIL | FAIL | $0.56/$0.57/$0.68 |
+| SKILL-24 | tools+iris-ai-hub | FAIL | PASS | PASS | $2.99/$2.85/$1.15 |
+| SKILL-25 | tools             | FAIL | FAIL | FAIL | $0.32/$0.24/$0.27 |
+| SKILL-25 | tools+iris-ai-hub | PASS | PASS | PASS | $0.77/$0.24/$1.65 |
+
+Every skill-arm session loaded its skill, and all 12 sessions were scored. The report gives b=1, c=0, lift 0.5, n=2, underpowered. `needs_fix` flags nothing: the skill arm never failed 2 or more repeats where the tools arm passed.
+
+**SKILL-24** (register the MCP web app `/mcp/iadaihub139`). Call numbers come from `tool_calls list ladder-20260930T143937`.
+
+- tools r0, calls 6–26: stuck on the registration step. `iris_execute_method` returned the raw `%Status` bytes of the error (B2). Mechanical failure.
+- tools r1, calls 12–28: `iris_doc_search` found 0 hits, and calls 22–28 got the same raw status. Mechanical failure: more than 10 calls on one step.
+- tools r2: registered the app with `Type=2` instead of 18 (D6). Knowledge failure.
+- tools+skill r0, calls 13–90: calls 51–68 hit B3, where a multi-line `iris_ws_exec` ran only its first line. `iris_execute_method` cannot pass an array by reference, so `Modify` gave `<PARAMETER>`. The session ended with an empty `DispatchClass`. Mechanical failure.
+- FR-016 decision: **none**. Only one skill-arm repeat failed, so no step failed in both arms on 2 or more repeats, and no new tool is proposed. The mechanical causes were bugs in existing tools. B2 and B3 are fixed in `a636694` (drafts.md).
+
+**SKILL-25** (fix the `%OnInit` precedence). All three tools-arm sessions wrote `If '$ISOBJECT(..Provider) && ..#MODELCONFIGNAME '= ""`, which ObjectScript evaluates strictly left to right. Knowledge failure, and the skill already states the rule. The skill arm passed 3/3. FR-016 decision: **none**.
+
+### Train run `ladder-20260930T150504`
+
+One session finished before I stopped the run for the cap: SKILL-22 tools r0, FAIL in 3 calls with a wrong answer (knowledge failure), $0.11. SKILL-23 did not run. A skill edit may draw only on train failures, and one knowledge failure in the tools arm does not show a gap in the skill, so **the skill is not edited**.
+
+### Gate (T043)
+
+SC-006 is **unmet**. The holdout has 3 scored repeats per arm on both tasks. The train side has 1 of 12 sessions, because the run was stopped after the cap overrun ($12.40 against $3). I did not start more billable sessions. `teardown` ran for SKILL-22 to SKILL-25, and `_ai_hub_leftovers` returns `[]`, so 139 is clean.
+
+`pytest tests/e2e/skill_eval` gave 1295 passed, 22 skipped and 1 failed. The failure was SKILL-22's live check finding two `IadAihub139.Q23` classes left by an earlier run. That run had no `IAD_BINARY`, so the checks ran the Homebrew 1.4.2 binary from PATH, which predates B1. It leaked a license unit per call (LU 1 to 2 over 3 calls, measured) and put 139 into `<LICENSE LIMIT EXCEEDED>`. SKILL-23's teardown then fell back to docker exec, which refuses `{}`, and left its classes behind. After a restart, the four AI Hub checks passed on the rebuilt binary, and 139 stayed at LU=2. The 139 fixture now skips when `IAD_BINARY` is unset or missing (`test_the_139_tests_refuse_a_binary_from_path`).
+
+## R11: Coverage (T044)
+
+`scripts/coverage.sh` ran the instrumented suite with `--include-ignored`, serial, against iris-dev-iris and 139 (19 of the 139 CSP and tool-fix tests ran and passed). Result: 5516 passed, 1 failed.
+
+- Core line coverage is 88.17% by raw lcov and 89.15% by `check-coverage-floors.py`, above the enforced 88%. The 85.00% baseline (2026-07-17) is up 3.2 points by raw lcov.
+- New files: `csp_session.rs` 94.4%, floor set at 91. `error_hints.rs` got a floor of 97. `ws_session.rs` is at 78.4%, and `doc.rs` at 88.4%.
+- The failure is `test_skill_facts_127_live::a_read_committed_read_of_a_locked_row_is_minus_114`. It saw `SQLCODE=-114 value=[]` under instrumentation and passed when run alone. It is a timing flake in a 130 test that 132 does not touch, so I changed nothing.
+
 ## Claim table
 
 Filled during implementation. Columns: id, claim, source, verdict (holds / false / reworded / not taken), test, credit. The unit test parses this table.
