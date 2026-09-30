@@ -1,6 +1,6 @@
 # Drafts: ai-hub-eap docs against build 139
 
-Each `D` entry is a place where the ai-hub-eap docs at `72749d6` say one thing and IRISHealth 2026.3.0AI.139.0 does another. The named live test in `crates/iris-agentic-dev-core/tests/integration/test_aihub_139_live.rs` shows what 139 does. The `B` entries are iad bugs found along the way; B1 is fixed here, not drafted.
+Each `D` entry is a place where the ai-hub-eap docs at `72749d6` say one thing and IRISHealth 2026.3.0AI.139.0 does another. The named live test in `crates/iris-agentic-dev-core/tests/integration/test_aihub_139_live.rs` shows what 139 does. The `B` entries are iad bugs found along the way; B1 to B3 are fixed here, not drafted.
 
 Nothing here is filed. Tom files, or does not.
 
@@ -129,3 +129,21 @@ Draft upstream text:
 - 139 did: each client had its own cookie jar, so each one opened its own CSP session, and none logged out when the process exited. The sessions lived out the web app's 3600 s timeout. Ten `iad exec` calls took `^%cspSession` on 139 from 15 to 35, and two ladder tasks ran the 128-LU key into `<LICENSE LIMIT EXCEEDED>` (HTTP 503). After that, `exec` fell back to docker exec, which refuses `{}` blocks.
 - Test: `test_csp_session_132` (unit) and `test_csp_logout_132` (live, bin crate). Before the fix, 5 `exec` calls left 10 sessions, a failed `exec` left 2, and an MCP server stopped by SIGTERM left 3. After the fix, all three leave none.
 - Status: fixed in iad, 132. Every client takes one process-wide cookie store (`iris::csp_session`). The store records each `CSPSESSIONID-*` cookie's path, and `main` and `crate::exit` send `?IRISLogout=end` to each path before the process exits. IRIS ends the session and answers 401. The cookie alone is enough, so no credentials are sent.
+
+## B2: `iris_execute_method` handed back an error %Status as raw bytes
+
+- Doc: none. iad code: `handle_iris_execute_method` in `crates/iris-agentic-dev-core/src/tools/doc.rs` wrote the method's return value as it was and took the first line.
+- Doc says: n/a
+- 139 did: an error %Status is `"0 "` followed by a `$List`, so `Security.Applications.Create` failing came back as `{"return_value":"0 \u0000+\u0004","success":true}`. In the holdout ladder, SKILL-24 tools repeat 0 made 17 such calls (calls 6-10, 12, 19-26). It never saw the error text and ended without the web app.
+- Test: `test_tool_fixes_132` (unit) and `test_tool_fixes_132_live` (live). `%Library.Integer:IsValid("abc")` returned the raw status before the fix. After it, the call answers `success: false`, `METHOD_RETURNED_ERROR`, with `ERROR #7207`.
+- Status: fixed in iad, 132. The generator code checks for `"0 "` followed by a valid `$List` and writes `$System.Status.GetErrorText` behind a marker. A plain value that starts with `"0 "` is still a value.
+
+## B3: `iris_ws_exec` sent multi-line code as one terminal input
+
+- Doc: none. iad code: `WsSessionPool::exec` in `crates/iris-agentic-dev-core/src/iris/ws_session.rs` sent `code` in one `prompt` frame.
+- Doc says: n/a
+- 139 did: the terminal read the first newline as part of line 1, so each multi-line call answered `<SYNTAX>` `Expected end of line` on its first line. SKILL-24 tools+iris-ai-hub repeat 0 spent calls 51-68 on this. It rewrote the same `Set tApp=...` block 18 ways, none of which could work.
+- Test: `test_tool_fixes_132` (unit) and `test_tool_fixes_132_live` (live). `Set tA=1\nSet tB=2\nWrite tA+tB` answered `<SYNTAX>` before the fix and `3` after it.
+- Status: fixed in iad, 132. Each non-blank line goes to the terminal as its own input, as a pasted block would.
+
+Both ladder runs in `research.md` used the binary from before B2 and B3 were fixed. A re-run would show whether SKILL-24 changes.

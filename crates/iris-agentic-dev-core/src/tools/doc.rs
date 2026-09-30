@@ -1884,7 +1884,7 @@ pub async fn handle_iris_execute_method(
         format!("##class({class}).{method}({args_csv})")
     };
 
-    let code = format!(" Set result = {call_expr}\n Write result,$C(10)");
+    let code = execute_method_code(&call_expr);
 
     let namespace = crate::tools::resolve_namespace(p.namespace.as_deref(), &iris.namespace);
     let output = match iris.execute_via_generator(&code, namespace, client).await {
@@ -1901,13 +1901,41 @@ pub async fn handle_iris_execute_method(
         return err_json("IRIS_EXECUTE_ERROR", stripped.trim());
     }
 
-    // Take first line only — the method may write side-effects on subsequent lines
-    let return_value = output.lines().next().unwrap_or("").to_string();
+    match method_output(&output) {
+        Ok(return_value) => ok_json(serde_json::json!({
+            "success": true,
+            "return_value": return_value,
+        })),
+        Err(text) => err_json(
+            "METHOD_RETURNED_ERROR",
+            &format!("{class}.{method} returned an error %Status: {text}"),
+        ),
+    }
+}
 
-    ok_json(serde_json::json!({
-        "success": true,
-        "return_value": return_value,
-    }))
+const STATUS_ERROR_MARKER: &str = "IAD_STATUS_ERROR:";
+
+/// The generator code for one `iris_execute_method` call (132 B2).
+///
+/// An error %Status is `"0 "` followed by a `$List`; written as it is, it reached the agent as
+/// raw bytes. The code writes its `GetErrorText` behind a marker instead. No braces: the docker
+/// exec path runs this in a terminal a line at a time.
+pub fn execute_method_code(call_expr: &str) -> String {
+    format!(
+        " Set result = {call_expr}\n \
+         Set tIsErr = ($Extract(result,1,2)=\"0 \")&&$ListValid($Extract(result,3,*))\n \
+         Write:tIsErr \"{STATUS_ERROR_MARKER}\",$System.Status.GetErrorText(result),$C(10)\n \
+         Write:'tIsErr result,$C(10)"
+    )
+}
+
+/// The return value, or the decoded text of a returned error %Status (132 B2).
+pub fn method_output(output: &str) -> Result<String, String> {
+    match output.strip_prefix(STATUS_ERROR_MARKER) {
+        Some(text) => Err(text.trim().to_string()),
+        // First line only — the method may write side-effects on subsequent lines
+        None => Ok(output.lines().next().unwrap_or("").to_string()),
+    }
 }
 
 /// Strip `Storage Name { ... }` blocks from ObjectScript class content.

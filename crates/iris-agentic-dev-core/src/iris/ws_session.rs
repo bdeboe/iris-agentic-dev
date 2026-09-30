@@ -220,10 +220,20 @@ impl WsSessionPool {
 
     /// Execute ObjectScript code in a persistent session.
     ///
-    /// Sends `{"type":"prompt","input":"<code>"}`, collects all `{"type":"output"}` frames
-    /// (using the `"text"` field) until the next `{"type":"prompt"}`, and returns
-    /// the concatenated output text.
+    /// Sends each line of `code` as `{"type":"prompt","input":"<line>"}`, collects all
+    /// `{"type":"output"}` frames (using the `"text"` field) until the next `{"type":"prompt"}`,
+    /// and returns the concatenated output text. One line per input, as a pasted block runs in
+    /// a terminal: sent whole, the terminal read the first newline as part of line 1 and every
+    /// multi-line call ended in `<SYNTAX>` (132 B3).
     pub async fn exec(pool_ref: &Arc<Self>, token: &str, code: &str) -> Result<String, McpError> {
+        let mut output = String::new();
+        for line in terminal_lines(code) {
+            output.push_str(&Self::exec_line(pool_ref, token, line).await?);
+        }
+        Ok(output)
+    }
+
+    async fn exec_line(pool_ref: &Arc<Self>, token: &str, code: &str) -> Result<String, McpError> {
         let _parsed = Self::parse_token(token).ok_or_else(|| {
             McpError::invalid_request(format!("{}: invalid token format", SESSION_STALE), None)
         })?;
@@ -391,6 +401,20 @@ async fn get_csp_session_cookie(conn: &IrisConnection) -> Result<String, McpErro
 }
 
 /// Convert an HTTP base URL to a WebSocket URL (http → ws, https → wss).
+/// The terminal inputs for `code`: one per non-blank line, or one empty input for empty code.
+pub fn terminal_lines(code: &str) -> Vec<&str> {
+    let lines: Vec<&str> = code
+        .lines()
+        .map(|l| l.strip_suffix('\r').unwrap_or(l))
+        .filter(|l| !l.trim().is_empty())
+        .collect();
+    if lines.is_empty() {
+        vec![""]
+    } else {
+        lines
+    }
+}
+
 fn build_ws_url(base: &str, path: &str) -> String {
     if let Some(rest) = base.strip_prefix("https://") {
         format!("wss://{}{}", rest, path)

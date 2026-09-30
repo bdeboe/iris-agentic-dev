@@ -505,7 +505,9 @@ Invoke a `ClassMethod` directly by class, method name, and arguments.
 | `args`      | string[] | `[]`     | Positional string arguments             |
 | `namespace` | string   | `"USER"` |                                         |
 
-String-returning methods only (v1).
+String-returning methods only (v1). A method that returns an error `%Status` answers
+`success: false`, `error_code: METHOD_RETURNED_ERROR`, with the status text from
+`$System.Status.GetErrorText`.
 
 ```text
 iris_execute_method(class="MyApp.Util", method="GetVersion")
@@ -1689,6 +1691,9 @@ devices) persists across calls.
 | `session`   | string  | —       | **Required.** Token from `iris_ws_open`        |
 | `code`      | string  | —       | **Required.** ObjectScript to run              |
 | `confirmed` | boolean | `false` | Confirm execution on a `subject`-role instance |
+
+Each line of `code` goes to the terminal as its own input, as a pasted block would; blank
+lines are skipped. A block in braces must sit on one line, as it must at a terminal prompt.
 
 The per-frame timeout is a fixed 30 seconds, not a parameter. On timeout the session
 stays open; call `iris_ws_close` to release it.

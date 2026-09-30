@@ -121,6 +121,7 @@ mod test_testing_helpers;
 mod test_tls_trust_127;
 mod test_tool_catalogue;
 mod test_tool_category_coverage;
+mod test_tool_fixes_132;
 mod test_tools_fixes;
 mod test_tools_mod_unit;
 mod test_toolset;
