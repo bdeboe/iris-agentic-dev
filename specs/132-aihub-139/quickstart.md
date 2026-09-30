@@ -50,7 +50,7 @@ With the container stopped, this panics naming `iad-aihub-iris`. To skip instead
 
 ```bash
 IAD_AIHUB_LLM=1 OPENAI_API_KEY=... IAD_BINARY=$PWD/target/debug/iris-agentic-dev \
-cargo test --features testing --test integration test_aihub_139_real_turn -- --include-ignored --test-threads=1
+cargo test --features testing --test integration test_aihub_139_live::aihub_139_real_turn -- --include-ignored --test-threads=1
 ```
 
 The key reaches the container by variable name only, and the test deletes the Wallet and ConfigStore entries after.
@@ -58,7 +58,14 @@ The key reaches the container by variable name only, and the test deletes the Wa
 ## Upstream file list against GitHub
 
 ```bash
-cargo test --features testing --test integration test_aihub_139_upstream_files -- --include-ignored
+cargo test --features testing --test integration test_aihub_139_live::aihub_139_upstream_files -- --include-ignored
+```
+
+## Ladder task checks on 139 (no LLM)
+
+```bash
+IRIS_WEB_PORT=52781 IRIS_CONTAINER=iad-aihub-iris \
+  pytest tests/e2e/skill_eval/test_graded_task_live.py -k aihub -v
 ```
 
 ## Ladder
