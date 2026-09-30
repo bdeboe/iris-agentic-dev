@@ -54,7 +54,7 @@ Both crates declare a handful of `[[test]]` targets, not one per file. Each is a
 | `core` | `misc`            | 15    | Older top-level `tests/*.rs`                       |
 | `core` | `skills`          | 1     | Single file, so it stays its own target            |
 | `bin`  | `bin_unit`        | 10    | CLI arg parsing, config resolution                 |
-| `bin`  | `bin_integration` | 14    | Spawned-binary and live-IRIS CLI paths             |
+| `bin`  | `bin_integration` | 15    | Spawned-binary and live-IRIS CLI paths             |
 | `bin`  | `bin_misc`        | 2     | Older top-level `tests/*.rs`                       |
 
 Cargo runs test binaries strictly one after another and gives you no knob to change that, so a

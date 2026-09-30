@@ -1,6 +1,7 @@
 pub mod audit_log;
 pub mod connection;
 pub mod connection_pool;
+pub mod csp_session;
 pub mod discovery;
 pub mod iris_audit;
 pub mod server_manager;

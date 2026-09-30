@@ -186,7 +186,7 @@ pub fn tls_insecure_from_env() -> bool {
 ///
 /// `timeout_secs`: wall-clock request timeout. Pass `None` to inherit reqwest's default.
 /// `insecure`: skip TLS certificate validation (e.g. for self-signed dev certs).
-/// `cookie_store`: retain CSP session cookies across requests on the same client.
+/// `cookie_store`: retain CSP session cookies, in the process-wide store (`csp_session`).
 pub fn iris_http_client(
     timeout: Option<std::time::Duration>,
     insecure: bool,
@@ -195,8 +195,10 @@ pub fn iris_http_client(
     let mut b = reqwest::Client::builder()
         .user_agent(user_agent(caller_mode()))
         .danger_accept_invalid_certs(insecure)
-        .cookie_store(cookie_store)
         .tcp_keepalive(std::time::Duration::from_secs(20));
+    if cookie_store {
+        b = b.cookie_provider(super::csp_session::shared_cookie_store());
+    }
     if let Some(t) = timeout {
         b = b.timeout(t);
     }
@@ -1023,7 +1025,7 @@ impl IrisConnection {
             .connect_timeout(std::time::Duration::from_secs(5))
             .timeout(std::time::Duration::from_secs(10))
             .danger_accept_invalid_certs(insecure)
-            .cookie_store(true)
+            .cookie_provider(super::csp_session::shared_cookie_store())
             .tcp_keepalive(std::time::Duration::from_secs(20))
             .build()?)
     }
@@ -1038,7 +1040,8 @@ impl IrisConnection {
             .user_agent(user_agent(caller_mode()))
             .timeout(std::time::Duration::from_secs(30))
             .danger_accept_invalid_certs(insecure)
-            .cookie_store(true) // reuse CSP sessions to avoid license slot exhaustion (#43)
+            // One CSP session per process, shared with the probe, and ended at exit (#43, 132 B1).
+            .cookie_provider(super::csp_session::shared_cookie_store())
             .tcp_keepalive(std::time::Duration::from_secs(20)) // prevent NAT/firewall from silently dropping idle connections (#44)
             .build()?)
     }

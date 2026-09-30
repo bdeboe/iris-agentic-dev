@@ -365,6 +365,8 @@ fn no_aihub_eap_left_in_the_repo() {
         "tests/e2e/results/",
         "tests/e2e/skill_eval/fixtures/skill-eval-",
         "crates/iris-agentic-dev-core/tests/unit/test_aihub_139.rs",
+        // Checks the committed pilot record, which installed the vendored skill in its day.
+        "tests/e2e/skill_eval/test_pilot.py",
     ];
     let mut hits = Vec::new();
     for f in files.split('\0').filter(|f| !f.is_empty()) {

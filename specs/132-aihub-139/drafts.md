@@ -1,6 +1,6 @@
 # Drafts: ai-hub-eap docs against build 139
 
-Each `D` entry is a place where the ai-hub-eap docs at `72749d6` say one thing and IRISHealth 2026.3.0AI.139.0 does another. The named live test in `crates/iris-agentic-dev-core/tests/integration/test_aihub_139_live.rs` shows what 139 does. The `B` entries are iad bugs found along the way.
+Each `D` entry is a place where the ai-hub-eap docs at `72749d6` say one thing and IRISHealth 2026.3.0AI.139.0 does another. The named live test in `crates/iris-agentic-dev-core/tests/integration/test_aihub_139_live.rs` shows what 139 does. The `B` entries are iad bugs found along the way; B1 is fixed here, not drafted.
 
 Nothing here is filed. Tom files, or does not.
 
@@ -122,14 +122,10 @@ Draft upstream text:
 >
 > I can open the PR if that helps.
 
-## B1: each iad process leaks three CSP sessions on /api/atelier
+## B1: each iad process leaked two or three CSP sessions on /api/atelier
 
-- Doc: none, iad code: `crates/iris-agentic-dev-core/src/tools/mod.rs` builds `client` and `exec_client` with `IrisConnection::http_client()`, and the startup probe builds a third with `probe_client()`.
+- Doc: none. iad code: `crates/iris-agentic-dev-core/src/tools/mod.rs` built `client` and `exec_client` with `IrisConnection::http_client()`, and the startup probe built a third client with `probe_client()`.
 - Doc says: n/a
-- 139 does: each client has its own cookie jar, so each one opens its own CSP session. None logs out when the process exits. The sessions live out the web app's 3600 s timeout, and each holds a license unit. On 139's 128-LU key, one run of the live suite costs about 30 LU. Two or three runs in an hour exhaust the key, and every later request gets a license error until `docker restart`.
-- Test: none yet. Measured by hand with `$System.License.LUConsumed()` before and after a run (quickstart.md, "License units").
-- Status: drafted
-
-Draft upstream text:
-
-> iad opens three CSP sessions per process on `/api/atelier` (probe, `client`, `exec_client`, each with its own cookie jar) and never ends them. On a licensed instance each session holds a license unit for the web app's session timeout. Fix: share one `reqwest` cookie jar across the three clients, and on shutdown send one request with `CacheLogout=1` so IRIS ends the session. Test: a binary test that spawns iad against a live instance, reads `LUConsumed()` before and after, and asserts it goes back to where it was.
+- 139 did: each client had its own cookie jar, so each one opened its own CSP session, and none logged out when the process exited. The sessions lived out the web app's 3600 s timeout. Ten `iad exec` calls took `^%cspSession` on 139 from 15 to 35, and two ladder tasks ran the 128-LU key into `<LICENSE LIMIT EXCEEDED>` (HTTP 503). After that, `exec` fell back to docker exec, which refuses `{}` blocks.
+- Test: `test_csp_session_132` (unit) and `test_csp_logout_132` (live, bin crate). Before the fix, 5 `exec` calls left 10 sessions, a failed `exec` left 2, and an MCP server stopped by SIGTERM left 3. After the fix, all three leave none.
+- Status: fixed in iad, 132. Every client takes one process-wide cookie store (`iris::csp_session`). The store records each `CSPSESSIONID-*` cookie's path, and `main` and `crate::exit` send `?IRISLogout=end` to each path before the process exits. IRIS ends the session and answers 401. The cookie alone is enough, so no credentials are sent.

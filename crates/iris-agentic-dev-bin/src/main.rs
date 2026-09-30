@@ -67,6 +67,9 @@ fn main() -> Result<()> {
         .enable_all()
         .build()?;
     let result = rt.block_on(async_main());
+    // End the CSP sessions this process opened; left alone each holds a license slot for the
+    // web app's timeout (132 B1).
+    iris_agentic_dev_core::iris::csp_session::logout_blocking(std::time::Duration::from_secs(3));
     // `#[tokio::main]` drops the runtime with no deadline, and dropping waits for blocking
     // threads. The stdin reader behind `iad mcp` is one, parked in `read` until the host closes
     // the pipe, so after a SIGTERM the process never exited (130 round 4). The telemetry flush has

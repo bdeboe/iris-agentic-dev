@@ -64,7 +64,7 @@ path = "tests/unit/main.rs"
 required-features = ["testing"]
 
 [[test]]
-# All 14 files under tests/integration/ compile into this one binary. See tests/integration/main.rs for why.
+# All 15 files under tests/integration/ compile into this one binary. See tests/integration/main.rs for why.
 name = "bin_integration"
 path = "tests/integration/main.rs"
 required-features = ["testing"]

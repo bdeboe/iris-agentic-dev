@@ -48,7 +48,7 @@ With the container stopped, this panics naming `iad-aihub-iris`. To skip instead
 
 ## License units
 
-Each iad process leaves three CSP sessions open on `/api/atelier` for an hour (drafts.md B1). One live-suite run costs about 30 of the key's 128 license units. Check before a run:
+Before the 132 fix (drafts.md B1), each iad process left two or three CSP sessions open on `/api/atelier` for an hour. A binary built from 132 or later ends them on exit. An older binary on `PATH` still leaks them, so check before a run:
 
 ```bash
 printf 'Write "consumed=",$System.License.LUConsumed(),!\nhalt\n' \
