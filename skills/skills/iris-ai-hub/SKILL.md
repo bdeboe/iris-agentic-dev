@@ -58,6 +58,54 @@ Do not name `%Dictionary.ClassDefinition` or `%Dictionary.MethodDefinition` in `
 
 ## What holds on 2026.3
 
+Each fact below has a live test on build 139 (`crates/iris-agentic-dev-core/tests/integration/test_aihub_139_live.rs`); the claim table in `specs/132-aihub-139/research.md` names it. On another build, check the class first (workflow step 2).
+
+### ConfigStore and Wallet
+
+- `%ConfigStore.Configuration` class methods: `Create(area, type, subtype, name, details)` (six optional args follow), `Get(fqn, .config)`, `GetDetails(fqn, .details, checkValid, resolveSecrets)`, `Delete(fqn)`. All return `%Status`. `fqn` is the dotted name, and an empty subtype drops out: `("AI","LLM","","openai")` is `AI.LLM.openai` (from Gabriel Ing's hackathon skills).
+- An LLM entry holds `model_provider`, `model` and `api_key` (from Gabriel Ing's hackathon skills).
+- Keep the key in the wallet: `%Wallet.Collection` `Create(name, {"UseResource":..,"EditResource":..})`, then `%Wallet.KeyValue` `Create("Coll.Key", {"Usage":"CUSTOM","Secret":{"api_key":..}})`, and put `"api_key": "secret://Coll.Key#api_key"` in the entry. `GetDetails(fqn, .d, 1, 1)` resolves it (from Gabriel Ing's hackathon skills).
+- Wallet and ConfigStore writes work from USER. Only `Security.Resources` needs `%SYS`.
+
+### Provider and agent
+
+- `%AI.Provider` `Create(name, settings)` is a class method; `"openai"` is a valid name. `%AI.Agent` `%New(provider)` sets `Provider` (from Gabriel Ing's hackathon skills).
+- An `%AI.Agent` subclass sets `Parameter PROVIDERCONFIG = "@{config:Name}"` (or `"@{config:AI.LLM.Name}"`) and `Parameter TOOLSETS = "<ToolSet class>"`. Nothing is built until `%Init()`: after `%New()` alone `Provider` is empty. `%Init()` builds the provider, loads the toolsets and then calls your `%OnInit()` (from Gabriel Ing's hackathon skills).
+- In `%OnInit()`, parenthesise each comparison: `If (..Provider = "") && (..#X '= "")`. ObjectScript runs left to right, so without the parentheses the test is always true.
+- `%AI.Agent` properties: `Provider`, `Model`, `SystemPrompt`, `ToolManager` (an `%AI.ToolMgr`), `ParentAgent` (from Gabriel Ing's hackathon skills).
+- `CreateSession(config="")` returns `%AI.Agent.Session`. `Chat(session, input)`, `StreamChat(session, input, callbackObj, callbackMethod)`, `ChatWithContent(session, content As %DynamicArray)` and `Run(session, goal)` return `%AI.LLM.Response` (`Content`, `ToolCalls`, `Usage`). `session` is required. `session.GetStats()` returns a `%DynamicObject` (from Gabriel Ing's hackathon skills).
+- Sub-agents: `%AI.Agent.SubAgent` `Create(parentAgent, systemPrompt, config)` returns an `%AI.Agent`, so it has `Chat`, `Run` and `CreateSession`. Skills are `%AI.Agent.Skill`: `Parameter TOOLS`, `ExportSkill(target)` returns a path string, `GetSkillFromURI(uri, subpath, cacheDir, authProvider)` is a class method (from Gabriel Ing's hackathon skills).
+
+### Tools and toolsets
+
+- An `%AI.Tool` subclass: each class method is a tool. Its doc comment is the description and its signature gives the parameters. There is no `DESCRIPTION` parameter.
+- `%AI.ToolMgr` `AddTool(obj)` takes an instance. `ExecuteTool(name, args)` returns `{"timing":..,"value":..}`. `%AI.ToolMgr` `%Discover()` returns a bare array of tool specs; a tool's own `%Discover()` returns `{"tools":[...]}` (from Gabriel Ing's hackathon skills).
+- `%AI.ToolSet` reads `XData Definition [ MimeType = application/xml ]` with root `<ToolSet Name="..">` and children `<Description>`, `<Policies>`, `<Include Class=".."/>`, `<Exclude Tool=".."/>` and `<Query>` (from Gabriel Ing's hackathon skills).
+- `<Query Name=".." Arguments="schema As %String, minLen As %Integer = 0" MaxRows="..">` takes SQL with `:name` parameters. `%Integer` becomes JSON `integer`, `%Boolean` `boolean`, `%String` `string`; an argument without a default is required. The row cap is `MaxRows`, else `Parameter QUERYMAXROWS` (100). A result is `{columns, rows, row_count, truncated, elapsed_ms}` (from Gabriel Ing's hackathon skills).
+- These do not compile: a `?` placeholder (ERROR #6049), a `:name` not in `Arguments` (#5431), an argument the SQL never uses (#5822) (from Gabriel Ing's hackathon skills).
+
+### Policies
+
+- `%AI.Policy.Authorization` `%CanExecute(tool, call, metadata) As %Status`: `tool` is the tool spec as JSON (read `.name`), not a bare name. Deny with `$$$ERROR($$$AICoreToolAccessDenied, ..)` after `Include %AI` (from Gabriel Ing's hackathon skills).
+- `%AI.Policy.Audit` `%LogExecution(call As %DynamicObject, metadata As %DynamicObject, result As %DynamicObject, duration As %Integer, status As %Status) As %Status`; `call.name` is the tool name. `%AI.Policy.ConsoleAudit` and `%AI.Policy.Discovery` exist (from Gabriel Ing's hackathon skills).
+- Global: `ToolManager.SetAuthPolicy(obj)`, `SetAuditPolicy(obj)`, `SetDiscoveryPolicy(obj)` (from Gabriel Ing's hackathon skills).
+- ToolSet-local: `<Policies><Authorization Class=".."><Item>..</Item></Authorization><Audit Class=".."/></Policies>`. The policy class extends `%XML.Adaptor`, sets `Parameter XMLNAME`, and projects list properties with `XMLITEMNAME` and `XMLPROJECTION = "ELEMENT"` (from Gabriel Ing's hackathon skills). A list with one item loads empty on 139, so give a deny list at least two entries.
+
+### RAG
+
+- `%AI.RAG.Embedding.FastEmbed` `Create()` needs no key: local, 384 dims, model `AllMiniLML6V2` (from Gabriel Ing's hackathon skills).
+- `%AI.RAG.VectorStore.IRIS`: set `TableName`, `Dimensions`, `ModelName`, then `Build()`. It makes the table and `<Table>_Config`, and refuses a later build with another model ("Model mismatch") (from Gabriel Ing's hackathon skills).
+- `%AI.RAG.KnowledgeBase`: set `Name`, `Description`, `TopK`, then `Build(embedding, vectorStore)`. `AddDocument(text, metadata)` returns `%Status`; `AddDocuments([[text, meta], ...])` and `ReindexDocument(source, text)` return a chunk count. A second `AddDocument` with the same `source` replaces the first; without a `source` the same text is stored twice (from Gabriel Ing's hackathon skills).
+- `kb.AddToAgent(agent)` registers a tool named `kb.Name` with parameters `query` (string, required) and `top_k` (integer). It returns hits with `id`, `text`, `score` and `metadata` (`source`, `chunk_index`) (from Gabriel Ing's hackathon skills).
+
+### MCP server
+
+- A service is a subclass of `%AI.MCP.Service` with `Parameter SPECIFICATION = "<ToolSet class>"` (from Gabriel Ing's hackathon skills).
+- Its web application uses the subclass as dispatch class and needs `Type` 18 (CSP + MCP). `Security.Applications.Create` refuses 16 ("CSP bit"); a Type 2 app is accepted but the bridge gets no tools from it and logs "failed identity checking".
+- The bridge, `iris-mcp-server` in `<install>/bin`, reaches IRIS on the superserver port (1972), not HTTP. Config: `[mcp] transport = "stdio"`, and under `[[iris]]` a `server = {host, port, username, password}` plus `endpoints = [{path, username, password}]` (from Gabriel Ing's hackathon skills).
+- Bridged tool names are `mcp_<path segments>_<tool>`: `/mcp/myapp` serves `mcp_myapp_GetCustomer`. The description starts `[Remote Service: <iris name>_mcp_myapp]`. A tool result arrives as JSON text (`"\"cba\""`). The bridge's fallback status tool is gone once an endpoint serves tools (from Gabriel Ing's hackathon skills).
+- A ToolSet audit policy that subclasses `%AI.Policy.ConsoleAudit` still serves over the bridge.
+
 ## Corrections
 
 ## Upstream's own skill

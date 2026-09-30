@@ -430,3 +430,105 @@ fn quickstart_filters_match_live_tests() {
         );
     }
 }
+
+// ── US3: every claim holds on 139 ───────────────────────────────────────────
+
+const VERDICTS: [&str; 4] = ["holds", "false", "reworded", "not taken"];
+
+/// One row of the claim table at the end of research.md.
+struct Claim {
+    id: String,
+    claim: String,
+    source: String,
+    verdict: String,
+    test: String,
+    credit: String,
+}
+
+fn claims() -> Vec<Claim> {
+    let text = read("specs/132-aihub-139/research.md");
+    let table = &text[text
+        .find("\n## Claim table\n")
+        .expect("research.md has ## Claim table")..];
+    table
+        .lines()
+        .filter(|l| l.starts_with('|') && !l.starts_with("| ---") && !l.starts_with("| id "))
+        .map(|l| {
+            let c: Vec<String> = l
+                .trim_matches('|')
+                .split(" | ")
+                .map(|s| s.trim().to_string())
+                .collect();
+            assert_eq!(c.len(), 6, "claim row has {} cells, want 6: {l}", c.len());
+            Claim {
+                id: c[0].clone(),
+                claim: c[1].clone(),
+                source: c[2].clone(),
+                verdict: c[3].clone(),
+                test: c[4].clone(),
+                credit: c[5].clone(),
+            }
+        })
+        .collect()
+}
+
+#[test]
+fn claim_table_rows_are_well_formed() {
+    let rows = claims();
+    assert!(!rows.is_empty(), "claim table is empty");
+    let live = read("crates/iris-agentic-dev-core/tests/integration/test_aihub_139_live.rs");
+    let mut seen = std::collections::HashSet::new();
+    for r in &rows {
+        assert!(seen.insert(r.id.clone()), "duplicate claim id {}", r.id);
+        assert!(
+            VERDICTS.contains(&r.verdict.as_str()),
+            "{}: verdict {:?} not in {VERDICTS:?}",
+            r.id,
+            r.verdict
+        );
+        if r.verdict != "not taken" {
+            let name = r
+                .test
+                .strip_prefix('`')
+                .and_then(|t| t.strip_suffix('`'))
+                .unwrap_or_else(|| {
+                    panic!("{}: test cell {:?} is not one backticked fn", r.id, r.test)
+                });
+            assert!(
+                live.contains(&format!("fn {name}(")),
+                "{}: no fn {name} in test_aihub_139_live.rs",
+                r.id
+            );
+        }
+        if r.source.starts_with("hackathon:") {
+            assert!(
+                r.credit.contains("Gabriel Ing"),
+                "{}: hackathon claim must credit Gabriel Ing",
+                r.id
+            );
+        }
+    }
+}
+
+/// Every `%AI.*` / `%ConfigStore.*` name the skill prints is backed by a row that holds.
+#[test]
+fn skill_names_only_held_classes() {
+    let t = ai_hub_skill();
+    let rows = claims();
+    let held: Vec<&Claim> = rows
+        .iter()
+        .filter(|r| r.verdict == "holds" || r.verdict == "reworded")
+        .collect();
+    let re = regex::Regex::new(r"%(?:AI|ConfigStore|Wallet)\.[A-Za-z0-9.]*[A-Za-z0-9]").unwrap();
+    let mut names: Vec<&str> = re.find_iter(&t).map(|m| m.as_str()).collect();
+    names.sort_unstable();
+    names.dedup();
+    let unbacked: Vec<&str> = names
+        .into_iter()
+        .filter(|n| !held.iter().any(|r| r.claim.contains(&format!("`{n}"))))
+        .collect();
+    assert!(
+        unbacked.is_empty(),
+        "skill names these with no holds/reworded row: {unbacked:?}"
+    );
+}

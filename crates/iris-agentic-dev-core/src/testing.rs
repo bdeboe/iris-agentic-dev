@@ -1263,6 +1263,12 @@ impl McpSession {
     /// `env` is added back on top of `clean_command`'s empty slate, so a test states its own
     /// environment. Nothing is inherited.
     pub fn start(env: &[(String, String)]) -> Self {
+        Self::start_in(None, env)
+    }
+
+    /// `start`, with the child's working directory set, so it reads the `.iris-agentic-dev.toml`
+    /// there. Keys with no env-var form (`docker_only`) can only be set this way.
+    pub fn start_in(dir: Option<&Path>, env: &[(String, String)]) -> Self {
         let bin = iad_binary_path();
         assert!(
             bin.exists(),
@@ -1273,6 +1279,9 @@ impl McpSession {
         let mut cmd = clean_mcp_command(&bin);
         for (k, v) in env {
             cmd.env(k, v);
+        }
+        if let Some(d) = dir {
+            cmd.current_dir(d);
         }
         let mut child = cmd
             .stdin(Stdio::piped())
