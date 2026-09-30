@@ -4,26 +4,28 @@ Measured 2026-09-30 on `iad-aihub-iris` unless marked otherwise. Anything not me
 
 ## R1: How iad reaches 139
 
-**Decision**: `docker_only = true`. Tests load fixtures with `docker cp` + `$system.OBJ.Load` and read claims through iad `iris_execute` on the docker path. The ladder waits on a license key.
+**Decision**: run 139 licensed, with a Web Gateway sidecar, and reach it over HTTP like any other instance. The container mounts a Sales Engineers ARM64 container key from `~/.config/iris-agentic-dev/aihub139/iris.key` (copied from the fhir-arno checkout, read only; 128 users, expires 2026-11-30). The sidecar `iad-aihub-webgateway` serves host 52781 and reaches IRIS at `host.docker.internal:11976`. Its `CSP.ini`/`CSP.conf` live in the same directory. Nothing under `~/.config/iris-agentic-dev/aihub139/` enters the repo.
 
-**Measured**:
+**Measured unlicensed** (why the key is needed; EAP images ship without one):
 
-- `WebServer=0`, no `/usr/irissys/httpd`, and host 52781 (mapped to 52773) does not answer.
-- messages.log at startup:
-  - `LMF Error: No valid license key. No valid local file found and LicenseID not defined.`
-  - `Not licensed for Interoperability, auto-start skipped.`
-- `$SYSTEM.License.LUAvailable()=0` and `LUConsumed()=1` with one `iris session` open. So the instance has one license unit.
-- A Web Gateway sidecar (`containers.intersystems.com/intersystems/webgateway:2026.2`, arm64) was pointed at the IRIS container's bridge IP, port 1972, as CSPSystem/SYS, with host port 52782. `/csp/sys/UtilHome.csp` returned 200, so the gateway reached IRIS. `/api/atelier/` and `/api/mgmnt/` with `_SYSTEM:SYS` returned 503 `Service Unavailable` on every try. The gateway itself logged no error. My reading is that the authenticated login needs a license unit and none is free. That is inferred from the unit counts, not proven by an IRIS log line.
-- IRIS logged `Web Gateway version 2602.1863 has connected … You should upgrade the Web Gateway`, a warning only.
-- `docker network create` failed (`all predefined address pools have been fully subnetted`), so the sidecar used the default bridge by IP. A compose file with its own network would need a pool freed first.
+- `WebServer=0` and no `/usr/irissys/httpd`, so there is no private web server to map.
+- messages.log at startup: `LMF Error: No valid license key. No valid local file found and LicenseID not defined.` and `Not licensed for Interoperability, auto-start skipped.`
+- `$SYSTEM.License.LUAvailable()=0` and `LUConsumed()=1` with one `iris session` open. The instance has one license unit.
+- Through the sidecar, `/csp/sys/UtilHome.csp` returned 200 but `/api/atelier/` and `/api/mgmnt/` with `_SYSTEM:SYS` returned 503 on every try. The authenticated login needs a license unit and none is free.
+
+**Measured licensed** (2026-09-30):
+
+- `LUAvailable()=127`.
+- `iris-agentic-dev tool iris_doc` with `IRIS_HOST=localhost IRIS_WEB_PORT=52781 IRIS_CONTAINER=iad-aihub-iris`: put and compile of `IadAihub139.Smoke Extends %AI.Agent` returned `compiled: true`; `iris_execute` returned `execution_path: atelier`; delete succeeded.
+- IRIS logs `Web Gateway version 2602.1863 has connected … You should upgrade the Web Gateway`. A warning only.
+- `docker network create` fails on this host (`all predefined address pools have been fully subnetted`), so the sidecar reaches IRIS through `host.docker.internal` rather than a shared network.
+- After recreating the container, `_SYSTEM` gets 401 until `Security.Users.UnExpireUserPasswords("*")` runs; the first try right after "Enabling logons" can be early, so retry.
 
 **Alternatives**:
 
-- Gateway sidecar now. Rejected: it returns 503.
-- Run 139 on the ladder under `docker_only`. Rejected: `apply_documents`, `list_classes` and `reset_documents` in `graded_task.py` all call `iris_doc`, and the agent would have no way to write a class. Every task would fail on the plumbing, which measures nothing about AI Hub.
-- Use another project's 2026.3 container (irispython-dx runs build 154). Rejected: the containers are project-exclusive, and it has no web server either.
-
-**Unblock recipe (for when a key arrives)**: mount `iris.key` into `/usr/irissys/mgr/`, restart, check `LUAvailable()>1`, then run the sidecar from `quickstart.md` on 52781 (recreate IRIS with only 11976 mapped), and set the registry `web_port: 52781`. The gateway config I used is in quickstart.md.
+- `docker_only`. Rejected: `apply_documents`, `list_classes` and `reset_documents` in `graded_task.py` call `iris_doc`, which the docker path lacks. The skill still covers this path, because Enterprise AI builds may ship with no gateway (DPP-1192).
+- Unlicensed with the sidecar. Rejected: 503 on every REST login.
+- Another project's 2026.3 container (irispython-dx runs build 154). Rejected: containers are project-exclusive.
 
 ## R2: Upstream docs
 

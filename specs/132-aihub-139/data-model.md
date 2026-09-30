@@ -4,15 +4,15 @@ No database. These are the shapes the tests and harness read.
 
 ## AihubEnv (`testing.rs`)
 
-| Field              | Source env var        | Default          |
-| ------------------ | --------------------- | ---------------- |
-| `container`        | `IAD_AIHUB_CONTAINER` | `iad-aihub-iris` |
-| `host`             | `IAD_AIHUB_HOST`      | `localhost`      |
-| `superserver_port` | `IAD_AIHUB_PORT`      | `11976`          |
-| `namespace`        | `IAD_AIHUB_NAMESPACE` | `USER`           |
+| Field       | Source env var        | Default          |
+| ----------- | --------------------- | ---------------- |
+| `container` | `IAD_AIHUB_CONTAINER` | `iad-aihub-iris` |
+| `host`      | `IAD_AIHUB_HOST`      | `localhost`      |
+| `web_port`  | `IAD_AIHUB_WEB_PORT`  | `52781`          |
+| `namespace` | `IAD_AIHUB_NAMESPACE` | `USER`           |
 
-- `aihub_env() -> Option<AihubEnv>` returns `Some` when `docker inspect` reports the container is running.
-- When it is not running, it panics with the start command from quickstart.md.
+- `aihub_env() -> Option<AihubEnv>` returns `Some` when `GET /api/atelier/` on `host:web_port` answers 200.
+- When it does not answer, it panics with the start command from quickstart.md.
 - With `IAD_ALLOW_SKIP=1` set, it prints the same message and returns `None` instead of panicking.
 - Parsing is a pure `AihubEnv::from_vars(impl Fn(&str) -> Option<String>)` so the unit test needs no container.
 

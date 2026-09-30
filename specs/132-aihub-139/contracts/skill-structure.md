@@ -31,7 +31,8 @@ source: >-
    - Step 1 reads the build version (`iris_info` or `$ZVERSION` via `iris_execute`).
    - Step 2 reads the installed `%AI` classes.
    - It states that the installed classes win over the docs and that the agent says so when they differ.
-4. **No web server.**
+4. **No web gateway (fallback).**
+   - Short. The primary path is HTTP through a gateway; this section covers AI builds that ship with none (DPP-1192), where iad runs `docker_only`.
    - Under `docker_only`, `docs_introspect`/`iris_symbols`/`iris_doc` do not work.
    - Read class metadata with `iris_execute` on `%Dictionary.CompiledClass`/`CompiledMethod` instead.
 5. **Topic sections.** Every factual sentence maps to a `holds` or `reworded` claim row.

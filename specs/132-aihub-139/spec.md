@@ -106,7 +106,7 @@ Tom can see, for each AI Hub ladder task, how the tools arm and the tools+skill 
 
 ### Edge Cases
 
-- The 139 image starts without a license key, but then it has one license unit and no web server, so no authenticated REST call succeeds even through a Web Gateway (measured 2026-09-30, plan research R1). US1–US4 run over docker exec (`docker_only`). The US5 ladder run waits until Tom supplies a key. There is no workaround with another project's container.
+- The 139 image ships without a license key. Unlicensed it has one license unit and no web server, so every authenticated REST call returns 503 even through a Web Gateway (measured 2026-09-30, plan research R1). The container therefore mounts a Sales Engineers ARM64 key kept outside the repo, and a Web Gateway sidecar serves Atelier on 52781. All stories, the ladder included, run over HTTP.
 - The pulled image is x64 only: record it; run under emulation only if the instance starts and tests pass, and note it in `research.md`.
 - The upstream repo moves a file in the map: the existence test fails and names the file.
 - The upstream repo is unreachable from an agent session: the skill tells the agent to fall back to the installed classes, which need no network.

@@ -5,32 +5,21 @@ Stacked on `131-mdx-cube-facts`. Every claim in the skill comes from a live test
 ## Technical context
 
 - Rust 2021, `iris-agentic-dev-core`. No new crate dependency. Python 3.11 for the ladder (`tests/e2e/skill_eval/`), no new dependency.
-- Live target: `iad-aihub-iris`, image `docker.iscinternal.com/docker-unreleased/intersystems/irishealth:2026.3.0AI.139.0`, arm64, `$ZV` 2026.3.0AI Build 139U. Superserver on host 11976. 52781 is mapped but nothing answers.
-- **No private web server and no license key.** `WebServer=0`, and the instance has one license unit (`LUAvailable=0 LUConsumed=1` with one terminal session open). A Web Gateway sidecar reached IRIS (the portal login page returned 200) but every authenticated REST call (`/api/atelier`, `/api/mgmnt`) returned 503. So iad reaches 139 with `docker_only = true` only: `iris_execute` and `iris_compile` go through `docker exec … iris session`, and `iris_doc`, `docs_introspect` and `iris_symbols` do not work (research.md R1).
+- Live target: `iad-aihub-iris`, image `docker.iscinternal.com/docker-unreleased/intersystems/irishealth:2026.3.0AI.139.0`, arm64, `$ZV` 2026.3.0AI Build 139U. Superserver on host 11976.
+- **Licensed, with Atelier through a Web Gateway sidecar.** The image ships no private web server (`WebServer=0`, no httpd). Unlicensed, it has one license unit and every authenticated REST call gets 503, which rules that out. So the container mounts a Sales Engineers ARM64 container key (128 users, expires 2026-11-30) from `~/.config/iris-agentic-dev/aihub139/iris.key`, outside every repo. The sidecar `iad-aihub-webgateway` (`webgateway:2026.2`) serves host 52781 and reaches IRIS at `host.docker.internal:11976`. Measured 2026-09-30, using iad over HTTP on 52781: `iris_doc` put and compile of a `%AI.Agent` subclass, then `iris_execute` (`execution_path: atelier`), then delete. See research.md R1.
+- So iad reaches 139 the same way it reaches iris-dev-iris: `IRIS_HOST=localhost IRIS_WEB_PORT=52781 IRIS_CONTAINER=iad-aihub-iris`. The ladder harness runs unchanged apart from the port.
 - Namespace: USER. 139 has no BENCHMARK namespace. `%AI` (60 classes) and `%ConfigStore` are visible from USER. `Security.*` is %SYS only.
 - Upstream docs: `intersystems-community/ai-hub-eap` master at `72749d6dbf0b856a60775378fa88d346bb79d4e4` (2026-09-09). It describes build 162 and does not mention 139 or 2026.3.
 - Hackathon skills: `intersystems-ready-hackathon/ready-hackathon-dev-template` at 391c3d5, `skills/ai-hub-*/`, all from cefcd9e (Gabriel Ing, 2026-04-15). There are eight.
-- Container registry: iad's second entry `iris-agentic-dev-aihub` (container `iad-aihub-iris`, host_port 11976, web_port null) was added 2026-09-30, and the verifier no longer flags the container. It is not committed in productivity-framework.
-
-## What blocks what
-
-| Story                  | Runs on 139 today               | Why                                                                                                                                                                                                                        |
-| ---------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US1 container          | yes                             | docker exec                                                                                                                                                                                                                |
-| US2 skill + map        | yes                             | offline unit test, one GitHub test                                                                                                                                                                                         |
-| US3 claims             | yes, over docker                | fixtures are loaded with `docker cp` + `$system.OBJ.Load`; claims are read through iad `iris_execute` under `docker_only`                                                                                                  |
-| US3 real turn (FR-011) | unknown                         | whether an unlicensed instance makes an outbound provider call is not measured yet; the test measures it                                                                                                                   |
-| US4 mismatches         | yes                             | falls out of US3                                                                                                                                                                                                           |
-| US5 ladder             | **no, until a key is supplied** | the harness loads fixtures, snapshots and deletes classes through `iris_doc`, and an agent writes a class through `iris_doc`. Under `docker_only` none of that works. With a key, the sidecar in R1 gives Atelier on 52781 |
-
-US5 work that needs no instance (tasks, `--side train`, teardown field, cleanup tests) goes ahead. The ladder run waits for a key. research.md records the recipe.
+- Container registry: iad's entry `iris-agentic-dev-aihub` (container `iad-aihub-iris`, host_port 11976, web_port 52781, web_container `iad-aihub-webgateway`) verifies clean. It is not committed in productivity-framework.
+- The license key and gateway config live outside the repo and are never committed. The recipe to recreate both is in quickstart.md.
 
 ## Container (US1)
 
 - Start command and password unexpiry in `quickstart.md`. The container is not recreated by tests.
-- `testing.rs`: `aihub_env() -> AihubEnv { container, host, superserver_port, namespace }`. It reads `IAD_AIHUB_CONTAINER` (default `iad-aihub-iris`), `IAD_AIHUB_HOST` (`localhost`), `IAD_AIHUB_PORT` (`11976`) and `IAD_AIHUB_NAMESPACE` (`USER`). It checks the container with `docker inspect -f {{.State.Running}}` and panics with the start command unless `IAD_ALLOW_SKIP=1`, in which case it returns `None` and prints the same text. It does not reuse `live_env`, which names iris-dev-iris.
-- `aihub_session(env) -> McpSession` writes a temp `.iris-agentic-dev.toml` with `docker_only = true`, `container`, `namespace`, spawned through `clean_mcp_command`. This is the same shape as `docker_exec` in `test_exec_sql_131_live.rs`, moved into `testing.rs` so it can be shared.
-- `aihub_load(env, cls_files)` copies fixture `.cls` files into the container and runs `$system.OBJ.Load(path,"ck")` through `docker exec`. This is test setup, not the thing under test, and it does not go through the write gate. It returns the compile status text.
+- `testing.rs`: `aihub_env() -> AihubEnv { container, host, web_port, namespace }`. It reads `IAD_AIHUB_CONTAINER` (default `iad-aihub-iris`), `IAD_AIHUB_HOST` (`localhost`), `IAD_AIHUB_WEB_PORT` (`52781`) and `IAD_AIHUB_NAMESPACE` (`USER`). It probes `GET /api/atelier/` on the web port and panics with the start command unless `IAD_ALLOW_SKIP=1`, in which case it returns `None` and prints the same text. It does not reuse `live_env`, which names iris-dev-iris.
+- `aihub_session(env) -> McpSession` spawns iad through `clean_mcp_command` with `IRIS_HOST`/`IRIS_WEB_PORT`/`IRIS_CONTAINER`/`IRIS_NAMESPACE` from `AihubEnv`, over HTTP, like `live_env` does for iris-dev-iris.
+- Fixture classes go on with `iris_doc` put+compile through that session, and come off with `iris_doc` delete.
 
 ## Skill (US2)
 
@@ -39,7 +28,7 @@ US5 work that needs no instance (tasks, `--side train`, teardown field, cleanup 
   1. where the docs are (repo, branch, raw URL form)
   2. topic → file map
   3. workflow: build version, then installed `%AI` classes, where the build wins
-  4. under `docker_only`, how to read classes with `iris_execute` (`%Dictionary.CompiledClass`/`CompiledMethod` queries), because `docs_introspect`/`iris_symbols` need Atelier
+  4. if the instance has no web gateway (AI builds ship none), iad runs `docker_only`, where `iris_doc`/`docs_introspect`/`iris_symbols` do not work: read class metadata with `iris_execute` on `%Dictionary.CompiledClass`/`CompiledMethod`. One live test runs that fallback against 139 over the docker path
   5. then ConfigStore, Wallet, provider, agent, tools and toolsets, MCP server, policies, and RAG, with tested claims only
   6. "the guide says X; on 2026.3 it is Y" corrections
   7. upstream's own skill by raw URL, without `skill_community`
@@ -80,7 +69,7 @@ US5 work that needs no instance (tasks, `--side train`, teardown field, cleanup 
   - `Security.Applications.Exists` in %SYS
 - New optional task field `teardown` (ObjectScript). `pilot.py` runs it before the session and after the check, next to the FR-023 class cleanup. It removes the ConfigStore, Wallet and web-app entries under `IadAihub139`. A teardown that errors makes the run unscored, not failed. This closes FR-017 for non-class state.
 - `ladder.py --side {holdout,train}`, default `holdout`. A train run writes `side: train` into the result, and `split.assert_holdout_only` refuses to publish it.
-- `ladder.py --web-port` passes through to `IsolatedEnv.with_mcp`. The run waits on a license key (above).
+- `ladder.py --web-port` passes through to `IsolatedEnv.with_mcp` and to the check CLI. The AI Hub run uses `--container iad-aihub-iris --web-port 52781`.
 - Mechanical-failure evidence: `skill_eval/tool_calls.py list <run_id>` prints each session's tool calls, one per line (`n tool ok/err first-120-chars`), from the `<run_id>.transcripts/` files. research.md cites those lines per FR-016. No classifier.
 
 ## Tests
@@ -118,7 +107,7 @@ US5 work that needs no instance (tasks, `--side train`, teardown field, cleanup 
 
 | Principle                        | Status                                                                                                                                                                                                                     |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| III HTTP-first                   | Deviation, justified: 139 cannot serve Atelier (no PWS, one license unit). Tests use the docker path iad already supports (`docker_only`), and the skill says so. iris-dev-iris tests stay HTTP.                           |
+| III HTTP-first                   | Met: 139 is reached over Atelier through the gateway sidecar. The one docker-path test covers the no-gateway fallback the skill describes.                                                                                 |
 | IV test-first                    | Unit and Python tests are written red before the skill rewrite and the harness changes. Each live claim test is written before its claim goes in the skill.                                                                |
 | VI no mocks                      | Live claims run on 139. The offline map test reads a recorded list, not a mocked GitHub; the live test checks the list against GitHub.                                                                                     |
 | VIII coverage                    | The polish task runs `cargo llvm-cov --features testing` and records the delta. Only `testing.rs` helpers are new Rust.                                                                                                    |
@@ -129,8 +118,8 @@ US5 work that needs no instance (tasks, `--side train`, teardown field, cleanup 
 | XIII                             | Skill text names tools that exist, and a unit test checks every `iris_*` name against the registry.                                                                                                                        |
 | Issue closure / external actions | Drafts only.                                                                                                                                                                                                               |
 
-Post-design re-check: no new violation. The III deviation is forced by the build and is recorded here and in research.md R1.
+Post-design re-check: no violation.
 
 ## Out of scope
 
-`iris-mcp-oauth2`. Any new tool. Running the ladder before a license key is supplied. Committing in productivity-framework. Filing upstream. Pushing.
+`iris-mcp-oauth2`. Any new tool. Committing in productivity-framework. Committing the license key or gateway config. Filing upstream. Pushing.
