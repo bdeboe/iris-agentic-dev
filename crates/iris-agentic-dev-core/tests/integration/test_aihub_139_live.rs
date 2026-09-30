@@ -147,3 +147,36 @@ fn aihub_http_path() {
         "the probe class must be gone after delete: {left}"
     );
 }
+
+// ── US2: the topic map points at files that exist ───────────────────────────
+
+/// One HEAD per recorded path against GitHub raw on `master`. Needs network, not IRIS; a path that
+/// upstream moved or deleted since `upstream-files.txt` was recorded fails here, by name.
+#[tokio::test]
+#[ignore = "live GitHub raw"]
+async fn aihub_139_upstream_files() {
+    let list = include_str!("../fixtures/aihub139/upstream-files.txt");
+    let client = reqwest::Client::new();
+    let mut bad = Vec::new();
+    let paths: Vec<&str> = list.lines().skip(1).collect();
+    assert_eq!(
+        paths.len(),
+        56,
+        "upstream-files.txt holds the 56 paths at 72749d6"
+    );
+    for path in paths {
+        let url = format!(
+            "https://raw.githubusercontent.com/intersystems-community/ai-hub-eap/master/{path}"
+        );
+        match client.head(&url).send().await {
+            Ok(r) if r.status().as_u16() == 200 => {}
+            Ok(r) => bad.push(format!("{path}: HTTP {}", r.status().as_u16())),
+            Err(e) => bad.push(format!("{path}: {e}")),
+        }
+    }
+    assert!(
+        bad.is_empty(),
+        "not on ai-hub-eap master:\n{}",
+        bad.join("\n")
+    );
+}

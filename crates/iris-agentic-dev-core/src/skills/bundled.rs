@@ -81,7 +81,6 @@ macro_rules! embedded_skill {
 /// compile time. Kept in sync with `skills/skills/` by
 /// `embedded_catalog_matches_the_skills_directory_on_disk`.
 const EMBEDDED_SKILLS: &[(&str, &str)] = &[
-    embedded_skill!("aihub-eap"),
     embedded_skill!("ensemble-production"),
     embedded_skill!("iris-agentic-dev"),
     embedded_skill!("iris-ai-hub"),

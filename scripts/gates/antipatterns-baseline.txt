@@ -163,10 +163,7 @@ tool-name-refs	crates/iris-agentic-dev-core/src/tools/search.rs	ff5e05b9ffc2	# n
 tool-name-refs	docs/connecting.md	7432c62fd33a	# names `iris_audit_failures`, which is not in tools::write_gate::CLASSI
 tool-name-refs	skills/pyprod/SKILL.md	b3a64e5fc5dd	# names `iris_package_name`, which is not in tools::write_gate::CLASSIFI
 tool-name-refs	skills/pyprod/references/production-definition.md	b3a64e5fc5dd	# names `iris_package_name`, which is not in tools::write_gate::CLASSIFI
-tool-name-refs	skills/skills/aihub-eap/SKILL.md	3e8d56a7e411	# names `iris_arm64`, which is not in tools::write_gate::CLASSIFICATION.
-tool-name-refs	skills/skills/aihub-eap/SKILL.md	90a9824eb1e0	# names `iris_devtester`, which is not in tools::write_gate::CLASSIFICAT
 tool-name-refs	skills/skills/ensemble-production/SKILL.md	b3a64e5fc5dd	# names `iris_package_name`, which is not in tools::write_gate::CLASSIFI
-tool-name-refs	skills/skills/iris-ai-hub/SKILL.md	3a2953ed510b	# names `iris_llm`, which is not in tools::write_gate::CLASSIFICATION. A
 tool-name-refs	skills/skills/iris-connectivity/SKILL.md	90a9824eb1e0	# names `iris_devtester`, which is not in tools::write_gate::CLASSIFICAT
 tool-name-refs	skills/skills/iris-cpf-merge/SKILL.md	90a9824eb1e0	# names `iris_devtester`, which is not in tools::write_gate::CLASSIFICAT
 tool-name-refs	skills/skills/iris-devtester/SKILL.md	1455ff586d37	# names `iris_db_shared`, which is not in tools::write_gate::CLASSIFICAT
