@@ -1,5 +1,11 @@
 # What the tools are worth, measured
 
+> **Withdrawn (2026-09-26).** Both figures in this document are void. The harness did not set
+> `OPENCODE_DISABLE_CLAUDE_CODE=1`, so opencode loaded the operator's `~/.claude/CLAUDE.md` and
+> personal skills into every session, in every arm. The finding is in
+> [`specs/130-content-skills/research.md`](../130-content-skills/research.md). The document stays as
+> the record of what the run reported.
+
 One graded run, 123 sessions, 41 holdout task-pairs. Every task graded by an ObjectScript check
 printing `PASS` or `FAIL` against live IRIS; no model scored anything. The artifact is
 `tests/e2e/results/ladder-121-tools-holdout.json` and every number below is in it.

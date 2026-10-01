@@ -419,20 +419,21 @@ connection.
 
 Skills and the MCP server are independent — installing the binary installs no skills.
 
-**So far they are measured to be worth nothing.** On a graded holdout of 41 task-pairs,
-every task scored by an ObjectScript check rather than a model, adding the skills on top of
-the tools moved the pass rate by +0.098 with an interval of [-0.034, +0.229]. Six tasks won,
-two lost, p=0.1445. That is indistinguishable from no effect, and the rule that calls it
-that was written down before the first session ran. See
-[`specs/121-benchmark-program/skills-verdict.md`](specs/121-benchmark-program/skills-verdict.md).
+**There is no measured effect yet, in either direction.** An earlier run reported the skills at
++0.098 [-0.034, +0.229] and the tools at +0.829 [+0.714, +0.944] over a bare model, on 41 graded
+task-pairs. Both figures are void. That harness did not set `OPENCODE_DISABLE_CLAUDE_CODE=1`, so
+opencode loaded my `~/.claude/CLAUDE.md` and about 160 personal skills into every session, in
+every arm; the finding is in
+[`specs/130-content-skills/research.md`](specs/130-content-skills/research.md).
 
-The tools did better. The same run measured them at **+0.829** [+0.714, +0.944]
-over a bare model, 34 of 41 tasks won and none lost
-([`results.md`](specs/121-benchmark-program/results.md)).
+On clean isolation, a 19-task ladder at three repeats passed 11 of 19 with the tools alone and 12
+of 19 with the tools plus the matching skill (b=3, c=2). That is below the run's power floor, so it
+supports no claim either way. Every task is scored by an ObjectScript check against live IRIS, not
+by a model.
 
 Older figures in this repo — including a +27% for `objectscript-review` on a 22-task repair
 suite — came from a harness that used a model as the judge, on a different corpus. They are
-not comparable to the numbers above and should not be read as current.
+not comparable and should not be read as current.
 
 **Install skills:**
 

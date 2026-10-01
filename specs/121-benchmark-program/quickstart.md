@@ -125,6 +125,10 @@ four fragments and a run that finished in one sitting produce the same document.
 
 ## Reading the result
 
+The line below is the format, taken from the 121 run. That run is void, because its sessions
+loaded the operator's `~/.claude` setup (see [`results.md`](results.md)), so read it for the
+columns, not the figure.
+
 ```
 bare -> tools           lift +0.829  [+0.714, +0.944]  n=41  b=34 c=0  p=0.0000  passed
 ```

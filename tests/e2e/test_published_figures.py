@@ -10,9 +10,9 @@ So the two figures the project publishes are checked against the run that produc
 future run moves them, these tests fail and the documents get updated in the same commit, which is
 the only time anyone remembers to do it.
 
-Not asserted here: that the figures are *good*. `+0.098` for the skills is a bad result and the
-test is just as happy — its subject is whether the document agrees with the data, not whether the
-data flatters the project.
+Not asserted here: that the figures are *good*. Its subject is whether the document agrees with
+the data, not whether the data flatters the project. The 121 figures turned out to be void, not
+bad: that run was not isolated, so a document may quote them only as withdrawn.
 """
 
 from __future__ import annotations
@@ -78,29 +78,52 @@ def test_the_tools_figure_in_the_docs_is_the_figure_in_the_report():
             f"{document} quotes lift {figure} but not its interval {interval}. A lift without the "
             f"interval is not a result — it reads as precision the run does not have"
         )
-        assert f"n={tools['n_pairs']}" in body or f"{tools['n_pairs']} " in body, (
-            f"{document} quotes lift {figure} without the item count n={tools['n_pairs']}"
-        )
+        assert (
+            f"n={tools['n_pairs']}" in body or f"{tools['n_pairs']} " in body
+        ), f"{document} quotes lift {figure} without the item count n={tools['n_pairs']}"
 
 
-def test_the_skills_figure_is_reported_as_indistinguishable():
-    """The verdict, not just the number. `+0.098` read alone looks like a small win."""
-    skills = _comparison(_report(), "tools", "tools+skills")
-    assert not skills["publishable"] or skills["verdict"] != "passed", (
-        f"the skills comparison now reads {skills['verdict']}; this test and the documents it "
-        f"guards were written around a negative and both need revisiting"
-    )
+#: What a document has to say near a 121 figure. That run was not isolated: opencode read
+#: `~/.claude/CLAUDE.md` and `~/.claude/skills` into every session, in every arm, until
+#: `OPENCODE_DISABLE_CLAUDE_CODE=1` was set (specs/130-content-skills/research.md). Both figures
+#: are void, and 1.5.0's release notes say so.
+WITHDRAWN_MARKERS = ("void", "withdrawn")
+
+#: Where the finding is written down. A withdrawal with no reason reads as a figure that
+#: embarrassed someone.
+LEAK_FINDING = "specs/130-content-skills/research.md"
+
+
+def test_no_document_presents_the_121_figures_as_current():
+    """`+0.098` and `+0.829` may be named as history, next to the word that says they are void."""
+    report = _report()
+    figures = [
+        f"{_comparison(report, 'tools', 'tools+skills')['lift']:+.3f}",
+        f"{_comparison(report, 'bare', 'tools')['lift']:+.3f}",
+    ]
+    for document in CITING_DOCUMENTS:
+        body = _read(document)
+        # A note at the top withdraws the whole document.
+        if "**withdrawn" in body[:800].lower():
+            continue
+        for figure in figures:
+            for match in re.finditer(re.escape(figure), body):
+                window = body[max(0, match.start() - 600) : match.end() + 600].lower()
+                assert any(marker in window for marker in WITHDRAWN_MARKERS), (
+                    f"{document} quotes {figure} near offset {match.start()} with nothing saying "
+                    f"the 121 run is void. Every session in it had the operator's ~/.claude "
+                    f"loaded; mark the figure withdrawn or drop it"
+                )
+
+
+def test_the_readme_says_why_the_figures_were_withdrawn():
     readme = _read("README.md")
-    assert f"{skills['lift']:+.3f}" in readme, (
-        f"README does not carry the measured skills lift {skills['lift']:+.3f}. It advertised "
-        f"+27% from a retired model-judged harness once; a figure with no artifact behind it is "
-        f"how that happens again"
-    )
-    assert "indistinguishable" in readme.lower(), (
-        "README quotes the skills lift without saying it is indistinguishable from no effect. "
-        f"b={skills['b']} c={skills['c']} p={skills['p_value_one_sided']:.4f} — the number alone "
-        f"reads as a small win"
-    )
+    assert (
+        "OPENCODE_DISABLE_CLAUDE_CODE" in readme
+    ), "README withdraws the 121 figures without naming the leak that voided them"
+    assert (
+        LEAK_FINDING in readme
+    ), f"README does not point at the finding in {LEAK_FINDING}"
 
 
 def test_no_document_advertises_the_retired_figure_as_current():
