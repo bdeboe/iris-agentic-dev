@@ -12,6 +12,10 @@ the pilot, the nightly canary, and `python -m tests.e2e.skill_eval` — ask for 
 else does, which is the point: a test file that grows a live session starts failing rather than billing.
 
 A test that deliberately runs a real session sets the variable itself, and says so where it sets it.
+
+`spend_cap()` bounds a block by measured cost. `collect_events` charges each session's own
+`step_finish.cost` to it, and `assert_allowed` refuses the next session once the total reaches the
+cap. The session that crosses the cap runs to its end; it was already billed.
 """
 
 from __future__ import annotations
@@ -27,6 +31,46 @@ class BillingRefused(Exception):
     """A session was about to start that nothing had asked for."""
 
 
+class SpendCapReached(BillingRefused):
+    """A session was about to start after measured spend had reached the cap."""
+
+
+class _Meter:
+    def __init__(self, cap: float | None):
+        self.cap = cap
+        self.spent = 0.0
+
+
+_meter: _Meter | None = None
+
+
+def current_spend() -> float | None:
+    """Dollars measured so far inside the open `spend_cap` block, or None outside one."""
+    return _meter.spent if _meter is not None else None
+
+
+def charge(events) -> float:
+    """Add one finished session's measured cost to the open block. Returns that session's cost."""
+    from tests.e2e.skill_eval.cost_estimator import session_cost
+
+    cost = session_cost(events)
+    if _meter is not None:
+        _meter.spent += cost
+    return cost
+
+
+@contextlib.contextmanager
+def spend_cap(cap: float | None):
+    """Count every session's measured cost for the block; with a cap, stop sessions at it."""
+    global _meter
+    previous = _meter
+    _meter = _Meter(cap)
+    try:
+        yield _meter
+    finally:
+        _meter = previous
+
+
 def allowed() -> bool:
     """Whether a billable session may start. Exactly `1` — no truthiness, no `yes`, no `true`.
 
@@ -39,6 +83,10 @@ def allowed() -> bool:
 def assert_allowed(what: str) -> None:
     """Raise unless something asked for a billable session. `what` is named in the message."""
     if allowed():
+        if _meter is not None and _meter.cap is not None and _meter.spent >= _meter.cap:
+            raise SpendCapReached(
+                f"refusing to start {what}: ${_meter.spent:.2f} measured, cap ${_meter.cap:.2f}"
+            )
         return
     raise BillingRefused(
         f"refusing to start {what}: nothing asked for a billable agent session. "

@@ -226,12 +226,14 @@ def collect_events(
     timeout: int = 300,
     working_dir: str | None = None,
 ) -> list[dict]:
-    """Run opencode and return all events as a list."""
-    return list(
+    """Run opencode and return all events as a list, charged to any open `billing.spend_cap`."""
+    events = list(
         run_opencode(
             prompt, env_vars, model=model, timeout=timeout, working_dir=working_dir
         )
     )
+    billing.charge(events)
+    return events
 
 
 def read_session_db(db_path: str) -> dict:

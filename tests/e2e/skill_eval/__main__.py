@@ -315,7 +315,7 @@ def _merge_and_report(args) -> int:
     return 1 if regressions else 0
 
 
-def _main():
+def build_parser():
     parser = argparse.ArgumentParser(
         description="Skill regression and lift measurement suite"
     )
@@ -360,7 +360,20 @@ def _main():
         metavar="DIR",
         help="Merge per-shard skill-eval-*.json under DIR into one summary and exit",
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--cap",
+        type=float,
+        default=None,
+        help=(
+            "Stop starting sessions once their measured cost (opencode step_finish.cost) "
+            "reaches this many dollars. The estimate runs 3 to 35 times low (132)."
+        ),
+    )
+    return parser
+
+
+def _main():
+    args = build_parser().parse_args()
 
     # Before anything spends: corpus, scorer, binary, tool surface. Skipped for the three
     # modes that start no session. Exit 2 means nothing was spent — the distinction from 1
@@ -458,16 +471,27 @@ def _main():
     invalid_skills: list[str] = []
     item_counts: dict[str, tuple[int, int]] = {}
     cost_records: list[dict] = []
+    capped = None
+    meter_block = billing.spend_cap(args.cap)
+    meter = meter_block.__enter__()
     for cfg in configs:
-        result, lift_data = _run_skill(
-            cfg,
-            openai_key,
-            args.model,
-            args.runs,
-            iris_host,
-            iris_web_port,
-            iris_container,
-        )
+        try:
+            result, lift_data = _run_skill(
+                cfg,
+                openai_key,
+                args.model,
+                args.runs,
+                iris_host,
+                iris_web_port,
+                iris_container,
+            )
+        except billing.SpendCapReached as stop:
+            # The skill in progress is dropped: part of its sessions ran, so its rates are not
+            # comparable to anything. The skills before it stand.
+            capped = f"{cfg.skill}: {stop}"
+            print(f"\n  stopped at {capped}", flush=True)
+            break
+        print(f"  [{cfg.skill}] sessions so far ${meter.spent:.2f}", flush=True)
         # Recorded before the comparison, because the comparison reads it: a Δ is only computed
         # when this run's task set, scale, and grader match the ones the entry was measured with.
         result.provenance = _provenance(run_id, lift_data, probe, args.runs)
@@ -496,6 +520,11 @@ def _main():
             )
         results.append(result)
 
+    meter_block.__exit__(None, None, None)
+    if capped:
+        done = {r.skill for r in results}
+        invalid_skills.extend(c.skill for c in configs if c.skill not in done)
+
     # Add uncovered skills
     for skill in uncovered:
         results.append(_make_uncovered_result(skill))
@@ -508,7 +537,9 @@ def _main():
     uncovered_names = [r.skill for r in results if r.no_task_coverage]
 
     # Run-wide, as 118 contracts/scoring.md says: one thin skill does not void the others.
-    run_valid, _ = run_validity(item_counts) if item_counts else (not invalid_skills, [])
+    run_valid, _ = (
+        run_validity(item_counts) if item_counts else (not invalid_skills, [])
+    )
     written = [r for r in results if r.skill not in invalid_skills]
     actual_cost = merge_scorer_costs(cost_records)
     run = EvalRun(
@@ -527,6 +558,9 @@ def _main():
             "run_valid": run_valid,
             "invalid_skills": invalid_skills,
             "tool_surface": probe.tool_surface,
+            "session_cost_usd": round(meter.spent, 4),
+            "cap_usd": args.cap,
+            "capped": capped,
         },
         scorer_model_requested=_resolved(results, "scorer_model_requested"),
         tool_surface=probe.tool_surface,
@@ -542,6 +576,13 @@ def _main():
     # An invalid run may not reach the durable file, first write or not. The 2026-08 baseline
     # holds nine entries of fabricated zeros because a run was asked to write them and nothing
     # checked whether it had measured anything.
+    print(
+        f"Agent sessions: ${meter.spent:.2f} measured"
+        + (f", cap ${args.cap:.2f}" if args.cap else "")
+    )
+    if capped:
+        print(f"\nBaseline not written: the run stopped at the cap ({capped}).")
+        sys.exit(EXIT_INTEGRITY)
     if not run_valid:
         print(
             "\nBaseline not written: more than one item in ten went unscored across the run, "
