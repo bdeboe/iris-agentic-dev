@@ -361,6 +361,8 @@ fn no_aihub_eap_left_in_the_repo() {
     let files = String::from_utf8(out.stdout).unwrap();
     let skip = [
         "specs/",
+        // Release notes are history too: v1.5.0 names the skill it removed.
+        "docs/release-notes/",
         "target/",
         "tests/e2e/results/",
         "tests/e2e/skill_eval/fixtures/skill-eval-",
