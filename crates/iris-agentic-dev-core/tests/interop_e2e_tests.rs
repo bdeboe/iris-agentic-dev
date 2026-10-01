@@ -7,6 +7,17 @@ fn iris_dev_bin() -> std::path::PathBuf {
 }
 
 fn mcp_exchange(messages: &[serde_json::Value]) -> Vec<serde_json::Value> {
+    mcp_exchange_timed(messages).0
+}
+
+/// The responses, and the time from spawn to the last of them. SC-003 bounds the tool call, so
+/// the clock stops there: stopping the server afterwards takes about 2.2 s since 1.5.0 (the
+/// runtime waits out its 2 s shutdown bound for the parked stdin reader), and timing that too put
+/// every call on the 3 s line.
+fn mcp_exchange_timed(
+    messages: &[serde_json::Value],
+) -> (Vec<serde_json::Value>, std::time::Duration) {
+    let started = std::time::Instant::now();
     let bin = iris_dev_bin();
     let iris_host = std::env::var("IRIS_HOST").unwrap_or_default();
     let iris_port = std::env::var("IRIS_WEB_PORT").unwrap_or_else(|_| "52780".to_string());
@@ -68,8 +79,9 @@ fn mcp_exchange(messages: &[serde_json::Value]) -> Vec<serde_json::Value> {
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
     }
+    let answered = started.elapsed();
     iris_agentic_dev_core::testing::stop_server(&mut child);
-    results
+    (results, answered)
 }
 
 fn find_response(responses: &[serde_json::Value], id: u64) -> Option<serde_json::Value> {
@@ -206,23 +218,18 @@ fn interop_queues_returns_array() {
 #[test]
 #[ignore = "requires live IRIS with Interoperability and a running production"]
 fn test_production_item_enable_disable() {
-    use std::time::Instant;
     let iris_host = std::env::var("IRIS_HOST").unwrap_or_default();
     assert!(!iris_host.is_empty(), "IRIS_HOST must be set");
     let item = std::env::var("TEST_PROD_ITEM").unwrap_or_else(|_| "TestService".to_string());
     let ns = std::env::var("IRIS_NAMESPACE").unwrap_or_else(|_| "USER".to_string());
 
     // disable
-    let start = Instant::now();
-    let responses = mcp_exchange(&[
+    let (responses, took) = mcp_exchange_timed(&[
         serde_json::json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1"}}}),
         serde_json::json!({"jsonrpc":"2.0","method":"notifications/initialized","params":{}}),
         serde_json::json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"iris_production_item","arguments":{"action":"disable","item":item,"namespace":ns}}}),
     ]);
-    assert!(
-        start.elapsed().as_secs() < 3,
-        "SC-003: tool call exceeded 3s"
-    );
+    assert!(took.as_secs() < 3, "SC-003: tool call exceeded 3s");
     let resp = find_response(&responses, 2).expect("no response");
     let result = parse_tool_text(&resp);
     assert!(
@@ -244,20 +251,18 @@ fn test_production_item_enable_disable() {
 #[test]
 #[ignore = "requires live IRIS with Interoperability"]
 fn test_credential_crud() {
-    use std::time::Instant;
     let iris_host = std::env::var("IRIS_HOST").unwrap_or_default();
     assert!(!iris_host.is_empty(), "IRIS_HOST must be set");
     let ns = std::env::var("IRIS_NAMESPACE").unwrap_or_else(|_| "USER".to_string());
     let cred_id = "IrisDevTestCred";
 
     // list — assert no password in response
-    let start = Instant::now();
-    let responses = mcp_exchange(&[
+    let (responses, took) = mcp_exchange_timed(&[
         serde_json::json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1"}}}),
         serde_json::json!({"jsonrpc":"2.0","method":"notifications/initialized","params":{}}),
         serde_json::json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"iris_credential_list","arguments":{"namespace":ns}}}),
     ]);
-    assert!(start.elapsed().as_secs() < 3, "SC-003: list exceeded 3s");
+    assert!(took.as_secs() < 3, "SC-003: list exceeded 3s");
     let resp = find_response(&responses, 2).expect("no response");
     let raw_text = resp["result"]["content"][0]["text"].as_str().unwrap_or("");
     assert!(
@@ -291,7 +296,6 @@ fn test_credential_crud() {
 #[test]
 #[ignore = "requires live IRIS with Interoperability"]
 fn test_lookup_crud() {
-    use std::time::Instant;
     let iris_host = std::env::var("IRIS_HOST").unwrap_or_default();
     assert!(!iris_host.is_empty(), "IRIS_HOST must be set");
     let ns = std::env::var("IRIS_NAMESPACE").unwrap_or_else(|_| "USER".to_string());
@@ -300,13 +304,12 @@ fn test_lookup_crud() {
     // set 3 keys — Key3's value carries a quote, an apostrophe and an accent:
     // the old SQL-style escaping corrupted ' to '' and died with <SYNTAX> on "
     for (key, val) in &[("Key1", "Val1"), ("Key2", "Val2"), ("Key3", "Va\"l'ñ3")] {
-        let start = Instant::now();
-        let responses = mcp_exchange(&[
+        let (responses, took) = mcp_exchange_timed(&[
             serde_json::json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1"}}}),
             serde_json::json!({"jsonrpc":"2.0","method":"notifications/initialized","params":{}}),
             serde_json::json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"iris_lookup_manage","arguments":{"action":"set","table":table,"key":key,"value":val,"namespace":ns}}}),
         ]);
-        assert!(start.elapsed().as_secs() < 3, "SC-003: set exceeded 3s");
+        assert!(took.as_secs() < 3, "SC-003: set exceeded 3s");
         let r = parse_tool_text(&find_response(&responses, 2).expect("no response"));
         assert_eq!(r["success"], true, "set {key} failed: {r}");
     }
@@ -386,22 +389,17 @@ fn test_lookup_crud() {
 #[test]
 #[ignore = "requires live IRIS with Interoperability"]
 fn test_production_autostart() {
-    use std::time::Instant;
     let iris_host = std::env::var("IRIS_HOST").unwrap_or_default();
     assert!(!iris_host.is_empty(), "IRIS_HOST must be set");
     let ns = std::env::var("IRIS_NAMESPACE").unwrap_or_else(|_| "USER".to_string());
 
     // get current state
-    let start = Instant::now();
-    let responses = mcp_exchange(&[
+    let (responses, took) = mcp_exchange_timed(&[
         serde_json::json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1"}}}),
         serde_json::json!({"jsonrpc":"2.0","method":"notifications/initialized","params":{}}),
         serde_json::json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"iris_production","arguments":{"action":"get_autostart","namespace":ns}}}),
     ]);
-    assert!(
-        start.elapsed().as_secs() < 3,
-        "SC-003: get_autostart exceeded 3s"
-    );
+    assert!(took.as_secs() < 3, "SC-003: get_autostart exceeded 3s");
     let r = parse_tool_text(&find_response(&responses, 2).expect("no response"));
     assert!(
         r["success"] == true || r.get("error_code").is_some(),
