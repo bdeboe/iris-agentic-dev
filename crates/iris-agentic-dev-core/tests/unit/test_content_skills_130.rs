@@ -168,6 +168,39 @@ fn query_plans_skill_exists_with_its_facts() {
     );
 }
 
+/// The Statistics section. Each line is held by a test in `test_query_stats_139_live.rs`. The
+/// docs' TUNE TABLE page still says it writes the class and recompiles cached queries, which 139
+/// does not do, so the skill must not repeat that.
+#[test]
+fn query_plans_has_the_statistics_facts_139_holds() {
+    let t = skill("iris-query-plans");
+    has(
+        "iris-query-plans",
+        &t,
+        &[
+            "## Statistics: fixed and collected",
+            "DROP FIXED STATISTICS",
+            "FIX STATISTICS",
+            "SetExtentSize",
+            "$SYSTEM.SQL.Stats.Table.Export",
+            "$SYSTEM.SQL.Stats.Table.Import",
+            "ClearTableStats",
+            "INFORMATION_SCHEMA.STATEMENTS",
+            "%SYS.Task.AutoStatsCollection",
+            "RSQL_tunetable",
+            "GSOD_opttable",
+        ],
+    );
+    lacks(
+        "iris-query-plans",
+        &t,
+        &[
+            "recompiles all cached queries",
+            "`TUNE TABLE Pkg.Orders` gathers selectivity and extent size, and the planner uses them",
+        ],
+    );
+}
+
 /// Round 3, SKILL-13. "Run `%BuildIndices` after a `%NOINDEX` bulk load" read as a one-off admin
 /// step: all three skill-arm sessions rebuilt the index by hand, and the loader's next run emptied it
 /// again. The skill now says the loader has to call it, and that a rebuild by hand does not last.

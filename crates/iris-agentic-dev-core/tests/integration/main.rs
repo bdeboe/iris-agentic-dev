@@ -54,6 +54,7 @@ mod test_live_reload_e2e;
 mod test_mcp_iris;
 mod test_mdx_131_live;
 mod test_mirror_and_freespace;
+mod test_query_stats_139_live;
 mod test_retry;
 mod test_role_gate_e2e;
 mod test_scm;
