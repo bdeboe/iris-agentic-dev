@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import sys
 
 #: Set to `1` for the duration of a command that is supposed to spend money.
 BILLABLE_ENV = "IAD_BILLABLE_SESSIONS"
@@ -56,6 +57,12 @@ def charge(events) -> float:
     cost = session_cost(events)
     if _meter is not None:
         _meter.spent += cost
+        cap = f" of cap ${_meter.cap:.2f}" if _meter.cap is not None else ""
+        print(
+            f"    session ${cost:.2f}, total ${_meter.spent:.2f}{cap}",
+            file=sys.stderr,
+            flush=True,
+        )
     return cost
 
 

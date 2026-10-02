@@ -80,3 +80,14 @@ def test_the_cli_takes_a_cap():
 
     assert build_parser().parse_args(["--cap", "5"]).cap == 5.0
     assert build_parser().parse_args([]).cap is None
+
+
+def test_each_charged_session_is_logged_with_the_running_total(capsys):
+    # A session that crosses the cap still runs to its end. The log line is how the overshoot is
+    # read afterwards: $1.50 cap, $3.92 spent, and which session did it.
+    with billing.allow(), billing.spend_cap(1.5):
+        billing.charge([_step(0.4)])
+        billing.charge([_step(2.0)])
+    err = capsys.readouterr().err
+    assert "session $0.40, total $0.40 of cap $1.50" in err
+    assert "session $2.00, total $2.40 of cap $1.50" in err
