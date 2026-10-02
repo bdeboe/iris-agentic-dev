@@ -327,14 +327,17 @@ fn skill_names_only_real_tools() {
     assert!(unknown.is_empty(), "not tools: {unknown:?}");
 }
 
+/// Build 162 is old and gone from the registry. Nothing an agent or user reads names it.
 #[test]
-fn skill_does_not_call_162_current() {
-    let t = ai_hub_skill();
-    for l in t.lines().filter(|l| l.contains("162")) {
-        assert!(
-            l.contains("describe"),
-            "162 may appear only as the build the docs describe: {l}"
-        );
+fn no_mention_of_build_162() {
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for rel in [
+        "skills/skills/iris-ai-hub/SKILL.md",
+        "contrib/aihub/README.md",
+    ] {
+        let t = std::fs::read_to_string(repo.join(rel)).unwrap();
+        let hits: Vec<&str> = t.lines().filter(|l| l.contains("162")).collect();
+        assert!(hits.is_empty(), "{rel} names build 162: {hits:?}");
     }
 }
 

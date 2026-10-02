@@ -2,7 +2,7 @@
 
 ## Tech stack
 
-- ObjectScript (IRIS AI Hub 2026.2 build 162+)
+- ObjectScript (IRIS AI Hub)
 - IRIS export format (`.xml` via `$system.OBJ.Export`)
 - Markdown (README, skill update)
 - Test runner: `iris-agentic-dev tool iris_execute` against aihub-iris-116 (port 21972)

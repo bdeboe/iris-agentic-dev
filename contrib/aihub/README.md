@@ -6,7 +6,7 @@ MCP tools into AI Hub agents as ToolSet and Skill classes.
 
 ## Prerequisites
 
-- IRIS AI Hub build 162 or later
+- IRIS with AI Hub (the `%AI` package)
 - `iris-agentic-dev` binary installed and on `PATH` (or at `/opt/homebrew/bin/iris-agentic-dev`
   on Apple Silicon, `/usr/local/bin/iris-agentic-dev` on Intel Mac)
 

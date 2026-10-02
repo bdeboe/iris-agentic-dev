@@ -66,7 +66,7 @@ that remove write-gated tools: `iris_compile`, `iris_doc` (put/delete modes),
 
 ### FR-006 — README
 
-`contrib/aihub/README.md` covers: prerequisites (IRIS AI Hub build 162+,
+`contrib/aihub/README.md` covers: prerequisites (IRIS with AI Hub,
 iris-agentic-dev binary), import steps, wallet setup, example agent snippet,
 read-only variant, troubleshooting.
 

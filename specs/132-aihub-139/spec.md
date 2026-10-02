@@ -7,7 +7,7 @@
 
 ## Context
 
-iad ships two AI Hub skills. `aihub-eap` (711 lines) is a vendored copy of the skill in the public repo `github.com/intersystems-community/ai-hub-eap`, pinned by a test to upstream's `skills/aihub-eap/SKILL.md` (blob `72f9046`, unchanged at upstream HEAD `72749d6`) plus one local patch. It says the current build is 2026.2.0AI.162.0. `iris-ai-hub` (255 lines) is iad's own. Neither tells an agent where the upstream docs live or how to read them, and neither has been checked against the 2026.3 line.
+iad ships two AI Hub skills. `aihub-eap` (711 lines) is a vendored copy of the skill in the public repo `github.com/intersystems-community/ai-hub-eap`, pinned by a test to upstream's `skills/aihub-eap/SKILL.md` (blob `72f9046`, unchanged at upstream HEAD `72749d6`) plus one local patch. It names an older 2026.2 build as current. `iris-ai-hub` (255 lines) is iad's own. Neither tells an agent where the upstream docs live or how to read them, and neither has been checked against the 2026.3 line.
 
 The EAP build is now 2026.3.0AI.139.0. The upstream repo still describes the 2026.2 line, so some class names, signatures or parameters may have moved. iad already has the tools to read the truth off an instance (`iris_info`, `docs_introspect`, `iris_symbols`). What is missing is a skill that sends the agent to the docs for concepts and to the build for facts, a 139 instance that tests can reach, and evidence about whether any step needs a tool rather than more skill text.
 

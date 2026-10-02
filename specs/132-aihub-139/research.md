@@ -60,7 +60,7 @@ With `IAD_ALLOW_SKIP=1`, the same run prints `SKIP (IAD_ALLOW_SKIP set): AI Hub 
   | Samples              | `objectscript/cls/`            | 40 `.cls` files |
   | Upstream's own skill | `skills/aihub-eap/SKILL.md`    | 707             |
 
-- The docs describe build 162. Nothing mentions 139 or 2026.3.
+- The docs describe an older 2026.2 build. Nothing mentions 139 or 2026.3.
 - `72f9046`, the id the old pin test used, is a **blob** sha, not a commit. It is the blob of `skills/aihub-eap/SKILL.md`, last changed in commit b716ddb, and unchanged at HEAD.
 
 ## R3: `skill_community` cannot install upstream's skill

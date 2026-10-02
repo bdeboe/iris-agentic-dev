@@ -17,7 +17,7 @@ AI Hub (`%AI.*`) ships only in Early Access builds, and each build changes names
 
 - Repo: `https://github.com/intersystems-community/ai-hub-eap`, branch `master`.
 - Read a file raw: `https://raw.githubusercontent.com/intersystems-community/ai-hub-eap/master/<path>`.
-- The repo moves. Check its current state (latest commit, whether the file you want still exists) before relying on a file; the map below was recorded at `72749d6` (2026-09-09), when the docs described build 162.
+- The repo moves. Check its current state (latest commit, whether the file you want still exists) before relying on a file; the map below was recorded at `72749d6` (2026-09-09).
 - If GitHub is unreachable, skip the docs and work from the installed `%AI` classes alone (workflow step 2). Say that you did.
 
 ## Topic map
@@ -122,6 +122,6 @@ Where the ai-hub-eap docs and 2026.3 disagree, trust these lines. Each one is a 
 
 ## Upstream's own skill
 
-ai-hub-eap carries its own agent skill. Read it raw: `https://raw.githubusercontent.com/intersystems-community/ai-hub-eap/master/skills/aihub-eap/SKILL.md`. It describes build 162; check what it says against the installed classes as in the workflow above.
+ai-hub-eap carries its own agent skill. Read it raw: `https://raw.githubusercontent.com/intersystems-community/ai-hub-eap/master/skills/aihub-eap/SKILL.md`. It was written for an older build; check what it says against the installed classes as in the workflow above.
 
 `skill_community` cannot install it: iad subscribes to a repo through an `iris-agentic-dev.toml` at the repo root, and ai-hub-eap has none.

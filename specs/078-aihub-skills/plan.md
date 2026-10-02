@@ -2,7 +2,7 @@
 
 ## Tech stack
 
-- ObjectScript (IRIS AI Hub 2026.2 build 162+)
+- ObjectScript (IRIS AI Hub)
 - IRIS export format
 - Source SKILL.md files in `skills/skills/`
 - Test runner: `iris_execute` against aihub-iris-116 (port 21972)
