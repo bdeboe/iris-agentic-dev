@@ -1,6 +1,8 @@
 # Quickstart: 132 AI Hub on EAP build 139
 
-## Start the 139 container
+## Start the AI Hub container
+
+The container ran build 139 until 2026-10-02 and runs 154 now. The 139 one is kept, stopped, as `iad-aihub-iris-139`. The key directory keeps its `aihub139` name.
 
 The key and gateway config live in `~/.config/iris-agentic-dev/aihub139/` (`iris.key`, `CSP.ini`, `CSP.conf`), outside the repo. Never commit them.
 
@@ -8,11 +10,13 @@ The key and gateway config live in `~/.config/iris-agentic-dev/aihub139/` (`iris
 D=~/.config/iris-agentic-dev/aihub139
 docker run -d --name iad-aihub-iris -p 11976:1972 \
   -v $D/iris.key:/usr/irissys/mgr/iris.key:ro \
-  docker.iscinternal.com/docker-unreleased/intersystems/irishealth:2026.3.0AI.139.0
-# wait for "Enabling logons" in messages.log, then (retry if the first try is early):
-printf 'do ##class(Security.Users).UnExpireUserPasswords("*")\nhalt\n' \
+  docker.iscinternal.com/docker-unreleased/intersystems/irishealth:2026.3.0AI.154.0
+# wait for "Enabling logons" in messages.log, then (retry if the first try is early).
+# A fresh container has an empty ConfigStore descriptor registry; without the rebuild every
+# AI.LLM Create fails with ERROR #26414.
+printf 'do ##class(Security.Users).UnExpireUserPasswords("*")\ndo ##class(%%ConfigStore.DescriptorManager).RebuildRegistry()\nhalt\n' \
   | docker exec -i iad-aihub-iris iris session IRIS -U %SYS
-docker exec iad-aihub-iris iris list   # expect 2026.3.0AI.139
+docker exec iad-aihub-iris iris list   # expect 2026.3.0AI.154
 ```
 
 ## Start the Web Gateway sidecar

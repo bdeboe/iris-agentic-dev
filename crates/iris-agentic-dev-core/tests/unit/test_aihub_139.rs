@@ -692,3 +692,28 @@ fn drafts_has_the_fr008_toml_request() {
         "{h}: says what the file enables"
     );
 }
+
+/// Build 154 (2026-10-02). `%CanExecute` takes `toolref`, the string the tool was registered under,
+/// where 139 passed the tool spec as JSON. `StreamChat` lost `callbackMethod`: its callback extends
+/// `%AI.Shell.StreamRenderer`. A fresh instance needs `RebuildRegistry` before any `AI.LLM` Create.
+/// The live proof is `aihub_139_policies`, `aihub_139_class_inventory` and
+/// `aihub_139_agent_providerconfig`.
+#[test]
+fn skill_carries_the_154_changes() {
+    let t = ai_hub_skill();
+    for good in [
+        "toolref",
+        "%AI.Shell.StreamRenderer",
+        "RebuildRegistry",
+        "#26414",
+        "Build 154",
+    ] {
+        assert!(t.contains(good), "iris-ai-hub must contain {good:?}");
+    }
+    for bad in [
+        "callbackObj, callbackMethod)",
+        "`tool` is the tool spec as JSON",
+    ] {
+        assert!(!t.contains(bad), "iris-ai-hub still contains {bad:?}");
+    }
+}

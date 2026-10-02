@@ -1,4 +1,5 @@
-//! Spec 132: AI Hub claims measured on the licensed 2026.3.0AI.139 instance.
+//! Spec 132: AI Hub claims first measured on the licensed 2026.3.0AI.139 instance. Since 2026-10-02
+//! `iad-aihub-iris` runs build 154; the names keep 139.
 //!
 //! Every test here talks to `iad-aihub-iris` through `iad-aihub-webgateway` on 52781, via a spawned
 //! iad over HTTP (`testing::aihub_session`). With the instance down each one panics naming the
@@ -49,7 +50,7 @@ fn exec(mcp: &mut McpSession, code: &str) -> String {
 
 #[test]
 #[ignore = "live iad-aihub-iris"]
-fn aihub_version_is_139() {
+fn aihub_version_is_154_or_later() {
     let Some(env) = aihub_env() else { return };
     let mut mcp = aihub_session(&env);
     let got = payload(&mcp.call("iris_info", &serde_json::json!({"what": "metadata"})));
@@ -58,7 +59,15 @@ fn aihub_version_is_139() {
         .and_then(serde_json::Value::as_str)
         .unwrap_or_else(|| panic!("no version in iris_info metadata: {got}"));
     assert!(version.contains("2026.3.0AI"), "{version}");
-    assert!(version.contains("Build 139"), "{version}");
+    // The container moved from 139 to 154 on 2026-10-02. The tests' names still say 139, the
+    // build the claims were first measured on.
+    let build: u32 = version
+        .split("Build ")
+        .nth(1)
+        .and_then(|b| b.split(|c: char| !c.is_ascii_digit()).next())
+        .and_then(|b| b.parse().ok())
+        .unwrap_or_else(|| panic!("no build number in {version}"));
+    assert!(build >= 154, "want build 154 or later: {version}");
 }
 
 #[test]
@@ -359,7 +368,7 @@ fn aihub_139_class_inventory() {
         ("%AI.Agent", "CreateSession", false, "config:%DynamicObject=\"\"", "%AI.Agent.Session"),
         ("%AI.Agent", "CreateSubAgent", false, "systemPrompt:%String=\"\"", "%AI.Agent"),
         ("%AI.Agent", "Run", false, "session:%AI.Agent.Session,goal:%String=\"\",callbackOref:%RegisteredObject=$$$NULLOREF", "%AI.LLM.Response"),
-        ("%AI.Agent", "StreamChat", false, "session:%AI.Agent.Session,input:%String,callbackObj:%RegisteredObject=$$$NULLOREF,callbackMethod:%String=\"\"", "%AI.LLM.Response"),
+        ("%AI.Agent", "StreamChat", false, "session:%AI.Agent.Session,input:%String,callbackObj:%RegisteredObject=$$$NULLOREF", "%AI.LLM.Response"),
         ("%AI.Agent", "UseToolSet", false, "className:%String", "%Library.Status"),
         ("%AI.Agent", "UseSkill", false, "skillOrClassName", "%Library.Status"),
         ("%AI.Agent.Session", "GetStats", false, "", "%Library.DynamicObject"),
@@ -367,7 +376,7 @@ fn aihub_139_class_inventory() {
         ("%AI.Agent.Skill", "GetSkillFromURI", true, "uri:%String,subpath:%String=\"\",cacheDir:%String=\"\",authProvider:%RegisteredObject=\"\"", "%AI.Agent.Skill"),
         ("%AI.Agent.SubAgent", "Create", true, "parentAgent:%AI.Agent,systemPrompt:%String=\"\",config:%String=\"\"", "%AI.Agent"),
         ("%AI.Policy.Audit", "%LogExecution", false, "call:%DynamicObject,metadata:%DynamicObject,result:%DynamicObject,duration:%Integer,status:%Status", "%Library.Status"),
-        ("%AI.Policy.Authorization", "%CanExecute", false, "tool:%String,call:%DynamicObject,metadata:%DynamicObject", "%Library.Status"),
+        ("%AI.Policy.Authorization", "%CanExecute", false, "toolref:%String,call:%DynamicObject,metadata:%DynamicObject", "%Library.Status"),
         ("%AI.Provider", "Create", true, "name:%String,settings:%DynamicObject", "%AI.Provider"),
         ("%AI.RAG.Embedding.FastEmbed", "Create", true, "", "%AI.RAG.Embedding.FastEmbed"),
         ("%AI.RAG.KnowledgeBase", "AddDocument", false, "text:%String,metadata:%DynamicObject={{}}", "%Library.Status"),
@@ -382,7 +391,7 @@ fn aihub_139_class_inventory() {
         ("%AI.ToolMgr", "SetAuditPolicy", false, "policy:%AI.Policy.Audit", "%Library.Status"),
         ("%AI.ToolMgr", "SetAuthPolicy", false, "policy:%AI.Policy.Authorization", "%Library.Status"),
         ("%AI.ToolMgr", "SetDiscoveryPolicy", false, "policy:%AI.Policy.Discovery", "%Library.Status"),
-        ("%ConfigStore.Configuration", "Create", true, "area:%String,type:%String,subtype:%String,name:%String,details:%DynamicObject,displayName:%String=\"\",description:%String=\"\",readResource:%String=\"\",editResource:%String=\"\",enabled:%Boolean=1,validateDetails:%Boolean=1", "%Library.Status"),
+        ("%ConfigStore.Configuration", "Create", true, "area:%String,type:%String,subtype:%String,name:%String,details:%DynamicObject,displayName:%String=\"\",description:%String=\"\",readResource:%String=$$$AdminConfigStoreResourceName,editResource:%String=$$$AdminConfigStoreResourceName,enabled:%Boolean=1,validateDetails:%Boolean=1", "%Library.Status"),
         ("%ConfigStore.Configuration", "Delete", true, "fqn:%String", "%Library.Status"),
         ("%ConfigStore.Configuration", "Get", true, "fqn:%String,*config:%ConfigStore.Configuration", "%Library.Status"),
         ("%ConfigStore.Configuration", "GetDetails", true, "fqn:%String,*details:%DynamicObject,checkValid:%Boolean=1,resolveSecrets:%Boolean=0", "%Library.Status"),
@@ -620,9 +629,9 @@ const SEE_TOOL: &str = r#"/// Records the tool argument %CanExecute receives, an
 Class IadAihub139.SeeTool Extends %AI.Policy.Authorization
 {
 
-Method %CanExecute(tool As %String, call As %DynamicObject, metadata As %DynamicObject) As %Status
+Method %CanExecute(toolref As %String, call As %DynamicObject, metadata As %DynamicObject) As %Status
 {
-    Set ^IadAihub139("tool") = tool
+    Set ^IadAihub139("tool") = toolref
     Return $$$OK
 }
 
@@ -661,11 +670,12 @@ Set rd=##class(%XML.Reader).%New() Do rd.OpenString("<Authorization><Blocked>Rev
         "cba calls=1 last=Reverse",
         "SetAuditPolicy sees each call; call.name is the tool name"
     );
-    let seen: serde_json::Value = serde_json::from_str(get(&m, "seen"))
-        .unwrap_or_else(|e| panic!("%CanExecute's tool argument is not tool JSON ({e}): {m:?}"));
+    // 139 passed the tool spec as JSON here. 154 passes `toolref`, the string the tool was
+    // registered under.
     assert_eq!(
-        seen["name"], "Reverse",
-        "tool is the whole tool spec: {seen}"
+        get(&m, "seen"),
+        "Reverse",
+        "%CanExecute's first argument is the bare toolref: {m:?}"
     );
 
     let local2 = get(&m, "local2");
@@ -717,6 +727,7 @@ Method %OnInit() As %Status
 
 /// The fake-key wallet and config, and everything else the agent test leaves.
 const AGENT_TEARDOWN: &str = r#"Do ##class(%ConfigStore.Configuration).Delete("AI.LLM.IadAihub139LLM")
+Do ##class(%ConfigStore.Configuration).Delete("AI.LLM.IadAihub139NoKey")
 Do ##class(%Wallet.KeyValue).Delete("IadAihub139.Fake")
 Do ##class(%Wallet.Collection).Delete("IadAihub139")"#;
 
@@ -739,7 +750,9 @@ fn aihub_139_agent_providerconfig() {
         s.put((name, src));
     }
     let code = format!(
-        r#"Set sc=##class(%Wallet.Collection).Create("IadAihub139",{{"UseResource":"%DB_USER","EditResource":"%DB_USER"}}) Write "wallet=",{ST},!
+        r#"Set sc=##class(%ConfigStore.DescriptorManager).RebuildRegistry() Write "registry=",{ST},!
+Set sc=##class(%ConfigStore.Configuration).Create("AI","LLM","","IadAihub139NoKey",{{"model_provider":"openai","model":"gpt-4.1-mini"}}) Write "nokey=",$System.Status.GetErrorText(sc),!
+Set sc=##class(%Wallet.Collection).Create("IadAihub139",{{"UseResource":"%DB_USER","EditResource":"%DB_USER"}}) Write "wallet=",{ST},!
 Set sc=##class(%Wallet.KeyValue).Create("IadAihub139.Fake",{{"Usage":"CUSTOM","Secret":{{"api_key":"sk-fake-not-a-key"}}}}) Write "secret=",{ST},!
 Set sc=##class(%ConfigStore.Configuration).Create("AI","LLM","","IadAihub139LLM",{{"model_provider":"openai","model":"gpt-4.1-mini","api_key":"secret://IadAihub139.Fake#api_key"}}) Write "create=",{ST},!
 Set sc=##class(%ConfigStore.Configuration).Get("AI.LLM.IadAihub139LLM",.c) Write "get=",{ST}," ",$IsObject($Get(c)),!
@@ -761,7 +774,13 @@ Set sc=##class(%ConfigStore.Configuration).Get("AI.LLM.IadAihub139LLM",.c) Write
     );
     let m = s.kv(&code);
 
-    for k in ["wallet", "secret", "create"] {
+    // A fresh 139 or 154 container has an empty descriptor registry, and every AI.LLM Create
+    // fails with ERROR #26414 "No descriptor found for AI.LLM" until RebuildRegistry runs.
+    assert!(
+        get(&m, "nokey").contains("'api_key' is required for provider 'openai'"),
+        "an openai entry with no api_key is refused: {m:?}"
+    );
+    for k in ["registry", "wallet", "secret", "create"] {
         assert_eq!(get(&m, k), "ok", "{k}: {m:?}");
     }
     assert_eq!(get(&m, "get"), "ok 1", "Get(fqn, .config) reads the entry");
@@ -1197,7 +1216,8 @@ fn aihub_139_real_turn() {
 
     // The key goes by name into the session's environment; it is never in a command line,
     // in iad's environment, or in anything this test prints.
-    let script = r#"Set k=$System.Util.GetEnviron("OPENAI_API_KEY")
+    let script = r#"Set sc=##class(%ConfigStore.DescriptorManager).RebuildRegistry()
+Set k=$System.Util.GetEnviron("OPENAI_API_KEY")
 Set sc=##class(%Wallet.Collection).Create("IadAihub139",{"UseResource":"%DB_USER","EditResource":"%DB_USER"})
 Set sc=##class(%Wallet.KeyValue).Create("IadAihub139.OpenAI",{"Usage":"CUSTOM","Secret":{"api_key":(k)}}) Kill k
 Write "wallet=",$System.Status.IsOK(sc),!

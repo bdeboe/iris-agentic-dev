@@ -3,7 +3,7 @@ name: iris-ai-hub
 author: tdyar
 version: 0.2.0
 managed_by: iris-agentic-dev
-description: "IRIS AI Hub (%AI.* classes, EAP builds): where the upstream docs are and which file covers what, how to check them against the installed build, and the %AI.Agent / %AI.Tool / %AI.ToolSet / ConfigStore / Wallet / MCP server facts measured on 2026.3.0AI build 139. Load when building or debugging AI Hub agents, tools, providers or MCP servers."
+description: "IRIS AI Hub (%AI.* classes, EAP builds): where the upstream docs are and which file covers what, how to check them against the installed build, and the %AI.Agent / %AI.Tool / %AI.ToolSet / ConfigStore / Wallet / MCP server facts measured on 2026.3.0AI builds 139 and 154. Load when building or debugging AI Hub agents, tools, providers or MCP servers."
 source: >-
   ai-hub-eap master 72749d6dbf0b856a60775378fa88d346bb79d4e4;
   ready-hackathon-dev-template 391c3d5 ai-hub-* skills by Gabriel Ing
@@ -37,7 +37,7 @@ The SDK guide is over 3,000 lines. Fetch it once and search it for the class you
 
 ## Workflow
 
-1. Read the build: `iris_info` with `what: "metadata"` (the `version` field), or `Write $ZVERSION` through `iris_execute`. Note the build number (for example `2026.3.0AI (Build 139U)`).
+1. Read the build: `iris_info` with `what: "metadata"` (the `version` field), or `Write $ZVERSION` through `iris_execute`. Note the build number (for example `2026.3.0AI (Build 154U)`).
 2. Read the installed `%AI` classes for the part you are about to use: `iris_symbols` or `docs_introspect` on the class, or `iris_query` on `%Dictionary.CompiledClass` / `%Dictionary.CompiledMethod` for names and signatures.
 3. Fetch the doc file for the topic from the map above and read it for the concept and the calling pattern.
 4. Where the doc and the installed class disagree, the installed classes win. Write the code against the installed signature, and tell the user which doc line disagrees with which build.
@@ -58,12 +58,14 @@ Do not name `%Dictionary.ClassDefinition` or `%Dictionary.MethodDefinition` in `
 
 ## What holds on 2026.3
 
-Each fact below has a live test on build 139 (`crates/iris-agentic-dev-core/tests/integration/test_aihub_139_live.rs`); the claim table in `specs/132-aihub-139/research.md` names it. On another build, check the class first (workflow step 2).
+Each fact below has a live test, first run on build 139 and last run on Build 154 (`crates/iris-agentic-dev-core/tests/integration/test_aihub_139_live.rs`); the claim table in `specs/132-aihub-139/research.md` names it. On another build, check the class first (workflow step 2).
 
 ### ConfigStore and Wallet
 
 - `%ConfigStore.Configuration` class methods: `Create(area, type, subtype, name, details)` (six optional args follow), `Get(fqn, .config)`, `GetDetails(fqn, .details, checkValid, resolveSecrets)`, `Delete(fqn)`. All return `%Status`. `fqn` is the dotted name, and an empty subtype drops out: `("AI","LLM","","openai")` is `AI.LLM.openai` (from Gabriel Ing's hackathon skills).
-- An LLM entry holds `model_provider`, `model` and `api_key` (from Gabriel Ing's hackathon skills).
+- An LLM entry holds `model_provider`, `model` and `api_key` (from Gabriel Ing's hackathon skills). Create refuses an `openai` entry with no `api_key`.
+- On a fresh instance every `AI.LLM` Create fails with ERROR #26414 "No descriptor found for AI.LLM": the descriptor registry is empty. Run `Do ##class(%ConfigStore.DescriptorManager).RebuildRegistry()` once, then Create works. Seen on fresh 139 and 154 containers.
+- On 154, Create's `readResource` and `editResource` default to `$$$AdminConfigStoreResourceName`. On 139 they defaulted to empty.
 - Keep the key in the wallet: `%Wallet.Collection` `Create(name, {"UseResource":..,"EditResource":..})`, then `%Wallet.KeyValue` `Create("Coll.Key", {"Usage":"CUSTOM","Secret":{"api_key":..}})`, and put `"api_key": "secret://Coll.Key#api_key"` in the entry. `GetDetails(fqn, .d, 1, 1)` resolves it (from Gabriel Ing's hackathon skills).
 - Wallet and ConfigStore writes work from USER. Only `Security.Resources` needs `%SYS`.
 
@@ -73,7 +75,7 @@ Each fact below has a live test on build 139 (`crates/iris-agentic-dev-core/test
 - An `%AI.Agent` subclass sets `Parameter PROVIDERCONFIG = "@{config:Name}"` (or `"@{config:AI.LLM.Name}"`) and `Parameter TOOLSETS = "<ToolSet class>"`. Nothing is built until `%Init()`: after `%New()` alone `Provider` is empty. `%Init()` builds the provider, loads the toolsets and then calls your `%OnInit()` (from Gabriel Ing's hackathon skills).
 - In `%OnInit()`, parenthesise each comparison: `If (..Provider = "") && (..#X '= "")`. ObjectScript runs left to right, so without the parentheses the test is always true.
 - `%AI.Agent` properties: `Provider`, `Model`, `SystemPrompt`, `ToolManager` (an `%AI.ToolMgr`), `ParentAgent` (from Gabriel Ing's hackathon skills).
-- `CreateSession(config="")` returns `%AI.Agent.Session`. `Chat(session, input)`, `StreamChat(session, input, callbackObj, callbackMethod)`, `ChatWithContent(session, content As %DynamicArray)` and `Run(session, goal)` return `%AI.LLM.Response` (`Content`, `ToolCalls`, `Usage`). `session` is required. `session.GetStats()` returns a `%DynamicObject` (from Gabriel Ing's hackathon skills).
+- `CreateSession(config="")` returns `%AI.Agent.Session`. `Chat(session, input)`, `StreamChat(session, input, callbackObj)`, `ChatWithContent(session, content As %DynamicArray)` and `Run(session, goal)` return `%AI.LLM.Response` (`Content`, `ToolCalls`, `Usage`). `session` is required. On 154 the `StreamChat` callback must extend `%AI.Shell.StreamRenderer`: `OnChunk()` fires per delta and `OnMessage()` once per turn. 139 also took a `callbackMethod` name; 154 does not. `session.GetStats()` returns a `%DynamicObject` (from Gabriel Ing's hackathon skills).
 - Sub-agents: `%AI.Agent.SubAgent` `Create(parentAgent, systemPrompt, config)` returns an `%AI.Agent`, so it has `Chat`, `Run` and `CreateSession`. Skills are `%AI.Agent.Skill`: `Parameter TOOLS`, `ExportSkill(target)` returns a path string, `GetSkillFromURI(uri, subpath, cacheDir, authProvider)` is a class method (from Gabriel Ing's hackathon skills).
 
 ### Tools and toolsets
@@ -86,10 +88,10 @@ Each fact below has a live test on build 139 (`crates/iris-agentic-dev-core/test
 
 ### Policies
 
-- `%AI.Policy.Authorization` `%CanExecute(tool, call, metadata) As %Status`: `tool` is the tool spec as JSON (read `.name`), not a bare name. Deny with `$$$ERROR($$$AICoreToolAccessDenied, ..)` after `Include %AI` (from Gabriel Ing's hackathon skills).
+- `%AI.Policy.Authorization` `%CanExecute(toolref, call, metadata) As %Status`. On 154 `toolref` is the plain string the tool was registered under (`Reverse`); 139 passed the tool spec as JSON there. Read the tool name from `call.name` on either build. Deny with `$$$ERROR($$$AICoreToolAccessDenied, ..)` after `Include %AI` (from Gabriel Ing's hackathon skills).
 - `%AI.Policy.Audit` `%LogExecution(call As %DynamicObject, metadata As %DynamicObject, result As %DynamicObject, duration As %Integer, status As %Status) As %Status`; `call.name` is the tool name. `%AI.Policy.ConsoleAudit` and `%AI.Policy.Discovery` exist (from Gabriel Ing's hackathon skills).
 - Global: `ToolManager.SetAuthPolicy(obj)`, `SetAuditPolicy(obj)`, `SetDiscoveryPolicy(obj)` (from Gabriel Ing's hackathon skills).
-- ToolSet-local: `<Policies><Authorization Class=".."><Item>..</Item></Authorization><Audit Class=".."/></Policies>`. The policy class extends `%XML.Adaptor`, sets `Parameter XMLNAME`, and projects list properties with `XMLITEMNAME` and `XMLPROJECTION = "ELEMENT"` (from Gabriel Ing's hackathon skills). A list with one item loads empty on 139, so give a deny list at least two entries.
+- ToolSet-local: `<Policies><Authorization Class=".."><Item>..</Item></Authorization><Audit Class=".."/></Policies>`. The policy class extends `%XML.Adaptor`, sets `Parameter XMLNAME`, and projects list properties with `XMLITEMNAME` and `XMLPROJECTION = "ELEMENT"` (from Gabriel Ing's hackathon skills). A list with one item loads empty on 139 and 154, so give a deny list at least two entries.
 
 ### RAG
 
@@ -108,7 +110,7 @@ Each fact below has a live test on build 139 (`crates/iris-agentic-dev-core/test
 
 ## Corrections
 
-Where the ai-hub-eap docs and 2026.3 disagree, trust these lines. Each one is a live test on build 139.
+Where the ai-hub-eap docs and 2026.3 disagree, trust these lines. Each one is a live test, last run on Build 154.
 
 - `Config_Store_Guide.md:154` says `Get("AI","LLM","","openai")` returns the object; on 2026.3 it is `Get("AI.LLM.openai", .config)`, which returns a `%Status`. Four arguments raise `<PARAMETER>`.
 - `Config_Store_Guide.md:175` says `Delete` also takes four parts; on 2026.3 it is `Delete("AI.LLM.openai")` only. Four arguments raise `<PARAMETER>` and the entry stays.
