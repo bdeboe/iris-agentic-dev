@@ -1,5 +1,6 @@
 ---
 name: objectscript-navigation
+tier: extra
 description: Deep codebase discovery using MCP and text tools. Use this to bridge the gap between raw MCP tool data and high-level architectural understanding.
 ---
 

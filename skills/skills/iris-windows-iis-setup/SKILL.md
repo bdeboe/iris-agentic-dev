@@ -1,5 +1,6 @@
 ---
 name: iris-windows-iis-setup
+tier: extra
 description: Configure IIS for IRIS installed natively on Windows so iris-agentic-dev can connect
 ---
 

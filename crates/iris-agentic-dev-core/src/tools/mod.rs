@@ -6020,7 +6020,8 @@ Methods:
     async fn skill_list(&self, _: Parameters<NoParams>) -> Result<CallToolResult, McpError> {
         use crate::skills::bundled;
 
-        let bundled_skills = bundled::load_bundled_skills();
+        // Internal-tier skills stay reachable through skill_describe but are not advertised.
+        let bundled_skills = bundled::advertised(&bundled::load_bundled_skills());
         let (synth, synth_searched) = self.synthesized_skills().await;
         let merged = bundled::merge_sources(&bundled_skills, &synth);
         let skills: Vec<serde_json::Value> = merged.iter().map(|m| m.to_json()).collect();
@@ -6096,7 +6097,7 @@ Methods:
     ) -> Result<CallToolResult, McpError> {
         use crate::skills::bundled;
 
-        let bundled_skills = bundled::load_bundled_skills();
+        let bundled_skills = bundled::advertised(&bundled::load_bundled_skills());
         let (synth, synth_searched) = self.synthesized_skills().await;
 
         let terms = bundled::query_terms(&p.query);
@@ -6130,6 +6131,7 @@ Methods:
                     .unwrap_or_default()
                     .to_string(),
                 tags: Vec::new(),
+                tier: None,
                 path: None,
             };
             let score = bundled::score_skill(&synth_skill, &terms);

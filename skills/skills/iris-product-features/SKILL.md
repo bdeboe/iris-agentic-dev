@@ -29,6 +29,7 @@ metadata:
     uses PostgreSQL FTS syntax
   version: 1.0.0
 name: iris-product-features
+tier: extra
 pass_rate: 0.714
 state: reviewed
 tags:

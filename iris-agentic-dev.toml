@@ -50,6 +50,4 @@ skills = [
     "skills/skills/iris-agentic-dev",
     "skills/skills/iris-devtester",
     "skills/skills/iris-docs",
-    # MCP & Tools
-    "skills/skills/opencode-introspect",
 ]

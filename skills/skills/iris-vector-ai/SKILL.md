@@ -29,6 +29,7 @@ metadata:
     without this skill
   version: 1.0.0
 name: iris-vector-ai
+tier: extra
 pass_rate: 1.0
 state: reviewed
 tags:

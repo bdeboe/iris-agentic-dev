@@ -1,5 +1,6 @@
 ---
 name: irispython-connector
+tier: extra
 description: Connect Python to IRIS from outside IRIS over TCP — DB-API, SQLAlchemy, and pandas. Covers the port confusion, keyword-arg segfault, FETCH FIRST crash, and type normalization blockers that trip up every first-time user.
 trigger: When Python code outside IRIS needs to query IRIS via DB-API or SQLAlchemy, or when a segfault / SIGSEGV / exit 139 occurs connecting Python to IRIS
 ---

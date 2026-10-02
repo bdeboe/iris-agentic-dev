@@ -1,5 +1,6 @@
 ---
 name: iris-docs
+tier: extra
 description: Look up InterSystems IRIS documentation. Use iris_doc_search for discovery questions and API lookups. Covers the Algolia search recipe, Documatic URL pattern, and when to use docs_introspect vs iris_doc_search vs iris_doc.
 tags:
   - iris

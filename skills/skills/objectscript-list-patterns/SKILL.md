@@ -32,6 +32,7 @@ description:
   "
 iris_version: ">=2024.1"
 name: objectscript-list-patterns
+tier: core
 pass_rate: 0.9090909090909091
 state: reviewed
 tags:

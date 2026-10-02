@@ -9,9 +9,9 @@ pub struct SkillCommand {
 
 #[derive(Subcommand)]
 pub enum SkillSubcommand {
-    /// Install the official InterSystems skill pack into AI agent directories
+    /// Install InterSystems skills into AI agent directories (core skills unless --all or names)
     Install(SkillInstallArgs),
-    /// List skills in the official pack and their install status
+    /// List skills in the official pack, their tier and their install status
     List(SkillListArgs),
     /// Show install paths and managed-by status for all local skill files
     Status,
@@ -19,8 +19,16 @@ pub enum SkillSubcommand {
 
 #[derive(Args)]
 pub struct SkillInstallArgs {
-    /// Skill names to install (omit for full pack)
+    /// Skill names to install, at any tier (omit for the core skills)
     pub skills: Vec<String>,
+
+    /// Install the core and extra skills, not just core
+    #[arg(long, conflicts_with = "skills")]
+    pub all: bool,
+
+    /// Remove managed copies of skills this install would not write (left by an older install)
+    #[arg(long)]
+    pub prune: bool,
 
     /// Target agent(s)
     #[arg(long, default_value = "all-user-global")]
@@ -76,7 +84,10 @@ impl SkillCommand {
 }
 
 async fn run_install(args: SkillInstallArgs) -> Result<()> {
-    use iris_agentic_dev_core::skill_install::{install_skill, InstallOutcome, SkillPackInstaller};
+    use iris_agentic_dev_core::skill_install::{
+        find_leftovers, install_skill, keep_after_fetch, prune_leftovers, select_paths,
+        InstallMode, InstallOutcome, SkillPackInstaller,
+    };
 
     if args.mirror_to_iris {
         eprintln!(
@@ -84,35 +95,29 @@ async fn run_install(args: SkillInstallArgs) -> Result<()> {
         );
     }
 
+    let mode = if !args.skills.is_empty() {
+        InstallMode::Named(args.skills.clone())
+    } else if args.all {
+        InstallMode::All
+    } else {
+        InstallMode::Core
+    };
+    if args.prune && matches!(mode, InstallMode::Named(_)) {
+        eprintln!("error: --prune works with a bare install or --all, not with skill names");
+        crate::exit(2);
+    }
+
     let installer = SkillPackInstaller::new();
 
     let skill_paths = installer.fetch_pack_manifest().await?;
-
-    let skill_names_to_install: Vec<String> = if args.skills.is_empty() {
-        skill_paths
-            .iter()
-            .filter_map(|p| p.split('/').next_back().map(|s| s.to_string()))
-            .collect()
-    } else {
-        args.skills.clone()
-    };
 
     let mut written = 0usize;
     let mut updated = 0usize;
     let mut skipped = 0usize;
     let mut failed = 0usize;
 
-    for skill_path in &skill_paths {
-        let skill_name = match skill_path.split('/').next_back() {
-            Some(n) => n.to_string(),
-            None => continue,
-        };
-
-        if !skill_names_to_install.contains(&skill_name) {
-            continue;
-        }
-
-        let content = match installer.fetch_skill_content(skill_path).await {
+    for (skill_name, skill_path) in select_paths(&skill_paths, &mode) {
+        let content = match installer.fetch_skill_content(&skill_path).await {
             Ok(c) => c,
             Err(e) => {
                 eprintln!("error: could not fetch {}: {}", skill_name, e);
@@ -120,6 +125,10 @@ async fn run_install(args: SkillInstallArgs) -> Result<()> {
                 continue;
             }
         };
+
+        if !keep_after_fetch(&mode, &skill_name, &content) {
+            continue;
+        }
 
         let targets = build_targets(&skill_name, &args);
 
@@ -157,10 +166,60 @@ async fn run_install(args: SkillInstallArgs) -> Result<()> {
         written, updated, skipped
     );
 
+    let leftovers = find_leftovers(&install_bases(&args.agent), &mode);
+    if !leftovers.is_empty() {
+        println!();
+        if args.prune {
+            for (path, r) in prune_leftovers(&leftovers, args.dry_run) {
+                match r {
+                    Ok(()) if args.dry_run => {
+                        println!("Pruning {} ... would remove", path.display())
+                    }
+                    Ok(()) => println!("Pruning {} ... removed", path.display()),
+                    Err(e) => {
+                        eprintln!("Failed: {} — {}", path.display(), e);
+                        failed += 1;
+                    }
+                }
+            }
+        } else {
+            let mut names: Vec<&str> = leftovers.iter().map(|(n, _)| n.as_str()).collect();
+            names.dedup();
+            println!(
+                "An older install left {} skill(s) this install does not include: {}",
+                names.len(),
+                names.join(", ")
+            );
+            println!(
+                "Nothing was deleted. `iris-agentic-dev skill install --prune` removes them (managed copies only); `skill install --all` keeps the extra skills up to date instead."
+            );
+        }
+    }
+
     if failed > 0 {
         crate::exit(1);
     }
     Ok(())
+}
+
+/// The user-global skill directories for `agent`. Copilot's are repo-scoped and committed, so
+/// leftovers there are never reported or pruned.
+fn install_bases(agent: &AgentTarget) -> Vec<std::path::PathBuf> {
+    use iris_agentic_dev_core::skill_install::{claude_code, opencode};
+    let mut bases = Vec::new();
+    if matches!(
+        agent,
+        AgentTarget::ClaudeCode | AgentTarget::AllUserGlobal | AgentTarget::All
+    ) {
+        bases.extend(claude_code::install_base(None));
+    }
+    if matches!(
+        agent,
+        AgentTarget::OpenCode | AgentTarget::AllUserGlobal | AgentTarget::All
+    ) {
+        bases.extend(opencode::install_base(None));
+    }
+    bases
 }
 
 fn build_targets(
@@ -208,23 +267,7 @@ fn build_targets(
 fn run_list(args: SkillListArgs) -> Result<()> {
     use iris_agentic_dev_core::skill_install::InstallTarget;
 
-    let skill_names = &[
-        "objectscript-review",
-        "objectscript-guardrails",
-        "iris-sql",
-        "iris-query-plans",
-        "iris-vector-ai",
-        "objectscript-list-patterns",
-        "objectscript-loop-patterns",
-        "objectscript-sql-patterns",
-        "objectscript-tdd",
-        "objectscript-unit-test",
-        "iris-connectivity",
-        "iris-product-features",
-        "iris-vector-graph",
-        "iris-embedded-python",
-        "iris-vector-rag",
-    ];
+    let catalog = advertised_catalog();
 
     let show_cc = matches!(
         args.agent,
@@ -244,11 +287,11 @@ fn run_list(args: SkillListArgs) -> Result<()> {
     );
 
     println!(
-        "{:<28} {:<16} {:<12} COPILOT",
-        "SKILL", "CLAUDE CODE", "OPENCODE"
+        "{:<34} {:<8} {:<16} {:<14} COPILOT",
+        "SKILL", "TIER", "CLAUDE CODE", "OPENCODE"
     );
 
-    for name in skill_names {
+    for (name, tier) in &catalog {
         let cc = if show_cc {
             InstallTarget::for_claude_code(name, None)
                 .map(|t| {
@@ -280,7 +323,7 @@ fn run_list(args: SkillListArgs) -> Result<()> {
         let co = "n/a";
         let _ = show_co;
 
-        println!("{:<28} {:<16} {:<12} {}", name, cc, oc, co);
+        println!("{:<34} {:<8} {:<16} {:<14} {}", name, tier, cc, oc, co);
     }
 
     Ok(())
@@ -289,15 +332,8 @@ fn run_list(args: SkillListArgs) -> Result<()> {
 fn run_status() -> Result<()> {
     use iris_agentic_dev_core::skill_install::{is_managed, InstallTarget};
 
-    let skill_names = &[
-        "objectscript-review",
-        "objectscript-guardrails",
-        "iris-sql",
-        "iris-vector-ai",
-        "objectscript-list-patterns",
-    ];
-
-    for name in skill_names {
+    for (name, _) in advertised_catalog() {
+        let name = name.as_str();
         for target in [
             InstallTarget::for_claude_code(name, None),
             InstallTarget::for_opencode(name, None),
@@ -318,4 +354,17 @@ fn run_status() -> Result<()> {
     }
 
     Ok(())
+}
+
+/// `(name, tier)` for every skill this binary ships except the internal tier, core first.
+fn advertised_catalog() -> Vec<(String, &'static str)> {
+    use iris_agentic_dev_core::skills::bundled::{advertised, load_bundled_skills, SkillTier};
+    let mut v: Vec<(String, Option<SkillTier>)> = advertised(&load_bundled_skills())
+        .into_iter()
+        .map(|s| (s.name, s.tier))
+        .collect();
+    v.sort_by_key(|(n, t)| (*t != Some(SkillTier::Core), n.clone()));
+    v.into_iter()
+        .map(|(n, t)| (n, t.map_or("extra", |t| t.as_str())))
+        .collect()
 }

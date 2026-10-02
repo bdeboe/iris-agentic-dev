@@ -1,5 +1,6 @@
 ---
 name: iris-agentic-dev
+tier: core
 description: Configure, connect, and troubleshoot the iris-agentic-dev MCP server (iris_execute/iris_query/iris_doc/docs_introspect/kb/etc.) against an IRIS container or instance. Use when its tools return IRIS_UNREACHABLE, when pointing it at a new IRIS, or when a connection edit "isn't taking effect." Covers the .iris-agentic-dev.toml config, live file-watch reload, the OrbStack port-discovery gotcha, and the docker-exec fallback.
 author: tdyar
 managed_by: iris-agentic-dev
@@ -36,6 +37,34 @@ Load the skill(s) for what you're about to do. You don't need them all — just 
 | Set up VS Code + ObjectScript ext | `iris-vscode-objectscript`                        |
 | Docker / container setup          | `iris-linux-docker`                               |
 | IIS / Windows setup               | `iris-windows-iis-setup`                          |
+
+## Extra skills
+
+The plugin and a bare `iris-agentic-dev skill install` ship the core skills only. The skills below are not installed by default. Read one with `skill_describe(name="<skill>")`, or install it with `iris-agentic-dev skill install <skill>` (`skill install --all` installs all of them).
+
+- `ensemble-production`: start, stop and inspect Interoperability productions, logs, queues and message traces
+- `iris-ai-hub`: AI Hub `%AI.*` classes on EAP builds, where the upstream docs are and how to check them against the installed build
+- `iris-container-graceful-shutdown`: stop IRIS before `docker stop` so the WIJ stays clean and data survives restarts
+- `iris-cpf-merge`: configure containers with CPF merge files, passwords and `Actions`
+- `iris-devtester`: tests that need a live IRIS container through iris-devtester's `IRISContainer`
+- `iris-docs`: look up IRIS documentation with `iris_doc_search`, Documatic URLs, `docs_introspect`
+- `iris-embedded-python`: run Python inside IRIS and call Python libraries from ObjectScript
+- `iris-linux-docker`: Linux bind-mount permissions for IRIS containers (UID 51773)
+- `iris-objectscript-eval`: execute, compile and test ObjectScript through the MCP tools instead of `docker exec`
+- `iris-pgwire`: connect to IRIS over the PostgreSQL wire protocol (psycopg3 and other Postgres clients)
+- `iris-product-features`: what IRIS and its products actually include, before you describe a feature
+- `iris-query-plans`: read a query plan, stale indexes, `%BuildIndices`, `TUNE TABLE`, fixed and collected statistics
+- `iris-vector-ai`: vector search, embeddings and HNSW indexes in IRIS SQL (not pgvector syntax)
+- `iris-vscode-objectscript`: VS Code settings for ObjectScript against an IRIS container
+- `iris-windows-iis-setup`: IIS for IRIS installed natively on Windows
+- `irishealth-container`: IRIS for Health community (FHIR R4) and AI Hub containers
+- `irispython-connector`: DB-API, SQLAlchemy and pandas from Python outside IRIS over TCP
+- `objectscript-coverage`: line coverage with `iris_coverage`
+- `objectscript-fewshot-fixes`: worked fixes for common ObjectScript mistakes (Quit in a loop, escaping, and others)
+- `objectscript-loop-patterns`: `For`/`While`, `$Order` iteration, postfix `Quit`, `Return` vs `Quit`
+- `objectscript-mac-routines`: `.mac` routine syntax, labels, `#include`, `$ZTRAP`, extrinsic functions
+- `objectscript-navigation`: find your way around an unfamiliar codebase with the MCP and text tools
+- `objectscript-repair`: coordinated fixes across several classes after a signature change or rename
 
 ## The two facts that trip people up
 

@@ -1,5 +1,6 @@
 ---
 name: iris-ai-hub
+tier: extra
 author: tdyar
 version: 0.2.0
 managed_by: iris-agentic-dev

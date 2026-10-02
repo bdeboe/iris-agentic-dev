@@ -1,5 +1,6 @@
 ---
 name: ensemble-production
+tier: extra
 description: Manage and observe IRIS Interoperability productions — lifecycle, logs, queues, and message tracing. Covers pyprod Python API, ObjectScript Ens.Director, and MCP tool flow.
 trigger: When asked about a production status, to start/stop/restart a production, investigate message failures, check queue backlogs, or define a production declaratively in Python
 ---

@@ -33,6 +33,7 @@ description:
   "
 iris_version: ">=2024.1"
 name: objectscript-sql-patterns
+tier: core
 pass_rate: 0.5909090909090909
 state: reviewed
 tags:

@@ -1,5 +1,6 @@
 ---
 name: objectscript-coverage
+tier: extra
 description: Measure ObjectScript line coverage using iris_coverage. Use when a user asks about test coverage, coverage reports, or wants to know how well their test suite exercises their code.
 license: MIT
 metadata:

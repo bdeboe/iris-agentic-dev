@@ -3,6 +3,8 @@ pub mod copilot;
 pub mod opencode;
 
 use anyhow::Result;
+
+use crate::skills::bundled::{embedded_tier, parse_skill_md, SkillTier};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,13 +75,19 @@ impl InstallTarget {
 
 pub fn is_managed(path: &Path) -> bool {
     use std::io::Read;
-    let Ok(mut f) = std::fs::File::open(path) else {
+    let Ok(f) = std::fs::File::open(path) else {
         return false;
     };
-    let mut buf = [0u8; 512];
-    let n = f.read(&mut buf).unwrap_or(0);
-    let preview = std::str::from_utf8(&buf[..n]).unwrap_or("");
-    preview.contains(r#"managed_by: "iris-agentic-dev""#)
+    // The marker goes at the end of the frontmatter, which for some skills runs well past the
+    // first few hundred bytes, so read the whole frontmatter (bounded) rather than a fixed prefix.
+    let mut buf = Vec::new();
+    let _ = f.take(64 * 1024).read_to_end(&mut buf);
+    let text = String::from_utf8_lossy(&buf);
+    let Some(rest) = text.strip_prefix("---\n") else {
+        return false;
+    };
+    let frontmatter = rest.find("\n---").map_or(&rest[..0], |end| &rest[..end]);
+    frontmatter.contains(r#"managed_by: "iris-agentic-dev""#)
 }
 
 pub fn install_skill(
@@ -161,6 +169,120 @@ fn write_skill_file(
         }
         Err(e) => InstallOutcome::Failed(e.to_string()),
     }
+}
+
+/// What a `skill install` run asks for. See `docs/adr/0001-skill-tiers.md`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InstallMode {
+    /// No names and no `--all`: the core tier.
+    Core,
+    /// `--all`: core and extra.
+    All,
+    /// Skills named on the command line, whatever their tier.
+    Named(Vec<String>),
+}
+
+impl InstallMode {
+    /// Whether a skill of this tier belongs in a manifest-driven install. A skill with no tier
+    /// counts as extra. Named installs take every tier, so this is only asked of `Core` and `All`.
+    pub fn wants(&self, tier: Option<SkillTier>) -> bool {
+        match self {
+            InstallMode::Core => tier == Some(SkillTier::Core),
+            InstallMode::All => tier != Some(SkillTier::Internal),
+            InstallMode::Named(_) => true,
+        }
+    }
+}
+
+fn path_name(path: &str) -> Option<&str> {
+    path.rsplit('/').next().filter(|n| !n.is_empty())
+}
+
+/// The `(name, repo path)` pairs to fetch. A bare install skips manifest entries this binary
+/// knows are not core, and fetches the ones it does not know, because only their frontmatter can
+/// say. A named skill missing from the manifest is fetched from `skills/skills/<name>`, which is
+/// how an internal skill installs.
+pub fn select_paths(manifest: &[String], mode: &InstallMode) -> Vec<(String, String)> {
+    match mode {
+        InstallMode::Named(names) => names
+            .iter()
+            .map(|n| {
+                let path = manifest
+                    .iter()
+                    .find(|p| path_name(p) == Some(n.as_str()))
+                    .cloned()
+                    .unwrap_or_else(|| format!("skills/skills/{n}"));
+                (n.clone(), path)
+            })
+            .collect(),
+        _ => manifest
+            .iter()
+            .filter_map(|p| Some((path_name(p)?.to_string(), p.clone())))
+            .filter(|(n, _)| match embedded_tier(n) {
+                Some(t) => mode.wants(Some(t)),
+                None => true,
+            })
+            .collect(),
+    }
+}
+
+/// A fetched skill's tier: its own frontmatter, or this binary's copy when the fetched file has
+/// none (a `HEAD` from before tiers).
+pub fn effective_tier(name: &str, content: &str) -> Option<SkillTier> {
+    parse_skill_md(content, name)
+        .and_then(|s| s.tier)
+        .or_else(|| embedded_tier(name))
+}
+
+/// Whether to install a skill once its content is fetched.
+pub fn keep_after_fetch(mode: &InstallMode, name: &str, content: &str) -> bool {
+    mode.wants(effective_tier(name, content))
+}
+
+/// Managed installs, under `<base>/<name>/SKILL.md`, of skills this binary ships that `mode`
+/// would not install: what a bare install leaves from an older full-pack install. User-authored
+/// files and skills this binary does not ship are never leftovers. Named installs have none.
+pub fn find_leftovers(bases: &[PathBuf], mode: &InstallMode) -> Vec<(String, PathBuf)> {
+    if matches!(mode, InstallMode::Named(_)) {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for base in bases {
+        for name in crate::skills::bundled::embedded_skill_dirs() {
+            if mode.wants(embedded_tier(name)) {
+                continue;
+            }
+            let path = base.join(name).join("SKILL.md");
+            if path.is_file() && is_managed(&path) {
+                out.push((name.to_string(), path));
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// Delete each leftover file, then its directory if nothing else is in it. `dry_run` deletes
+/// nothing and reports each as `Ok`.
+pub fn prune_leftovers(
+    leftovers: &[(String, PathBuf)],
+    dry_run: bool,
+) -> Vec<(PathBuf, std::io::Result<()>)> {
+    leftovers
+        .iter()
+        .map(|(_, path)| {
+            if dry_run {
+                return (path.clone(), Ok(()));
+            }
+            let r = std::fs::remove_file(path).map(|_| {
+                if let Some(dir) = path.parent() {
+                    // Fails, harmlessly, when the directory still holds other files.
+                    let _ = std::fs::remove_dir(dir);
+                }
+            });
+            (path.clone(), r)
+        })
+        .collect()
 }
 
 pub struct InstalledSkill {

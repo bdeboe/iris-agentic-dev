@@ -1,5 +1,6 @@
 ---
 name: iris-query-plans
+tier: extra
 description: Read an IRIS SQL query plan and fix index problems. Use when a query is slow, when a count or search returns fewer rows than the table holds, after adding an Index to a persistent class, or when iris_query(mode="explain") shows "Read master map" where you expected an index. Covers master map vs index map, Cost, %BuildIndices, INSERT %NOINDEX, WHERE %NOINDEX as a check, CREATE INDEX, TUNE TABLE, fixed vs collected statistics and outlier selectivity.
 author: tdyar
 managed_by: iris-agentic-dev

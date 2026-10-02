@@ -1,5 +1,6 @@
 ---
 name: objectscript-debugging
+tier: core
 description: Captures IRIS diagnostic packets, maps .INT offsets to .CLS source lines, and correlates error logs. Use whenever an IRIS runtime error or compile failure needs to be diagnosed.
 license: MIT
 metadata:

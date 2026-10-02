@@ -1,5 +1,6 @@
 ---
 name: objectscript-unit-test
+tier: core
 description: Generates %UnitTest.TestCase subclasses for ObjectScript classes using live IRIS introspection. Use when asked to write tests for any ObjectScript class or method.
 license: MIT
 metadata:

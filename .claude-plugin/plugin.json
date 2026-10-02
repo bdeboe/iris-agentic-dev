@@ -15,7 +15,19 @@
     "skills",
     "interoperability"
   ],
-  "skills": ["./skills/skills", "./skills/skills/iris-agentic-dev/nopws-setup"],
+  "skills": [
+    "./skills/skills/iris-agentic-dev",
+    "./skills/skills/objectscript-guardrails",
+    "./skills/skills/objectscript-review",
+    "./skills/skills/objectscript-sql-patterns",
+    "./skills/skills/iris-sql",
+    "./skills/skills/objectscript-tdd",
+    "./skills/skills/objectscript-unit-test",
+    "./skills/skills/objectscript-debugging",
+    "./skills/skills/objectscript-list-patterns",
+    "./skills/skills/iris-connectivity",
+    "./skills/skills/iris-agentic-dev/nopws-setup"
+  ],
   "mcpServers": {
     "iris-dev": {
       "command": "iris-agentic-dev",

@@ -24,6 +24,7 @@ metadata:
     not SQL). Load explicitly for SQL tasks only.
   lift: 0.125
 name: iris-sql
+tier: core
 pass_rate: 0.75
 state: reviewed
 tags:

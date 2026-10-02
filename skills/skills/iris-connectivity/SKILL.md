@@ -28,6 +28,7 @@ metadata:
     in 100% of cases without this skill
   version: 1.0.0
 name: iris-connectivity
+tier: core
 pass_rate: 0.857
 state: reviewed
 tags:

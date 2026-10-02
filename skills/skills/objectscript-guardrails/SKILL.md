@@ -30,6 +30,7 @@ description:
   checklist catches the most common AI mistakes before showing code to the user.
 iris_version: ">=2024.1"
 name: objectscript-guardrails
+tier: core
 pass_rate: 0.8636363636363636
 state: reviewed
 tags:

@@ -1,5 +1,6 @@
 ---
 name: objectscript-tdd
+tier: core
 description: Compile-test-fix loop for ObjectScript development. Use when writing or modifying ObjectScript classes.
 license: MIT
 metadata:

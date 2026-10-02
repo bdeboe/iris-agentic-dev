@@ -121,6 +121,7 @@ fn install_manifest_covers_every_skill_on_disk() {
     let listed: BTreeSet<String> = skills_in_install_manifest().into_iter().collect();
     let missing: Vec<_> = skills_on_disk()
         .into_iter()
+        .filter(|s| !is_internal(s))
         .filter(|s| !listed.contains(s))
         .collect();
 
@@ -154,6 +155,7 @@ fn registry_manifest_covers_every_skill_on_disk() {
     let listed: BTreeSet<String> = skills_in_registry_manifest().into_iter().collect();
     let missing: Vec<_> = skills_on_disk()
         .into_iter()
+        .filter(|s| !is_internal(s))
         .filter(|s| !listed.contains(s))
         .collect();
 
@@ -275,4 +277,10 @@ fn no_frontmatter_value_breaks_strict_yaml_parsing() {
         offenders.len(),
         offenders.join("\n  ")
     );
+}
+
+/// Internal-tier skills ship in the binary but in no list; `test_skill_tiers.rs` checks that.
+fn is_internal(name: &str) -> bool {
+    iris_agentic_dev_core::skills::bundled::embedded_tier(name)
+        == Some(iris_agentic_dev_core::skills::bundled::SkillTier::Internal)
 }

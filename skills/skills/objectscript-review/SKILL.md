@@ -1,5 +1,6 @@
 ---
 name: objectscript-review
+tier: core
 description: Reviews ObjectScript code for common LLM mistakes before presenting to the user
 trigger: After writing any .cls file or ObjectScript code block
 ---

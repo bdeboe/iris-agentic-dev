@@ -1,5 +1,6 @@
 ---
 name: objectscript-fewshot-fixes
+tier: extra
 description: Worked fix examples for the seven most common ObjectScript mistakes AI models make, each as Bug Pattern -> Root Cause -> Fix. Use when fixing an ObjectScript bug involving Quit inside a loop, HTML escaping order, a missing SQL date filter, forward iteration with removal, a missing $IsObject check, postfix Quit syntax, or O(n^2) string concatenation.
 author: tdyar
 managed_by: iris-agentic-dev

@@ -1,5 +1,6 @@
 ---
 name: objectscript-repair
+tier: extra
 description: Perform coordinated fixes across multiple ObjectScript files. Use when a change in one class requires updates in dependent classes (e.g., method signature changes, renames).
 ---
 

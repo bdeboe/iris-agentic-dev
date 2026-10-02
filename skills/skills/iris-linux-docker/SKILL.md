@@ -1,5 +1,6 @@
 ---
 name: iris-linux-docker
+tier: extra
 description: >
   IRIS Docker container volume permissions on Linux. All IRIS editions (community,
   enterprise, irishealth, ai_hub) run as UID 51773 (irisowner). Bind-mounting a

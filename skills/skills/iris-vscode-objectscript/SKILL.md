@@ -1,5 +1,6 @@
 ---
 name: iris-vscode-objectscript
+tier: extra
 description: >
   Use when configuring VSCode for ObjectScript development against an IRIS
   container. Covers the intersystems.servers settings.json config, the

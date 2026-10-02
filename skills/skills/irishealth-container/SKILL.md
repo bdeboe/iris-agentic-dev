@@ -1,5 +1,6 @@
 ---
 name: irishealth-container
+tier: extra
 description: >
   Use when working with irishealth-community (FHIR R4) or irishealth AI Hub
   containers, OR when setting up VSCode/iris-dev extension against any IRIS

@@ -93,6 +93,7 @@ fn vector_skill() -> BundledSkill {
         name: "iris-vector-ai".into(),
         description: "Use when writing any IRIS vector search, embedding, HNSW index, similarity search, or AI feature code.".into(),
         tags: vec!["iris".into(), "vector".into(), "hnsw".into(), "embedding".into()],
+        tier: None,
         path: None,
     }
 }
@@ -104,6 +105,7 @@ fn tag_only_term_matches() {
         name: "iris-vector-ai".into(),
         description: "Nothing about the acronym here.".into(),
         tags: vec!["hnsw".into()],
+        tier: None,
         path: None,
     };
     assert!(score_skill(&s, &["hnsw".to_string()]) > 0);
@@ -123,12 +125,14 @@ fn name_match_outranks_description_match() {
         name: "iris-vector-ai".into(),
         description: "unrelated".into(),
         tags: vec![],
+        tier: None,
         path: None,
     };
     let described = BundledSkill {
         name: "something-else".into(),
         description: "mentions vector once".into(),
         tags: vec![],
+        tier: None,
         path: None,
     };
     let terms = vec!["vector".to_string()];
@@ -142,6 +146,7 @@ fn results_are_sorted_by_descending_score() {
             name: "weak".into(),
             description: "vector".into(),
             tags: vec![],
+            tier: None,
             path: None,
         },
         vector_skill(),

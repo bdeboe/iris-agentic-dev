@@ -222,14 +222,14 @@ fn query_plans_puts_the_rebuild_in_the_loader() {
     );
 }
 
-/// FR-003. Every list of bundled skills names the new one.
+/// FR-003. Every list of bundled skills names the new one. `cmd/skill.rs` no longer keeps a
+/// list: `skill list` and `skill status` read the embedded catalog (`test_skill_tiers.rs`).
 #[test]
 fn query_plans_skill_is_registered_everywhere() {
     for rel in [
         "crates/iris-agentic-dev-core/src/skills/bundled.rs",
         "skills.sh.json",
         "iris-agentic-dev.toml",
-        "crates/iris-agentic-dev-bin/src/cmd/skill.rs",
         "skills/iris-dev.toml",
         "skills/README.md",
         "docs/skills.md",

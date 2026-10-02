@@ -1,5 +1,6 @@
 ---
 name: iris-devtester
+tier: extra
 description: >
   Use when writing tests that need a live IRIS container, using IRISContainer
   factory methods, debugging connection failures, or understanding the password

@@ -1,5 +1,6 @@
 ---
 name: iris-pgwire
+tier: extra
 description: Use when connecting to IRIS via the PostgreSQL wire protocol, using psycopg3 or any Postgres-compatible client
 managed_by: "iris-agentic-dev"
 ---

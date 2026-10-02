@@ -1,5 +1,6 @@
 ---
 name: objectscript-mac-routines
+tier: extra
 description: MAC routine syntax — label-based structure, #include, $ZTRAP error traps, extrinsic functions, and Quit vs Return. Use when working with .mac files, legacy CHUI applications, or any pre-class ObjectScript code.
 author: tdyar
 managed_by: iris-agentic-dev

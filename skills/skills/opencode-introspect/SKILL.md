@@ -1,5 +1,6 @@
 ---
 name: opencode-introspect
+tier: internal
 description: >
   Read and search opencode session logs from the SQLite DB at
   ~/.local/share/opencode/opencode.db. Use when you need to review what a

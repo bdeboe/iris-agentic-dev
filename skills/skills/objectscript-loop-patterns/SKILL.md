@@ -28,6 +28,7 @@ description:
   "
 iris_version: ">=2024.1"
 name: objectscript-loop-patterns
+tier: extra
 pass_rate: 0.5294117647058824
 state: reviewed
 tags:

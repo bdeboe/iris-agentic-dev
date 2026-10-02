@@ -16,6 +16,10 @@ its own `SKILL.md` loads as a single skill, and a path that does not loads every
 `<name>/SKILL.md` directly beneath it. It does not recurse. That is why
 `skills/skills/iris-agentic-dev/nopws-setup` needs naming — it sits two levels down, and
 `tools/nopws.rs` points people at it by path when a NoPWS build refuses a connection.
+
+Since 1.5.0 the plugin ships only the bundled skills whose frontmatter says `tier: core`, each
+named by its own path (docs/adr/0001-skill-tiers.md). Extra and internal skills stay in the
+binary and reach an agent through the MCP `skill_describe` tool, not the plugin.
 """
 
 import json
@@ -54,6 +58,35 @@ def _every_skill_in_the_repo() -> set[str]:
     return found
 
 
+def _tier(skill_dir: str) -> str | None:
+    """`tier:` from a SKILL.md's frontmatter, or None."""
+    with open(os.path.join(skill_dir, "SKILL.md"), encoding="utf-8") as handle:
+        text = handle.read()
+    if not text.startswith("---\n"):
+        return None
+    for line in text[4 : text.find("\n---", 4)].splitlines():
+        if line.startswith("tier:"):
+            return line.split(":", 1)[1].strip().strip('"')
+    return None
+
+
+def _bundled_by_tier() -> dict[str, set[str]]:
+    out: dict[str, set[str]] = {}
+    for entry in os.listdir(_BUNDLED_ROOT):
+        path = os.path.join(_BUNDLED_ROOT, entry)
+        if _has_skill_file(path):
+            out.setdefault(_tier(path) or "", set()).add(entry)
+    return out
+
+
+def _skills_the_plugin_should_ship() -> set[str]:
+    """Core bundled skills, `nopws-setup`, and the plugin-only skills at `skills/` root."""
+    bundled = {name for names in _bundled_by_tier().values() for name in names}
+    return (_every_skill_in_the_repo() - bundled) | _bundled_by_tier().get(
+        "core", set()
+    )
+
+
 def _skills_the_loader_would_see() -> set[str]:
     """Apply the loader's rule to this repo: implicit `skills/` root plus declared paths.
 
@@ -79,32 +112,39 @@ def _skills_the_loader_would_see() -> set[str]:
     return seen
 
 
-def test_the_bundled_catalog_is_under_a_path_the_plugin_declares():
-    bundled = {
-        entry
-        for entry in os.listdir(_BUNDLED_ROOT)
-        if _has_skill_file(os.path.join(_BUNDLED_ROOT, entry))
-    }
-    assert bundled, f"{_BUNDLED_ROOT} holds no skills, which cannot be right"
+def test_the_core_skills_are_under_a_path_the_plugin_declares():
+    core = _bundled_by_tier().get("core", set())
+    assert len(core) == 10, f"expected the 10 core skills, found {sorted(core)}"
 
-    missing = sorted(bundled - _skills_the_loader_would_see())
+    missing = sorted(core - _skills_the_loader_would_see())
     assert not missing, (
-        f"{len(missing)} bundled skills are invisible to the plugin loader: {missing}. "
-        'Declare their parent directory in plugin.json, e.g. "skills": ["./skills/skills"].'
+        f"{len(missing)} core skills are invisible to the plugin loader: {missing}. "
+        'Name each in plugin.json, e.g. "./skills/skills/objectscript-guardrails".'
     )
 
 
-def test_every_skill_in_the_repo_reaches_someone_who_installs_the_plugin():
-    """No SKILL.md in the tree may be unreachable, whatever depth it sits at.
+def test_the_plugin_ships_no_extra_or_internal_skill():
+    tiers = _bundled_by_tier()
+    shipped = (tiers.get("extra", set()) | tiers.get("internal", set())) & (
+        _skills_the_loader_would_see()
+    )
+    assert not shipped, (
+        f"the plugin loads non-core skills: {sorted(shipped)}. Declare core skills one path "
+        "each rather than their parent directory."
+    )
+
+
+def test_every_skill_the_plugin_should_ship_reaches_someone_who_installs_it():
+    """No SKILL.md the plugin is meant to carry may be unreachable, whatever depth it sits at.
 
     A skill nobody can load is worse than one that does not exist: it is referenced in docs
     and error messages, and a reader who follows the pointer finds nothing.
     """
-    missing = sorted(_every_skill_in_the_repo() - _skills_the_loader_would_see())
+    missing = sorted(_skills_the_plugin_should_ship() - _skills_the_loader_would_see())
     assert not missing, (
-        f"these skills exist in the repo but no `plugin install` delivers them: {missing}. "
-        "The loader does not recurse, so a skill more than one level under a declared path "
-        'needs its own entry in plugin.json "skills".'
+        f"these skills should ship with the plugin but no `plugin install` delivers them: "
+        f"{missing}. The loader does not recurse, so a skill more than one level under a "
+        'declared path needs its own entry in plugin.json "skills".'
     )
 
 
@@ -160,16 +200,16 @@ def test_the_loader_reports_the_skills_this_repo_expects():
         ),
         None,
     )
-    assert line, (
-        f"`plugin details {plugin_name}` printed no Skills line:\n{result.stdout}"
-    )
+    assert (
+        line
+    ), f"`plugin details {plugin_name}` printed no Skills line:\n{result.stdout}"
 
     reported = {
         name.strip() for name in line.split(")", 1)[1].split(",") if name.strip()
     }
-    expected = _every_skill_in_the_repo()
+    expected = _skills_the_plugin_should_ship()
     assert reported == expected, (
-        f"the loader reports {len(reported)} skills and this repo holds {len(expected)}. "
+        f"the loader reports {len(reported)} skills and the plugin should ship {len(expected)}. "
         f"Only in the loader: {sorted(reported - expected)}. "
         f"Only on disk: {sorted(expected - reported)}."
     )

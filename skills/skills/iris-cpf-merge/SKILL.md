@@ -1,5 +1,6 @@
 ---
 name: iris-cpf-merge
+tier: extra
 description: >
   Use when configuring IRIS containers via CPF merge files (ISC_CPF_MERGE_FILE).
   Covers CPFPreset patterns, the grongierisc template pattern for password

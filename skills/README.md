@@ -87,6 +87,8 @@ curl -sL https://raw.githubusercontent.com/intersystems-community/iris-agentic-d
 
 ### Step 3 (optional): Install the full validated set
 
+With the CLI, `iris-agentic-dev skill install` installs the ten core skills and `iris-agentic-dev skill install --all` installs core and extra. Each skill's tier is the `tier:` line in its frontmatter; see [docs/skills.md](../docs/skills.md#installing-skills). Without the CLI:
+
 ```bash
 SKILLS_DIR=~/.config/opencode/skills   # or ~/.claude/skills for Claude Code
 BASE=https://raw.githubusercontent.com/intersystems-community/iris-agentic-dev/master/skills/skills

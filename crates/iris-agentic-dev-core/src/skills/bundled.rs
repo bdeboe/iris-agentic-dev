@@ -35,6 +35,38 @@ impl SkillSource {
     }
 }
 
+/// Which channels ship a skill. Read from the `tier:` frontmatter key; see
+/// `docs/adr/0001-skill-tiers.md`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SkillTier {
+    /// In the Claude Code plugin and in a bare `skill install`.
+    Core,
+    /// In `skill install --all` and the MCP tools, indexed by the `iris-agentic-dev` skill.
+    Extra,
+    /// Shipped for this repo's own tooling. Installs only by name and is left out of
+    /// `skill_list` and `skill_search`; `skill_describe` still finds it.
+    Internal,
+}
+
+impl SkillTier {
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "core" => Some(SkillTier::Core),
+            "extra" => Some(SkillTier::Extra),
+            "internal" => Some(SkillTier::Internal),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SkillTier::Core => "core",
+            SkillTier::Extra => "extra",
+            SkillTier::Internal => "internal",
+        }
+    }
+}
+
 /// A skill parsed from a `SKILL.md` with YAML frontmatter.
 #[derive(Debug, Clone)]
 pub struct BundledSkill {
@@ -43,6 +75,9 @@ pub struct BundledSkill {
     /// Lowercased frontmatter tags. Searched alongside name and description —
     /// `hnsw` only ever appears as a tag on `iris-vector-ai`.
     pub tags: Vec<String>,
+    /// `None` when the frontmatter has no `tier:` (a synthesized skill, or a file from before
+    /// tiers).
+    pub tier: Option<SkillTier>,
     /// Set when the skill was read from disk rather than the embedded copy.
     pub path: Option<PathBuf>,
 }
@@ -61,6 +96,7 @@ impl BundledSkill {
             "name": self.name,
             "description": self.description,
             "tags": self.tags,
+            "tier": self.tier.map(|t| t.as_str()),
             "source": SkillSource::Bundled.as_str(),
         })
     }
@@ -120,6 +156,21 @@ const EMBEDDED_SKILLS: &[(&str, &str)] = &[
 /// Directory names of the embedded skills.
 pub fn embedded_skill_dirs() -> Vec<&'static str> {
     EMBEDDED_SKILLS.iter().map(|(d, _)| *d).collect()
+}
+
+/// The tier this binary's embedded copy of a skill declares, matched by directory or name.
+pub fn embedded_tier(name: &str) -> Option<SkillTier> {
+    let body = embedded_content(name)?;
+    parse_skill_md(body, name)?.tier
+}
+
+/// The skills `skill_list` and `skill_search` show: everything but the internal tier.
+pub fn advertised(skills: &[BundledSkill]) -> Vec<BundledSkill> {
+    skills
+        .iter()
+        .filter(|s| s.tier != Some(SkillTier::Internal))
+        .cloned()
+        .collect()
 }
 
 fn embedded_content(name: &str) -> Option<&'static str> {
@@ -231,9 +282,9 @@ pub fn load_bundled_skills() -> Vec<BundledSkill> {
 
 // ── frontmatter parsing ───────────────────────────────────────────────────────
 
-/// Pull `name`, `description` and `tags` out of a `SKILL.md`'s YAML frontmatter.
+/// Pull `name`, `description`, `tags` and `tier` out of a `SKILL.md`'s YAML frontmatter.
 ///
-/// Hand-rolled rather than a YAML dependency because we need exactly three keys
+/// Hand-rolled rather than a YAML dependency because we need four keys
 /// out of frontmatter that also carries nested `metadata:` maps. Handles both
 /// `tags: [a, b]` and block sequences, and folds wrapped `description:` values
 /// (which the real bundled files all use) back into one line.
@@ -246,6 +297,7 @@ pub fn parse_skill_md(content: &str, fallback_name: &str) -> Option<BundledSkill
     let mut name: Option<String> = None;
     let mut description: Option<String> = None;
     let mut tags: Vec<String> = Vec::new();
+    let mut tier: Option<SkillTier> = None;
 
     // Tracks which top-level key we are inside, so a nested `metadata:` list
     // never gets mistaken for the tag list.
@@ -319,6 +371,10 @@ pub fn parse_skill_md(content: &str, fallback_name: &str) -> Option<BundledSkill
                 state = In::Description;
                 description = Some(clean_scalar(value));
             }
+            "tier" => {
+                state = In::None;
+                tier = SkillTier::parse(&clean_scalar(value));
+            }
             "tags" => {
                 state = In::Tags;
                 if let Some(inner) = value.strip_prefix('[').and_then(|v| v.strip_suffix(']')) {
@@ -342,6 +398,7 @@ pub fn parse_skill_md(content: &str, fallback_name: &str) -> Option<BundledSkill
         name,
         description: description.unwrap_or_default(),
         tags,
+        tier,
         path: None,
     })
 }
@@ -433,6 +490,8 @@ pub struct MergedSkill {
     pub description: String,
     pub tags: Vec<String>,
     pub source: SkillSource,
+    /// Bundled skills only; a `^SKILLS` entry has no tier.
+    pub tier: Option<SkillTier>,
     /// A `^SKILLS` entry of the same name also exists (bundled copy wins).
     pub also_synthesized: bool,
 }
@@ -445,6 +504,9 @@ impl MergedSkill {
             "tags": self.tags,
             "source": self.source.as_str(),
         });
+        if let Some(t) = self.tier {
+            v["tier"] = serde_json::Value::from(t.as_str());
+        }
         if self.also_synthesized {
             v["also_synthesized"] = serde_json::Value::Bool(true);
         }
@@ -483,6 +545,7 @@ pub fn merge_sources(
             description: s.description.clone(),
             tags: s.tags.clone(),
             source: SkillSource::Bundled,
+            tier: s.tier,
             also_synthesized: false,
         })
         .collect();
@@ -498,6 +561,7 @@ pub fn merge_sources(
                 description: synthesized_description(v),
                 tags: Vec::new(),
                 source: SkillSource::Synthesized,
+                tier: None,
                 also_synthesized: false,
             }),
         }
@@ -634,6 +698,7 @@ mod tests {
             description: "d".into(),
             tags: vec![],
             source: SkillSource::Bundled,
+            tier: None,
             also_synthesized: false,
         };
         assert!(m.to_json().get("also_synthesized").is_none());
@@ -645,6 +710,7 @@ mod tests {
             name: "iris-vector-ai".into(),
             description: String::new(),
             tags: vec![],
+            tier: None,
             path: None,
         };
         assert!(s.content().unwrap().contains("HNSW"));

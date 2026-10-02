@@ -1,5 +1,6 @@
 ---
 name: iris-container-graceful-shutdown
+tier: extra
 description: >
   IRIS data persists across container restarts ONLY if IRIS is stopped gracefully
   before docker stop. Without this, docker stop sends SIGKILL after grace period,

@@ -1,5 +1,6 @@
 ---
 name: iris-objectscript-eval
+tier: extra
 description: Execute, compile, and test ObjectScript code via the objectscript MCP tools. Use when needing to run arbitrary ObjectScript, compile .cls files, or run %UnitTest tests. Prefers MCP tools over docker exec. Falls back to docker exec only when MCP is unavailable.
 license: MIT
 metadata:

@@ -23,7 +23,6 @@ skills = [
     "skills/iris-objectscript-eval",
     "skills/ensemble-production",
     "skills/objectscript-repair",
-    "skills/opencode-introspect",
 ]
 kb_items = [
     "kb/iris-error-codes.md",

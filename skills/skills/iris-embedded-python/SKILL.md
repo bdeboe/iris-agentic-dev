@@ -1,5 +1,6 @@
 ---
 name: iris-embedded-python
+tier: extra
 description: Use when the user wants to run Python code inside IRIS, call Python libraries from ObjectScript, or use the IRIS Python native API
 managed_by: "iris-agentic-dev"
 ---
