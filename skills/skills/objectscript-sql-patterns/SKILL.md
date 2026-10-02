@@ -141,7 +141,7 @@ Set rs = stmt.%Execute(key)
 
 Returning `""` on a negative SQLCODE hands the caller the not-found answer for an error. Throw it, or return a `%Status`, so the caller can tell them apart.
 
-**-114 is a lock timeout, not a miss.** Under `READ COMMITTED`, a read of a row another process has locked waits for the lock, then fails with SQLCODE -114. The `INTO` variable still holds the row's values, so code that checks only for 100 carries on with them. Treat -114 as an error like any other negative code.
+**-114 is a lock timeout, not a miss.** Under `READ COMMITTED`, a read of a row another process has locked waits for the lock, then fails with SQLCODE -114. Do not read the `INTO` variable after -114: on IRIS 2026.2 it held the locked row in some runs and came back empty in others, so code that checks only for 100 carries on with whichever it got. Treat -114 as an error like any other negative code.
 
 ## 6. IS NULL in IRIS SQL
 

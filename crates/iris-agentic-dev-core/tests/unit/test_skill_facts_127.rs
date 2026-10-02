@@ -380,7 +380,8 @@ fn sql_patterns_section_5_does_not_swallow_a_negative_sqlcode() {
 }
 
 /// sql-114 (130 FR-019). A row lock that times out is -114, and the INTO variable is not a
-/// sign of success: it can hold the locked row's data.
+/// sign of success. On 2026.2 it held the locked row in runs on their own and came back empty in
+/// three full-suite runs, so the section may not promise either value.
 #[test]
 fn sql_patterns_section_5_names_the_lock_timeout() {
     let s5 = section(&skill("objectscript-sql-patterns"), 5);
@@ -388,6 +389,14 @@ fn sql_patterns_section_5_names_the_lock_timeout() {
     assert!(
         s5.contains("READ COMMITTED"),
         "sql-patterns §5 must say -114 comes from READ COMMITTED's row lock"
+    );
+    assert!(
+        !s5.contains("still holds the row"),
+        "sql-patterns §5 must not promise the INTO variable holds the row on -114"
+    );
+    assert!(
+        s5.contains("empty"),
+        "sql-patterns §5 must say the INTO variable can be empty or hold the row on -114"
     );
 }
 

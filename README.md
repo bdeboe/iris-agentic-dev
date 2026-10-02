@@ -80,7 +80,7 @@ brew install iris-agentic-dev
 ```
 
 `brew upgrade iris-agentic-dev` updates the binary only — installed skills are
-not touched by Homebrew. Run `iris-agentic-dev skill install` after upgrading to
+not touched by Homebrew. Run `iris-agentic-dev skill install` (or `--all`) after upgrading to
 pick up new skills. Files installed before the `managed_by` marker was introduced
 (or installed by other means) will be skipped as unrecognized; pass `--force` to
 overwrite them and stamp them so later upgrades pick them up.
@@ -438,8 +438,9 @@ not comparable and should not be read as current.
 **Install skills:**
 
 ```bash
-iris-agentic-dev skill install                                # full pack, Claude Code + OpenCode
-iris-agentic-dev skill install objectscript-review           # selective
+iris-agentic-dev skill install                                # the 10 core skills, Claude Code + OpenCode
+iris-agentic-dev skill install --all                          # core and extra
+iris-agentic-dev skill install iris-query-plans              # one skill, any tier
 iris-agentic-dev skill install --agent copilot               # repo-scoped Copilot instructions
 iris-agentic-dev skill list                                  # check install status
 ```
@@ -614,7 +615,7 @@ iris-agentic-dev tool --list                      # List every tool, no connecti
 iris-agentic-dev tool <name> --schema             # Print one tool's parameters
 iris-agentic-dev batch --file steps.json          # Several tool calls in one process
 iris-agentic-dev compile MyApp.Foo.cls            # Compile from the terminal
-iris-agentic-dev skill install [names]            # Install skills
+iris-agentic-dev skill install [names|--all]      # Install core, all, or named skills
 iris-agentic-dev skill list                       # Check skill install status
 iris-agentic-dev init                             # Generate .iris-agentic-dev.toml
 iris-agentic-dev benchmark --skill <path>         # Run the skill benchmark harness

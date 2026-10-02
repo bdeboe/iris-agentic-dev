@@ -70,9 +70,11 @@ PYTHONPATH=. python -m tests.e2e.skill_eval --skill <name> --runs 5 \
 - [ ] If a skill improved, update `tests/e2e/results/skill-baseline.json`
 
 There is no `run_skill_eval.sh`; this item named one for months and nobody noticed, which says
-something about how often the gate was actually run. The full sweep is nine skills, about 105
-minutes of sequential opencode sessions and roughly $5 of `OPENAI_API_KEY`, so it is the one gate
-here that costs real money. That cost is why the nightly stopped running it: three nights in a row
+something about how often the gate was actually run. The full sweep is nine skills. For 1.5.0 it
+took 90 minutes of sequential opencode sessions and $63.23 of `OPENAI_API_KEY`, measured from
+opencode's own cost figures; `iris-ai-hub` alone was $16.06. It is the one gate here that costs
+real money, so pass `--cap` to every `skill_eval` run: the per-session estimate has been 3 to 35
+times low. That cost is why the nightly stopped running it: three nights in a row
 it failed on Δs smaller than eight task-pairs can resolve. The nightly now answers only whether the
 harness runs, whether the binary still advertises its tools, and whether `MCP-01`, `SKILL-01` and
 `FULL-01` still pass.

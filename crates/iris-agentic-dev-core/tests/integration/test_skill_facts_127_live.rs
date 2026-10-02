@@ -952,10 +952,11 @@ async fn a_read_committed_read_of_a_locked_row_is_minus_114() {
          Kill ^Test130Lk Write 1",
     )
     .await;
-    // The INTO variable still holds the row, so code that checks only for 100 uses it.
-    assert_eq!(
-        read, "SQLCODE=-114 value=[Alpha]",
-        "expected -114 with the row read"
+    // The INTO variable is set in some runs and empty in others (empty in three full-suite runs,
+    // set in every run on its own), so the skill promises neither. It is never left untouched.
+    assert!(
+        read == "SQLCODE=-114 value=[Alpha]" || read == "SQLCODE=-114 value=[]",
+        "expected -114 with the row or an empty value, got {read}"
     );
     let unlocked = run(
         &c,
