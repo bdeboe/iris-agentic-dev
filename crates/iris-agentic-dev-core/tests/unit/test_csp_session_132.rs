@@ -137,3 +137,54 @@ fn every_client_gets_the_same_store() {
         &shared_cookie_store()
     ));
 }
+
+#[test]
+fn a_path_with_no_trailing_slash_gets_one() {
+    let store = CspSessionStore::new();
+    set(
+        &store,
+        "http://localhost:52781/api/atelier/v1/USER",
+        &["CSPSESSIONID-SP-52781-UP-api-atelier-=44; path=/api/atelier;"],
+    );
+
+    assert_eq!(
+        store.logout_urls(),
+        vec!["http://localhost:52781/api/atelier/?IRISLogout=end".to_string()]
+    );
+}
+
+/// The send mechanics only: a local listener stands in for the web server and records the request
+/// line. What IRIS does with `?IRISLogout=end` is the live test's job.
+#[test]
+fn logout_blocking_sends_the_logout_get() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpListener;
+    use std::time::Duration;
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let seen = std::thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        let mut stream = stream;
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            .unwrap();
+        line
+    });
+
+    set(
+        &shared_cookie_store(),
+        &format!("http://127.0.0.1:{port}/csp/iad132/x"),
+        &["CSPSESSIONID-SP-0-UP-csp-iad132-=55; path=/csp/iad132/;"],
+    );
+    iris_agentic_dev_core::iris::csp_session::logout_blocking(Duration::from_secs(5));
+
+    let line = seen.join().unwrap();
+    assert!(
+        line.starts_with("GET /csp/iad132/?IRISLogout=end "),
+        "{line:?}"
+    );
+}

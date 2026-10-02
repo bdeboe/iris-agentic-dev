@@ -5,7 +5,8 @@
 //! spec 129 research R1–R6), not written from memory of what IRIS says.
 
 use iris_agentic_dev_core::tools::error_hints::{
-    cited_sections, coding_pack_from, matcher_ids, rules, runtime_error_hint, sql_error_hint, Hint,
+    cited_sections, coding_pack_from, coding_pack_on, matcher_ids, rules, runtime_error_hint,
+    sql_error_hint, Hint,
 };
 use iris_agentic_dev_core::tools::{IrisTools, Toolset};
 use std::path::Path;
@@ -225,6 +226,19 @@ fn a_reserved_alias_gets_the_quoted_spelling() {
     }
 }
 
+/// A reserved word that is not an alias (here a table name) has no `AS` before it, so the hint
+/// takes the query's own spelling of the last match. Live capture, iris-dev-iris 2026-10-02.
+#[test]
+fn a_reserved_table_name_gets_the_query_spelling() {
+    let h = sql(
+        "ERROR #5540: SQLCODE: -1 Message:  IDENTIFIER expected, reserved word LEVEL found ^ SELECT Title FROM Test129 . Hint WHERE Title IN ( SELECT Title FROM LEVEL",
+        "SELECT Title FROM Test129.Hint WHERE Title IN (SELECT Title FROM Level)",
+    )
+    .expect("reserved_word");
+    assert_eq!(h.rule(), "reserved_word");
+    assert!(h.text().contains("\"Level\""), "{}", h.text());
+}
+
 // ── nonstandard_insert (research R6) ─────────────────────────────────────────────────────────
 
 #[test]
@@ -350,6 +364,20 @@ fn apply_drops_hint_ref_with_the_pack_off_and_keeps_the_text() {
     assert!(off.get("hint_ref").is_none());
 }
 
+/// `apply` reads the switch from the environment; `hint` is set whichever way it reads.
+#[test]
+fn apply_reads_the_switch_and_always_sets_hint() {
+    let h = sql(
+        &table_missing("SECURITY.USERS"),
+        "SELECT * FROM Security.Users",
+    )
+    .unwrap();
+    let mut v = serde_json::json!({});
+    h.apply(&mut v);
+    assert_eq!(v["hint"], h.text());
+    assert_eq!(v.get("hint_ref").is_some(), coding_pack_on());
+}
+
 #[test]
 fn coding_pack_switch_reads_off_values() {
     for off in ["off", "0", "false", "no", "OFF", " No "] {
@@ -459,4 +487,26 @@ fn iris_execute_description_names_the_sys_only_packages() {
             "iris_execute description lacks {needle:?}"
         );
     }
+}
+
+// ── matchers give up cleanly ─────────────────────────────────────────────────────────────────
+//
+// These inputs are synthetic, unlike the rest of this file. They check that each matcher returns
+// no hint when part of the message it reads is missing, not what IRIS says.
+
+#[test]
+fn messages_missing_the_part_a_rule_reads_get_no_hint() {
+    for msg in [
+        "connection refused",
+        "ERROR #5540: SQLCODE: -99999999999 Message:  overflow",
+        "ERROR #5540: SQLCODE: -1 Message:  something else^ SELECT",
+        "ERROR #5540: SQLCODE: -29 Message:  something else",
+        "ERROR #5540: SQLCODE: -30 Message:  something else",
+        "ERROR #5540: SQLCODE: -30 Message:  Table 'NODOT' not found",
+        "ERROR #5540: SQLCODE: -30 Message:  Table 'SQLUSER.NOPE' not found",
+    ] {
+        assert!(sql(msg, "SELECT * FROM Nope").is_none(), "{msg}");
+    }
+    assert!(runtime_error_hint("ERROR: <UNDEFINED> x", "USER").is_none());
+    assert!(runtime_error_hint("<CLASS DOES NOT EXIST>", "USER").is_none());
 }

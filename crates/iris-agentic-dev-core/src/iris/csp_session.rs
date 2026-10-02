@@ -46,9 +46,13 @@ impl CspSessionStore {
     fn record(&self, header: &HeaderValue, url: &Url) {
         let Ok(text) = header.to_str() else { return };
         let mut parts = text.split(';').map(str::trim);
-        let Some(name) = parts.next().and_then(|kv| kv.split('=').next()) else {
-            return;
-        };
+        // `split` always yields one item, so a header with no name reads as an empty name.
+        let name = parts
+            .next()
+            .unwrap_or_default()
+            .split('=')
+            .next()
+            .unwrap_or_default();
         if !name.starts_with(SESSION_COOKIE_PREFIX) {
             return;
         }
