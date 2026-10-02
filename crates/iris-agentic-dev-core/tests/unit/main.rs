@@ -10,6 +10,7 @@
 //! thing that pulls these in.
 
 mod handler_keys;
+mod test_admin_api_guardrail;
 mod test_aihub_139;
 mod test_audit_log;
 mod test_audit_phi_scrub;

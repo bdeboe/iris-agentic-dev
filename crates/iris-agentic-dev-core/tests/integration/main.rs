@@ -20,6 +20,7 @@ mod params_batch7;
 mod rejection_order;
 mod sc007_schema_only;
 mod subclass_impl_live;
+mod test_admin_api_guardrail_live;
 mod test_admin_e2e;
 mod test_aihub_139_live;
 mod test_attribution_live;
