@@ -683,12 +683,14 @@ async fn director_status_calls_match_the_skill() {
          Set sc=##class(Ens.Director).StartProduction(\"IadLive130.EmptyProd\") Set again=$System.Status.GetErrorCodes(sc)_\" \"_$System.Status.GetErrorText(sc)\n \
          Set running=##class(Ens.Director).IsProductionRunning(\"IadLive130.EmptyProd\")\n \
          Set sc=##class(Ens.Director).StopProduction(60,0) Set s2=+sc,stoperr=$Select(sc:\"\",1:$System.Status.GetErrorText(sc))\n \
-         Set sc=##class(Ens.Director).GetProductionStatus(.n2,.st2)\n \
+         Set hist=\"\" For i=1:1:20 { Set sc=##class(Ens.Director).GetProductionStatus(.n2,.st2) Set hist=hist_st2 Quit:st2'=3  Hang 0.5 }\n \
          Set active=##class(Ens.Director).GetActiveProductionName()\n \
          Try { Do $CLASSMETHOD(\"Ens.Director\",\"GetProductionState\") Set gps=\"exists\" } Catch e { Set gps=e.Name }\n \
-         Write \"~[\",s1,\"|\",n1,\"|\",st1,\"|\",running,\"|\",s2,\"|\",n2,\"|\",st2,\"|\",active,\"|\",gps,\"|\",again,\"|\",stoperr,\"]~\"",
+         Write \"~[\",s1,\"|\",n1,\"|\",st1,\"|\",running,\"|\",s2,\"|\",n2,\"|\",st2,\"|\",active,\"|\",gps,\"|\",again,\"|\",stoperr,\"|\",hist,\"]~\"",
     )
     .await;
+    // On the CI runner GetProductionStatus has read 3 (troubled) right after a stop that returned
+    // 1, so the status is polled for up to 10 s; `hist` is every state it read.
     let p: Vec<String> = marked(&out).split('|').map(str::to_string).collect();
     assert_eq!(p[0], "1", "start: {out}");
     assert_eq!(p[1], "IadLive130.EmptyProd", "running name: {out}");
