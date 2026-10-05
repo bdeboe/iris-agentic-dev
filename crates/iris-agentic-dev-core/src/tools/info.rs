@@ -81,6 +81,8 @@ pub fn sa_schema_name_problem(name: Option<&str>) -> Option<String> {
 /// The `what` value `precheck` guards. A const, not a literal: the enum census reads literals in
 /// the handler's call chain as `what`'s values, and this check must not stand in for the match.
 const SA_SCHEMA: &str = "sa_schema";
+/// GETs while Atelier answers 202, 500 ms apart. A build of the deepsee grammar takes under a second.
+const SA_SCHEMA_ATTEMPTS: u32 = 20;
 
 /// The Atelier path for a `sa_schema` URL. Each segment is encoded and the slashes stay raw:
 /// Atelier answers `/saschema/http%3A//host/x` with the grammar and `/saschema/http%3A%2F%2Fhost%2Fx`
@@ -197,12 +199,30 @@ pub async fn handle_iris_info(
         other => return err_json("INVALID_PARAM", &format!("Unknown what='{}'. Use: documents, modified, namespace, metadata, jobs, csp_apps, csp_debug, sa_schema", other)),
     };
 
-    let resp = client
-        .get(&url)
-        .basic_auth(&iris.username, Some(&iris.password))
-        .send()
-        .await
-        .map_err(|e| rmcp::ErrorData::internal_error(format!("HTTP error: {e}"), None))?;
+    // A missing or stale grammar (fresh instance, or a cube class compiled since) makes Atelier
+    // start a background build and answer 202 with an empty result. Ask again until it is built.
+    let mut attempts = 0;
+    let resp = loop {
+        let resp = client
+            .get(&url)
+            .basic_auth(&iris.username, Some(&iris.password))
+            .send()
+            .await
+            .map_err(|e| rmcp::ErrorData::internal_error(format!("HTTP error: {e}"), None))?;
+        if p.what != "sa_schema" || resp.status() != reqwest::StatusCode::ACCEPTED {
+            break resp;
+        }
+        attempts += 1;
+        if attempts >= SA_SCHEMA_ATTEMPTS {
+            return err_json(
+                "SA_SCHEMA_PENDING",
+                &format!(
+                    "IRIS is still building the grammar for {url} after {attempts} tries. Call again in a few seconds."
+                ),
+            );
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    };
 
     if p.what == "sa_schema" && resp.status() == reqwest::StatusCode::NOT_FOUND {
         return err_json(

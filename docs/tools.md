@@ -768,7 +768,7 @@ iris_info(what="jobs")
 iris_info(what="sa_schema", name="http://www.intersystems.com/deepsee")
 ```
 
-`what=sa_schema` returns the Studio Assist grammar for that XData namespace. It does not list or describe BI cubes: run `%DeepSee.Utils` `%GetCubeList` and `%GetDimensionList` through `iris_execute` for those. A name that is not a URL is refused with `INVALID_PARAMS`, and a URL with no grammar returns `SA_SCHEMA_NOT_FOUND`.
+`what=sa_schema` returns the Studio Assist grammar for that XData namespace. It does not list or describe BI cubes: run `%DeepSee.Utils` `%GetCubeList` and `%GetDimensionList` through `iris_execute` for those. A name that is not a URL is refused with `INVALID_PARAMS`, and a URL with no grammar returns `SA_SCHEMA_NOT_FOUND`. While IRIS is still building a grammar (fresh instance, or a cube class compiled since the last build), iad waits up to ten seconds, then returns `SA_SCHEMA_PENDING`.
 
 ---
 

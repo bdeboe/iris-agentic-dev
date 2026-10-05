@@ -709,6 +709,27 @@ async fn sa_schema_returns_the_grammar_and_refuses_an_unknown_url() {
     assert!(text.contains("%GetCubeList"), "{text}");
 }
 
+/// When the cached grammar is missing or stale (a fresh instance, or any cube class compiled or
+/// dropped since), Atelier starts a background build and answers 202 with an empty result. That
+/// read as `SA_SCHEMA_NOT_FOUND` until iad waited for the build. Clearing the cache gives the 202.
+#[tokio::test]
+#[ignore = "requires live IRIS and the built binary"]
+async fn sa_schema_waits_for_a_grammar_that_is_still_building() {
+    let Some((c, client)) = conn() else { return };
+    let out = run(
+        &c,
+        &client,
+        " Kill ^IRIS.SASchema(\"http://www.intersystems.com/deepsee\") Write \"~[ok]~\"",
+    )
+    .await;
+    assert!(out.contains("~[ok]~"), "clearing the cache: {out}");
+    let ok = call_info("http://www.intersystems.com/deepsee").await;
+    let grammar = ok["result"]
+        .as_array()
+        .unwrap_or_else(|| panic!("grammar lines after a cleared cache: {ok}"));
+    assert!(grammar.len() > 20, "{ok}");
+}
+
 /// PR 142 review: the discovery and query snippets proposed for the skill's §14, run as written
 /// with the fixture's cube, level and measure names swapped in.
 #[tokio::test]
