@@ -22,13 +22,13 @@ fn skill(name: &str) -> String {
     read(&format!("skills/skills/{name}/SKILL.md"))
 }
 
-fn lacks(name: &str, text: &str, bad: &[&str]) {
+fn assert_lacks(name: &str, text: &str, bad: &[&str]) {
     for b in bad {
         assert!(!text.contains(b), "{name} still contains {b:?}");
     }
 }
 
-fn has(name: &str, text: &str, good: &[&str]) {
+fn assert_has(name: &str, text: &str, good: &[&str]) {
     for g in good {
         assert!(text.contains(g), "{name} must contain {g:?}");
     }
@@ -38,8 +38,8 @@ fn has(name: &str, text: &str, good: &[&str]) {
 #[test]
 fn sql_patterns_check_the_fetch_and_the_prepare() {
     let t = skill("objectscript-sql-patterns");
-    lacks("objectscript-sql-patterns", &t, &["Do stmt.%Prepare("]);
-    has(
+    assert_lacks("objectscript-sql-patterns", &t, &["Do stmt.%Prepare("]);
+    assert_has(
         "objectscript-sql-patterns",
         &t,
         &["%Next(.tSC)", "-400", "after the loop"],
@@ -51,7 +51,7 @@ fn sql_patterns_check_the_fetch_and_the_prepare() {
 #[test]
 fn unit_test_skill_names_real_tools_and_patterns() {
     let t = skill("objectscript-unit-test");
-    lacks(
+    assert_lacks(
         "objectscript-unit-test",
         &t,
         &[
@@ -63,7 +63,7 @@ fn unit_test_skill_names_real_tools_and_patterns() {
             "path to generated .cls file",
         ],
     );
-    has(
+    assert_has(
         "objectscript-unit-test",
         &t,
         &[
@@ -81,7 +81,7 @@ fn unit_test_skill_names_real_tools_and_patterns() {
 #[test]
 fn eval_and_coverage_use_the_colon_class_pattern() {
     let e = skill("iris-objectscript-eval");
-    lacks(
+    assert_lacks(
         "iris-objectscript-eval",
         &e,
         &[
@@ -89,18 +89,18 @@ fn eval_and_coverage_use_the_colon_class_pattern() {
             "pattern=\"MyPackage.Tests.MyClassTest\"",
         ],
     );
-    has("iris-objectscript-eval", &e, &["iris_test(pattern=\":"]);
+    assert_has("iris-objectscript-eval", &e, &["iris_test(pattern=\":"]);
 
     let c = skill("objectscript-coverage");
-    lacks("objectscript-coverage", &c, &["pattern=\"MyApp.Tests\","]);
-    has("objectscript-coverage", &c, &["pattern=\":"]);
+    assert_lacks("objectscript-coverage", &c, &["pattern=\"MyApp.Tests\","]);
+    assert_has("objectscript-coverage", &c, &["pattern=\":"]);
 }
 
 /// R4. A typo'd local and a dynamic call to a missing method both compile clean.
 #[test]
 fn tdd_says_a_clean_compile_is_not_a_test() {
     let t = skill("objectscript-tdd");
-    has(
+    assert_has(
         "objectscript-tdd",
         &t,
         &["compiles clean", "<UNDEFINED>", "<METHOD DOES NOT EXIST>"],
@@ -111,12 +111,12 @@ fn tdd_says_a_clean_compile_is_not_a_test() {
 #[test]
 fn ensemble_production_uses_real_director_calls() {
     let t = skill("ensemble-production");
-    lacks(
+    assert_lacks(
         "ensemble-production",
         &t,
         &["GetProductionState(", "$$$EnsProductionRunning"],
     );
-    has(
+    assert_has(
         "ensemble-production",
         &t,
         &[
@@ -132,14 +132,14 @@ fn ensemble_production_uses_real_director_calls() {
 #[test]
 fn guardrails_carry_the_namespace_rule() {
     let t = skill("objectscript-guardrails");
-    has("objectscript-guardrails", &t, &["New $NAMESPACE"]);
+    assert_has("objectscript-guardrails", &t, &["New $NAMESPACE"]);
 }
 
 /// R7. An XML export goes on under its `.cls` name, with the XML declaration on its own line.
 #[test]
 fn iris_agentic_dev_says_how_to_load_an_xml_export() {
     let t = skill("iris-agentic-dev");
-    has(
+    assert_has(
         "iris-agentic-dev",
         &t,
         &["XML export", "#16006", "#16021", "own line"],
@@ -154,7 +154,7 @@ fn query_plans_skill_exists_with_its_facts() {
         t.starts_with("---\nname: iris-query-plans\n"),
         "iris-query-plans frontmatter must open with its name"
     );
-    has(
+    assert_has(
         "iris-query-plans",
         &t,
         &[
@@ -174,7 +174,7 @@ fn query_plans_skill_exists_with_its_facts() {
 #[test]
 fn query_plans_has_the_statistics_facts_139_holds() {
     let t = skill("iris-query-plans");
-    has(
+    assert_has(
         "iris-query-plans",
         &t,
         &[
@@ -191,7 +191,7 @@ fn query_plans_has_the_statistics_facts_139_holds() {
             "GSOD_opttable",
         ],
     );
-    lacks(
+    assert_lacks(
         "iris-query-plans",
         &t,
         &[
@@ -207,12 +207,12 @@ fn query_plans_has_the_statistics_facts_139_holds() {
 #[test]
 fn query_plans_puts_the_rebuild_in_the_loader() {
     let t = skill("iris-query-plans");
-    lacks(
+    assert_lacks(
         "iris-query-plans",
         &t,
         &["Run `%BuildIndices` after a `%NOINDEX` bulk load."],
     );
-    has(
+    assert_has(
         "iris-query-plans",
         &t,
         &[
@@ -251,6 +251,6 @@ fn content_skills_stay_generic() {
         "ensemble-production",
     ] {
         let t = skill(name);
-        lacks(name, &t, &["HealthShare", "HSLIB", "HSCUSTOM"]);
+        assert_lacks(name, &t, &["HealthShare", "HSLIB", "HSCUSTOM"]);
     }
 }

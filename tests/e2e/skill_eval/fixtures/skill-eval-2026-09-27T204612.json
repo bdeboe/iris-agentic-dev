@@ -17,10 +17,7 @@
       "regression_flag": false,
       "new_skill": false,
       "no_task_coverage": false,
-      "task_ids_used": [
-        "ENSEMBLE-PYPROD",
-        "ENSEMBLE-APPROACH-CHOICE"
-      ],
+      "task_ids_used": ["ENSEMBLE-PYPROD", "ENSEMBLE-APPROACH-CHOICE"],
       "outcome": "not_comparable",
       "outcome_reason": "withdrawn (not_helped): -0.10 off one discordant pair in ten, inside mde_paired(10, 0.10) = 0.2482; not a regression",
       "arms": {
@@ -41,10 +38,7 @@
       },
       "provenance": {
         "run_id": "2026-09-27T204612",
-        "task_ids": [
-          "ENSEMBLE-APPROACH-CHOICE",
-          "ENSEMBLE-PYPROD"
-        ],
+        "task_ids": ["ENSEMBLE-APPROACH-CHOICE", "ENSEMBLE-PYPROD"],
         "scoring_mode": "pattern",
         "scorer_model": "claude-sonnet-4-6",
         "scorer_model_requested": "us.anthropic.claude-sonnet-4-6",
@@ -72,10 +66,7 @@
         "c": 0,
         "discordance": 0.1667,
         "lift": 0.1667,
-        "interval": [
-          -0.1315,
-          0.4649
-        ],
+        "interval": [-0.1315, 0.4649],
         "p_value_one_sided": 0.5,
         "mde": 0.3789,
         "floor": 37,
@@ -166,10 +157,7 @@
         "c": 2,
         "discordance": 0.3889,
         "lift": 0.1667,
-        "interval": [
-          -0.1109,
-          0.4443
-        ],
+        "interval": [-0.1109, 0.4443],
         "p_value_one_sided": 0.2266,
         "mde": 0.3853,
         "floor": 74,
@@ -197,9 +185,7 @@
       "regression_flag": false,
       "new_skill": false,
       "no_task_coverage": false,
-      "task_ids_used": [
-        "IRIS-PYTHON-CONNECT"
-      ],
+      "task_ids_used": ["IRIS-PYTHON-CONNECT"],
       "outcome": "not_comparable",
       "outcome_reason": "withdrawn (broken_check): graded through lift.format_transcript's 500-character cap; the judge scored a fragment and said so ('cutting off'). Reference solution scores 3/3/3 on the same check",
       "arms": {
@@ -220,9 +206,7 @@
       },
       "provenance": {
         "run_id": "2026-09-27T204612",
-        "task_ids": [
-          "IRIS-PYTHON-CONNECT"
-        ],
+        "task_ids": ["IRIS-PYTHON-CONNECT"],
         "scoring_mode": "judge",
         "scorer_model": "claude-sonnet-4-6",
         "scorer_model_requested": "us.anthropic.claude-sonnet-4-6",
@@ -250,10 +234,7 @@
         "c": 0,
         "discordance": 0.3333,
         "lift": 0.3333,
-        "interval": [
-          -0.2001,
-          0.8668
-        ],
+        "interval": [-0.2001, 0.8668],
         "p_value_one_sided": 0.5,
         "mde": 0.5774,
         "floor": 63,
@@ -281,10 +262,7 @@
       "regression_flag": false,
       "new_skill": false,
       "no_task_coverage": false,
-      "task_ids_used": [
-        "VECTOR-PYTHON-SEARCH",
-        "VECTOR-TOVECTOR-MISMATCH"
-      ],
+      "task_ids_used": ["VECTOR-PYTHON-SEARCH", "VECTOR-TOVECTOR-MISMATCH"],
       "outcome": "underpowered",
       "outcome_reason": "6 task-pairs against a floor of 96 (FR-008); the \u0394 is inside the harness's own resolution",
       "arms": {
@@ -305,10 +283,7 @@
       },
       "provenance": {
         "run_id": "2026-09-27T204612",
-        "task_ids": [
-          "VECTOR-PYTHON-SEARCH",
-          "VECTOR-TOVECTOR-MISMATCH"
-        ],
+        "task_ids": ["VECTOR-PYTHON-SEARCH", "VECTOR-TOVECTOR-MISMATCH"],
         "scoring_mode": "pattern",
         "scorer_model": "claude-sonnet-4-6",
         "scorer_model_requested": "us.anthropic.claude-sonnet-4-6",
@@ -336,10 +311,7 @@
         "c": 0,
         "discordance": 0.5,
         "lift": 0.5,
-        "interval": [
-          0.0999,
-          0.9001
-        ],
+        "interval": [0.0999, 0.9001],
         "p_value_one_sided": 0.125,
         "mde": 0.6563,
         "floor": 96,
@@ -410,9 +382,7 @@
       "regression_flag": false,
       "new_skill": false,
       "no_task_coverage": false,
-      "task_ids_used": [
-        "LIST-ITERATE"
-      ],
+      "task_ids_used": ["LIST-ITERATE"],
       "outcome": "not_comparable",
       "outcome_reason": "withdrawn (broken_check): graded through the 500-character cap; the recorded 0.00 did not reproduce \u2014 one live baseline session scored a pass",
       "arms": {
@@ -433,9 +403,7 @@
       },
       "provenance": {
         "run_id": "2026-09-27T204612",
-        "task_ids": [
-          "LIST-ITERATE"
-        ],
+        "task_ids": ["LIST-ITERATE"],
         "scoring_mode": "judge",
         "scorer_model": "claude-sonnet-4-6",
         "scorer_model_requested": "us.anthropic.claude-sonnet-4-6",
@@ -463,10 +431,7 @@
         "c": 1,
         "discordance": 1.0,
         "lift": 0.3333,
-        "interval": [
-          -0.7335,
-          1.4002
-        ],
+        "interval": [-0.7335, 1.4002],
         "p_value_one_sided": 0.5,
         "mde": 1.0,
         "floor": 194,
@@ -494,9 +459,7 @@
       "regression_flag": false,
       "new_skill": false,
       "no_task_coverage": false,
-      "task_ids_used": [
-        "STATUS-CHECK"
-      ],
+      "task_ids_used": ["STATUS-CHECK"],
       "outcome": "underpowered",
       "outcome_reason": "3 task-pairs against a floor of 129 (FR-008); the \u0394 is inside the harness's own resolution",
       "arms": {
@@ -517,9 +480,7 @@
       },
       "provenance": {
         "run_id": "2026-09-27T204612",
-        "task_ids": [
-          "STATUS-CHECK"
-        ],
+        "task_ids": ["STATUS-CHECK"],
         "scoring_mode": "judge",
         "scorer_model": "claude-sonnet-4-6",
         "scorer_model_requested": "us.anthropic.claude-sonnet-4-6",
@@ -547,10 +508,7 @@
         "c": 1,
         "discordance": 0.6667,
         "lift": 0.0,
-        "interval": [
-          -0.9239,
-          0.9239
-        ],
+        "interval": [-0.9239, 0.9239],
         "p_value_one_sided": 0.75,
         "mde": 0.8165,
         "floor": 129,
@@ -578,9 +536,7 @@
       "regression_flag": false,
       "new_skill": false,
       "no_task_coverage": false,
-      "task_ids_used": [
-        "SQLCODE-SILENT"
-      ],
+      "task_ids_used": ["SQLCODE-SILENT"],
       "outcome": "not_comparable",
       "outcome_reason": "withdrawn (broken_check): the live session was killed at opencode_runner's 300 s timeout with 0 completed tool calls and scored 0 rather than unscored",
       "arms": {
@@ -601,9 +557,7 @@
       },
       "provenance": {
         "run_id": "2026-09-27T204612",
-        "task_ids": [
-          "SQLCODE-SILENT"
-        ],
+        "task_ids": ["SQLCODE-SILENT"],
         "scoring_mode": "judge",
         "scorer_model": "claude-sonnet-4-6",
         "scorer_model_requested": "us.anthropic.claude-sonnet-4-6",
@@ -631,10 +585,7 @@
         "c": 0,
         "discordance": 0.0,
         "lift": 0.0,
-        "interval": [
-          0.0,
-          0.0
-        ],
+        "interval": [0.0, 0.0],
         "p_value_one_sided": null,
         "mde": null,
         "floor": 37,
@@ -1268,9 +1219,7 @@
   ],
   "summary": {
     "regressions": [],
-    "improvements": [
-      "iris-vector-ai"
-    ],
+    "improvements": ["iris-vector-ai"],
     "uncovered": [
       "aihub-eap",
       "iris-agentic-dev",
@@ -1304,9 +1253,7 @@
       "input_tokens": 96102,
       "output_tokens": 1911,
       "cost_usd": 0.316971,
-      "models": [
-        "claude-sonnet-4-6"
-      ],
+      "models": ["claude-sonnet-4-6"],
       "unpriced_models": []
     },
     "run_valid": true,

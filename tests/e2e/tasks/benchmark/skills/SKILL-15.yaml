@@ -9,68 +9,68 @@ prompt: |
   The instance runs in the Docker container iris-dev-iris.
 skill: objectscript-sql-patterns
 fixtures:
-- name: Bench.Ratio.Row
-  content: |
-    Class Bench.Ratio.Row Extends %Persistent
-    {
+  - name: Bench.Ratio.Row
+    content: |
+      Class Bench.Ratio.Row Extends %Persistent
+      {
 
-    Property Code As %String;
+      Property Code As %String;
 
-    Property Num As %Integer;
+      Property Num As %Integer;
 
-    Property Den As %Integer;
+      Property Den As %Integer;
 
-    }
-- name: Bench.Ratio.Calc
-  content: |
-    Class Bench.Ratio.Calc Extends %RegisteredObject
-    {
+      }
+  - name: Bench.Ratio.Calc
+    content: |
+      Class Bench.Ratio.Calc Extends %RegisteredObject
+      {
 
-    /// Num/Den for the row with this Code. NONE when no row has it, ERR when the query fails.
-    ClassMethod Of(pCode As %String) As %String
-    {
-        Set tRs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Num / Den FROM Bench_Ratio.Row WHERE Code = ?", pCode)
-        If tRs.%SQLCODE < 0 { Quit "ERR" }
-        If 'tRs.%Next() { Quit "NONE" }
-        Quit tRs.%GetData(1)
-    }
+      /// Num/Den for the row with this Code. NONE when no row has it, ERR when the query fails.
+      ClassMethod Of(pCode As %String) As %String
+      {
+          Set tRs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Num / Den FROM Bench_Ratio.Row WHERE Code = ?", pCode)
+          If tRs.%SQLCODE < 0 { Quit "ERR" }
+          If 'tRs.%Next() { Quit "NONE" }
+          Quit tRs.%GetData(1)
+      }
 
-    }
+      }
 check: |
   try { do ##class(Bench.Ratio.Row).%DeleteExtent() set o=##class(Bench.Ratio.Row).%New(),o.Code="a",o.Num=10,o.Den=2 do o.%Save() set o=##class(Bench.Ratio.Row).%New(),o.Code="z",o.Num=1,o.Den=0 do o.%Save() set ok=((##class(Bench.Ratio.Calc).Of("a")=5)&&(##class(Bench.Ratio.Calc).Of("z")="ERR")&&(##class(Bench.Ratio.Calc).Of("q")="NONE")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
 solution:
-- name: Bench.Ratio.Row
-  content: |
-    Class Bench.Ratio.Row Extends %Persistent
-    {
+  - name: Bench.Ratio.Row
+    content: |
+      Class Bench.Ratio.Row Extends %Persistent
+      {
 
-    Property Code As %String;
+      Property Code As %String;
 
-    Property Num As %Integer;
+      Property Num As %Integer;
 
-    Property Den As %Integer;
+      Property Den As %Integer;
 
-    }
-- name: Bench.Ratio.Calc
-  content: |
-    Class Bench.Ratio.Calc Extends %RegisteredObject
-    {
+      }
+  - name: Bench.Ratio.Calc
+    content: |
+      Class Bench.Ratio.Calc Extends %RegisteredObject
+      {
 
-    /// Num/Den for the row with this Code. NONE when no row has it, ERR when the query fails.
-    ClassMethod Of(pCode As %String) As %String
-    {
-        Set tRs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Num / Den FROM Bench_Ratio.Row WHERE Code = ?", pCode)
-        If tRs.%SQLCODE < 0 { Quit "ERR" }
-        Set tSC = $$$OK
-        If 'tRs.%Next(.tSC) {
-            If $$$ISERR(tSC) || (tRs.%SQLCODE < 0) { Quit "ERR" }
-            Quit "NONE"
-        }
-        Quit tRs.%GetData(1)
-    }
+      /// Num/Den for the row with this Code. NONE when no row has it, ERR when the query fails.
+      ClassMethod Of(pCode As %String) As %String
+      {
+          Set tRs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Num / Den FROM Bench_Ratio.Row WHERE Code = ?", pCode)
+          If tRs.%SQLCODE < 0 { Quit "ERR" }
+          Set tSC = $$$OK
+          If 'tRs.%Next(.tSC) {
+              If $$$ISERR(tSC) || (tRs.%SQLCODE < 0) { Quit "ERR" }
+              Quit "NONE"
+          }
+          Quit tRs.%GetData(1)
+      }
 
-    }
+      }
 tags:
-- sql
-- sqlcode
-- fetch
+  - sql
+  - sqlcode
+  - fetch

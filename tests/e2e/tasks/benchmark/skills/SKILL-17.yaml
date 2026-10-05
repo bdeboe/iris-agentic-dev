@@ -9,39 +9,39 @@ prompt: |
   The instance runs in the Docker container iris-dev-iris.
 skill: objectscript-guardrails
 fixtures:
-- name: Bench.Ns
-  content: |
-    Class Bench.Ns Extends %RegisteredObject
-    {
+  - name: Bench.Ns
+    content: |
+      Class Bench.Ns Extends %RegisteredObject
+      {
 
-    /// Number of users defined on the instance.
-    ClassMethod SysCount() As %Integer
-    {
-        Set $NAMESPACE = "%SYS"
-        Set tRs = ##class(%SQL.Statement).%ExecDirect(, "SELECT COUNT(*) FROM Security.Users")
-        Do tRs.%Next()
-        Quit tRs.%GetData(1)
-    }
+      /// Number of users defined on the instance.
+      ClassMethod SysCount() As %Integer
+      {
+          Set $NAMESPACE = "%SYS"
+          Set tRs = ##class(%SQL.Statement).%ExecDirect(, "SELECT COUNT(*) FROM Security.Users")
+          Do tRs.%Next()
+          Quit tRs.%GetData(1)
+      }
 
-    }
+      }
 check: |
   try { set n=##class(Bench.Ns).SysCount() set ok=((n>0)&&($namespace="BENCHMARK")) } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
 solution:
-- name: Bench.Ns
-  content: |
-    Class Bench.Ns Extends %RegisteredObject
-    {
+  - name: Bench.Ns
+    content: |
+      Class Bench.Ns Extends %RegisteredObject
+      {
 
-    /// Number of users defined on the instance.
-    ClassMethod SysCount() As %Integer
-    {
-        New $NAMESPACE
-        Set $NAMESPACE = "%SYS"
-        Set tRs = ##class(%SQL.Statement).%ExecDirect(, "SELECT COUNT(*) FROM Security.Users")
-        Do tRs.%Next()
-        Quit tRs.%GetData(1)
-    }
+      /// Number of users defined on the instance.
+      ClassMethod SysCount() As %Integer
+      {
+          New $NAMESPACE
+          Set $NAMESPACE = "%SYS"
+          Set tRs = ##class(%SQL.Statement).%ExecDirect(, "SELECT COUNT(*) FROM Security.Users")
+          Do tRs.%Next()
+          Quit tRs.%GetData(1)
+      }
 
-    }
+      }
 tags:
-- namespace
+  - namespace

@@ -9,72 +9,72 @@ prompt: |
   The instance runs in the Docker container iris-dev-iris.
 skill: iris-query-plans
 fixtures:
-- name: Bench.Plan.Orders
-  content: |
-    Class Bench.Plan.Orders Extends %Persistent
-    {
+  - name: Bench.Plan.Orders
+    content: |
+      Class Bench.Plan.Orders Extends %Persistent
+      {
 
-    Property Customer As %String;
+      Property Customer As %String;
 
-    Index CustIdx On Customer;
+      Index CustIdx On Customer;
 
-    }
-- name: Bench.Plan.Load
-  content: |
-    Class Bench.Plan.Load Extends %RegisteredObject
-    {
+      }
+  - name: Bench.Plan.Load
+    content: |
+      Class Bench.Plan.Load Extends %RegisteredObject
+      {
 
-    /// Loads 500 orders, 10 for each customer C0 to C49.
-    ClassMethod Run() As %Status
-    {
-        Set tSC = $$$OK
-        Do ##class(Bench.Plan.Orders).%KillExtent()
-        Set tStmt = ##class(%SQL.Statement).%New()
-        Set tSC = tStmt.%Prepare("INSERT %NOINDEX INTO Bench_Plan.Orders (Customer) VALUES (?)")
-        If $$$ISERR(tSC) { Quit tSC }
-        For i = 1:1:500 {
-            Set tRs = tStmt.%Execute("C"_(i # 50))
-            If tRs.%SQLCODE < 0 { Return $$$ERROR($$$SQLError, tRs.%SQLCODE, tRs.%Message) }
-        }
-        Quit tSC
-    }
+      /// Loads 500 orders, 10 for each customer C0 to C49.
+      ClassMethod Run() As %Status
+      {
+          Set tSC = $$$OK
+          Do ##class(Bench.Plan.Orders).%KillExtent()
+          Set tStmt = ##class(%SQL.Statement).%New()
+          Set tSC = tStmt.%Prepare("INSERT %NOINDEX INTO Bench_Plan.Orders (Customer) VALUES (?)")
+          If $$$ISERR(tSC) { Quit tSC }
+          For i = 1:1:500 {
+              Set tRs = tStmt.%Execute("C"_(i # 50))
+              If tRs.%SQLCODE < 0 { Return $$$ERROR($$$SQLError, tRs.%SQLCODE, tRs.%Message) }
+          }
+          Quit tSC
+      }
 
-    }
+      }
 check: |
   try { set ok=0 set sc=##class(Bench.Plan.Load).Run() if $system.Status.IsOK(sc), ##class(%Dictionary.CompiledIndex).%ExistsId("Bench.Plan.Orders||CustIdx") { set a=##class(%SQL.Statement).%ExecDirect(,"SELECT COUNT(*) FROM Bench_Plan.Orders WHERE Customer = 'C1'") do a.%Next() set b=##class(%SQL.Statement).%ExecDirect(,"SELECT COUNT(*) FROM Bench_Plan.Orders WHERE Customer = 'C37'") do b.%Next() set ok=((a.%GetData(1)=10)&&(b.%GetData(1)=10)) } } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
 solution:
-- name: Bench.Plan.Orders
-  content: |
-    Class Bench.Plan.Orders Extends %Persistent
-    {
+  - name: Bench.Plan.Orders
+    content: |
+      Class Bench.Plan.Orders Extends %Persistent
+      {
 
-    Property Customer As %String;
+      Property Customer As %String;
 
-    Index CustIdx On Customer;
+      Index CustIdx On Customer;
 
-    }
-- name: Bench.Plan.Load
-  content: |
-    Class Bench.Plan.Load Extends %RegisteredObject
-    {
+      }
+  - name: Bench.Plan.Load
+    content: |
+      Class Bench.Plan.Load Extends %RegisteredObject
+      {
 
-    /// Loads 500 orders, 10 for each customer C0 to C49.
-    ClassMethod Run() As %Status
-    {
-        Set tSC = $$$OK
-        Do ##class(Bench.Plan.Orders).%KillExtent()
-        Set tStmt = ##class(%SQL.Statement).%New()
-        Set tSC = tStmt.%Prepare("INSERT %NOINDEX INTO Bench_Plan.Orders (Customer) VALUES (?)")
-        If $$$ISERR(tSC) { Quit tSC }
-        For i = 1:1:500 {
-            Set tRs = tStmt.%Execute("C"_(i # 50))
-            If tRs.%SQLCODE < 0 { Return $$$ERROR($$$SQLError, tRs.%SQLCODE, tRs.%Message) }
-        }
-        Quit ##class(Bench.Plan.Orders).%BuildIndices($ListBuild("CustIdx"))
-    }
+      /// Loads 500 orders, 10 for each customer C0 to C49.
+      ClassMethod Run() As %Status
+      {
+          Set tSC = $$$OK
+          Do ##class(Bench.Plan.Orders).%KillExtent()
+          Set tStmt = ##class(%SQL.Statement).%New()
+          Set tSC = tStmt.%Prepare("INSERT %NOINDEX INTO Bench_Plan.Orders (Customer) VALUES (?)")
+          If $$$ISERR(tSC) { Quit tSC }
+          For i = 1:1:500 {
+              Set tRs = tStmt.%Execute("C"_(i # 50))
+              If tRs.%SQLCODE < 0 { Return $$$ERROR($$$SQLError, tRs.%SQLCODE, tRs.%Message) }
+          }
+          Quit ##class(Bench.Plan.Orders).%BuildIndices($ListBuild("CustIdx"))
+      }
 
-    }
+      }
 tags:
-- index
-- buildindices
-- noindex
+  - index
+  - buildindices
+  - noindex

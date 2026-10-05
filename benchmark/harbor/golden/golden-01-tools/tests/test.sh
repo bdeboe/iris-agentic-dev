@@ -11,6 +11,7 @@ REWARD_DIR="${REWARD_DIR:-/logs/verifier}"
 NS="${IRIS_NAMESPACE:-BENCHMARK}"
 IAD="${IAD_BINARY:-iris-agentic-dev}"
 
+# shellcheck disable=SC2016  # the quoted text is ObjectScript; $classmethod is not a shell expansion
 output="$("$IAD" exec -n "$NS" 'set tOK = 0
 try { set tOK = ($classmethod("Golden.Buggy","Triple",4) = 12) } catch { set tOK = 0 }
 write $select(tOK:"PASS",1:"FAIL")' 2>&1)"

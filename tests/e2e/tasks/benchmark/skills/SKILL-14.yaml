@@ -8,53 +8,53 @@ prompt: |
   The instance runs in the Docker container iris-dev-iris.
 skill: objectscript-unit-test
 fixtures:
-- name: Bench.Calc.Math
-  content: |
-    Class Bench.Calc.Math Extends %RegisteredObject
-    {
+  - name: Bench.Calc.Math
+    content: |
+      Class Bench.Calc.Math Extends %RegisteredObject
+      {
 
-    ClassMethod Sub(pA As %Integer, pB As %Integer) As %Integer
-    {
-        Quit pA + pB
-    }
+      ClassMethod Sub(pA As %Integer, pB As %Integer) As %Integer
+      {
+          Quit pA + pB
+      }
 
-    }
-- name: Bench.Calc.MathTest
-  content: |
-    Class Bench.Calc.MathTest Extends %UnitTest.TestCase
-    {
+      }
+  - name: Bench.Calc.MathTest
+    content: |
+      Class Bench.Calc.MathTest Extends %UnitTest.TestCase
+      {
 
-    Method CheckSub()
-    {
-        Do $$$AssertEquals(##class(Bench.Calc.Math).Sub(5, 3), 2, "5 - 3")
-    }
+      Method CheckSub()
+      {
+          Do $$$AssertEquals(##class(Bench.Calc.Math).Sub(5, 3), 2, "5 - 3")
+      }
 
-    }
+      }
 check: |
   try { set ok=0 if (##class(Bench.Calc.Math).Sub(5,3)=2)&&(##class(Bench.Calc.Math).Sub(1,4)=-3) { set rs=##class(%SQL.Statement).%ExecDirect(,"SELECT COUNT(*) FROM %Dictionary.CompiledMethod WHERE parent = 'Bench.Calc.MathTest' AND Origin = 'Bench.Calc.MathTest' AND Name %STARTSWITH 'Test'") do rs.%Next() set ok=(rs.%GetData(1)>0) } } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
 solution:
-- name: Bench.Calc.Math
-  content: |
-    Class Bench.Calc.Math Extends %RegisteredObject
-    {
+  - name: Bench.Calc.Math
+    content: |
+      Class Bench.Calc.Math Extends %RegisteredObject
+      {
 
-    ClassMethod Sub(pA As %Integer, pB As %Integer) As %Integer
-    {
-        Quit pA - pB
-    }
+      ClassMethod Sub(pA As %Integer, pB As %Integer) As %Integer
+      {
+          Quit pA - pB
+      }
 
-    }
-- name: Bench.Calc.MathTest
-  content: |
-    Class Bench.Calc.MathTest Extends %UnitTest.TestCase
-    {
+      }
+  - name: Bench.Calc.MathTest
+    content: |
+      Class Bench.Calc.MathTest Extends %UnitTest.TestCase
+      {
 
-    Method TestSub()
-    {
-        Do $$$AssertEquals(##class(Bench.Calc.Math).Sub(5, 3), 2, "5 - 3")
-    }
+      Method TestSub()
+      {
+          Do $$$AssertEquals(##class(Bench.Calc.Math).Sub(5, 3), 2, "5 - 3")
+      }
 
-    }
+      }
 tags:
-- unittest
-- naming
+  - unittest
+  - naming

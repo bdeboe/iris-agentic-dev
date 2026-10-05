@@ -673,16 +673,12 @@ async fn count_and_excludeempty() {
 // --- US1 live: sa_schema -------------------------------------------------------------------------
 
 async fn call_info(name: &str) -> serde_json::Value {
-    let bin = std::env::var("IAD_BINARY").unwrap_or_else(|_| {
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../target/debug/iris-agentic-dev"
-        )
-        .into()
-    });
+    let bin = iris_agentic_dev_core::testing::iad_binary_path();
     let args = serde_json::json!({"what": "sa_schema", "name": name}).to_string();
     let out = tokio::process::Command::new(bin)
         .args(["tool", "iris_info", "-n", NS, "-a", &args])
+        .env("IRIS_WRITE_TOOLS_ENABLED", "0")
+        .env("IRIS_DESTRUCTIVE_TOOLS_ENABLED", "0")
         .output()
         .await
         .expect("iris-agentic-dev must run");

@@ -1,1 +1,363 @@
-[{"number":141,"title":"Enhancement: no-plaintext credential for an out-of-process stdio MCP client on Windows (DPAPI / Server Manager) — follow-up to #107"},{"number":140,"title":"`iris_doc mode=list` fails with HTTP 400 for `category` MAC/INT/INC and for the default `ALL`: Atelier `docnames/:cat` only accepts `*`, `CLS`, `RTN`, `CSP`, `OTH`"},{"number":139,"title":"`iris_execute` / `iris_doc put` / `iris_production` fail 100% on native Windows IRIS since v1.3.2: `$IO` is lower-cased on Windows, so the `devio'=tmpfile` capture check always trips"},{"number":138,"title":"iris_execute output capture drops non-ASCII characters — tmpfile Open/Stream translation table isn't UTF-8 (present on 1.4.1)"},{"number":137,"title":"iris_ws_exec bypasses the non-configurable CODE_EDIT_BLOCKED hard-block (present on 1.3.0 and 1.4.1)"},{"number":136,"title":"Add a CHANGELOG.md"},{"number":135,"title":"1.3.0: CodeMode write gate false-positives on comments and string literals"},{"number":129,"title":"iad-native server registry (servers.json) can't store a web-server path prefix — instances behind a gateway prefix are unreachable"},{"number":128,"title":"Want to add your plugin to awesome-ai-plugins?"},{"number":127,"title":"Trust the OS cert store for Atelier TLS, not just bundled roots"},{"number":125,"title":"Docs: Cursor IDE / Cursor CLI quick start"},{"number":123,"title":"Operate mode: fleet [instance.*] never joins connection pool when config_file is a toml path"},{"number":119,"title":"skill_list/skill_search never see synthesized (^SKILLS) skills — synthesized_skills() emits invalid JSON"},{"number":118,"title":"It’s not exactly a problem. (Support for AntigravitIDE)"},{"number":117,"title":"initialize echoes client's protocolVersion without checking it's actually implemented — breaks all tool calls under MCP rev 2026-07-28 (missing cache annotation)"},{"number":115,"title":"Tools with outputSchema must return structuredContent (MCP 2025-06-18 / Cursor -32600)"},{"number":114,"title":"Operate mode: instance_role() matches host only — shared gateway causes wrong subject role gate"},{"number":113,"title":"Cursor MCP shows 0 enabled tools when full catalog is advertised (large tools/list + outputSchema)"},{"number":111,"title":"1.2.0: enabled_tools / disabled_tools are ignored when the config is passed with --config"},{"number":110,"title":"1.2.0: write_tools_enabled / destructive_tools_enabled in .iris-agentic-dev.toml have no effect"},{"number":108,"title":"Operate-mode [instance.*] ignores web_port and scheme"},{"number":107,"title":"External MCP clients (Cursor CLI / Remote SSH) can’t use Server Manager credentials — keychain + Auth Provider gap"},{"number":105,"title":"Storage-stripping behavior breaks agentic edits and doesn't match the Atelier contract"},{"number":104,"title":".iris-agentic-dev.toml isn't loaded on launch"},{"number":103,"title":"iris_production defaults to USER namespace and cannot be changed"},{"number":102,"title":"Add Windows installer / winget support"},{"number":99,"title":"[iris_test] %UnitTest.TestProduction suites can't run — only %UnitTest.TestCase is driven, so every Interoperability test suite reports NO_TESTS_FOUND"},{"number":98,"title":"[iris_debug] map_int/capture/source_map fail with DOCKER_REQUIRED on HTTP-only connections — the same code runs fine via execute_via_generator"},{"number":97,"title":"[interop] no way to FIND messages by body content — message search matches header fields only; iris_message_body requires a known id"},{"number":96,"title":"[namespace] omitting the optional namespace param silently runs in USER — the server's configured IRIS_NAMESPACE is never consulted (~25 param structs)"},{"number":95,"title":"[mcp] tool failures never set isError — every error path returns CallToolResult::success, so spec-compliant clients see failures as successes"},{"number":94,"title":"1.0.0: six mutating tools are tagged readOnlyHint: true (iris_doc, iris_query, iris_production, iris_production_item, iris_containers, iris_coverage)"},{"number":92,"title":"Generated ObjectScript embeds user strings with the wrong escaping (SQL-style '' / C-style \\\") — lookup import always <SYNTAX>, quotes silently corrupt passwords and values"},{"number":91,"title":"brew install instructions incorrect"},{"number":90,"title":"docs: CODE_EDIT_BLOCKED guardrail in iris_execute is undocumented (no release note, absent from tools.md)"},{"number":89,"title":"bug: .iris-agentic-dev.toml 'container' is loaded but not bound to the active connection (container:null in check_config/iris_containers)"},{"number":88,"title":"bug: iris_doc put silently discards an explicit Storage definition (follow-up to #80)"},{"number":87,"title":"bug: iris_test(coverage=true) executes the suite twice and returns all-zero coverage"},{"number":86,"title":"bug: iris_coverage(mode=run) returns success:true with 0/0 while start→test→report→stop measures real coverage"},{"number":85,"title":"web_prefix not applied — cannot connect to IRIS behind an IIS path prefix (env var ignored; .toml hangs)"},{"number":83,"title":"iris_test: exact class and wildcard patterns return NO_TESTS_FOUND; error lacks actionable hint"},{"number":82,"title":"bug: config resolution is cwd-dependent; silent fallback discovery can attach to the wrong IRIS (IDE-launched MCP, cwd=/)"},{"number":81,"title":"bug: CLI 'tool' exits 0 on tool errors; with no config it prints empty stdout and still exits 0"},{"number":80,"title":"bug: iris_doc put corrupts a class containing a Storage block — partial strip leaves orphaned XML (#5559)"},{"number":76,"title":"Writing a CONTRIBUTING.md"},{"number":75,"title":"Use Server Manager VS Code extension or enhance connection to allow for web server prefix"},{"number":74,"title":"feat: add the ability to disable tool discovery in config"},{"number":72,"title":"Transient 'execute_via_generator attempt 1 failed ... retrying in 100ms' WARN right after instance startup (0.8.0)"},{"number":71,"title":"iris_production start/stop generate invalid ObjectScript syntax"},{"number":66,"title":"feat: VS Code Server Manager zero-config discovery, per-connection policy gate, audit log"},{"number":65,"title":"feat: fleet roles, operate mode, and role-gate for multi-instance deployments"},{"number":64,"title":"bug: vscode-iris-agentic-dev/README.md still refers to old `iris-dev` name in several places"},{"number":61,"title":"bug: issue with iris_source_control status tool"},{"number":60,"title":"iris_execute/iris_test leave temp executor classes in the User package (User.IrisDevRun*) — use a dedicated scratch package"},{"number":59,"title":"iris_test: transport drops on long-running suites (~90s timeout / 'error sending request')"},{"number":58,"title":"iris_test: failing tests (failed>0) reported as success:false — can't distinguish red tests from a broken tool"},{"number":57,"title":"iris_doc: non-2xx Atelier responses mislabeled as IRIS_UNREACHABLE; body discarded; concurrent compile reported as success"},{"number":56,"title":"iris_execute/iris_production/iris_test fail 100% on native Windows IRIS — HTTP exec path hardcodes a Unix /tmp temp file"},{"number":55,"title":"iris_execute silently drops all write output (returns output:\"\" with success:true)"},{"number":53,"title":"Do you plan to move the vscode-iris-dev folder to vscode-iris-agentic-dev for consistency?"},{"number":52,"title":"VSIX: unused `iris-dev.nativePort` property?"},{"number":51,"title":"VSIX: missing LICENSE and README.md"},{"number":49,"title":"VSIX: implement IRIS_TLS_VERIFY env variable"},{"number":48,"title":"`iris_test` apparently fails to load testclasses at start of its run, but does delete them at the end"},{"number":46,"title":"iris_test tool is hard to use"},{"number":45,"title":"`iris-dev` MCP server advertises invalid `inputSchema` for 9 dispatcher tools"},{"number":44,"title":"HTTPS requests fail after successful connection probe on IRIS 2025.1.2"},{"number":43,"title":"bug: each Atelier REST call creates a new CSP session — license slot exhaustion"},{"number":42,"title":"objectscript.conn() settings still not honoured"},{"number":41,"title":"feat: iris_build_constraints — map IRIS build version to known runtime limitations"},{"number":40,"title":"feat: iris_table_globals — discover backing globals for DDL-created tables"},{"number":39,"title":"feat: iris_validate_embedded_sql — check SQL compatibility in embedded Python context"},{"number":38,"title":"feat: iris_table_info — DDL vs class-projection detection with global layout"},{"number":33,"title":"iris_query: add read-only SQL validation gate"},{"number":32,"title":"feat: iris_execute use persistant session"},{"number":31,"title":"Building a UnitTest, and, agent running it."},{"number":30,"title":"VS Code extension presents nondescript MCP server name `rmcp`"},{"number":29,"title":"bug: .iris-dev.toml container setting not applied to MCP connection at startup"},{"number":28,"title":"Misleading 'not found or not reachable' error when container is found but Atelier private web server is absent"},{"number":26,"title":"feat: environment guard — restrict write/execute tools to DEV instances"},{"number":25,"title":"feat: execution log resources — UUID-based progressive disclosure for large tool output"},{"number":24,"title":"feat: MCP sampling for log analysis with progressive disclosure"},{"number":23,"title":"How can I make MCP server use https for its IRIS connection?"},{"number":22,"title":"Install one-liner in v0.4.4 release notes 404s on macOS (darwin vs macos)"},{"number":21,"title":"iris-community container: HTTP auth (401) when started without IRIS_PASSWORD env var"},{"number":20,"title":"idt container up --port: auto-calculated web port exceeds valid range (>65535)"},{"number":19,"title":"iris-dev init: container scoring picks wrong container — workspace basename not matched against container name"},{"number":18,"title":"execute_via_generator: SQL stored proc name uses dots (User.IrisDevRunXXX_Execute) — should use underscores"},{"number":17,"title":"discover_iris: IRIS_CONTAINER env var ignored — localhost scan latches wrong container"},{"number":16,"title":"resolve_version() is a non-functional stub — always returns 0.1.0 or 1.0.0, never contacts registry or Git"},{"number":15,"title":"vscode_config: inline // comments, /* */ block comments, and trailing commas silently swallowed — settings ignored"},{"number":14,"title":"ObjectScript global-to-JSON builder produces invalid JSON for empty globals (\"]\" instead of \"[]\")"},{"number":13,"title":"interop tools execute in iris.namespace instead of params.namespace; update/recover/needs_update have no namespace param at all"},{"number":12,"title":"execute_via_generator: output containing newlines produces invalid ObjectScript — Quit \"line1\\nline2\" is a syntax error"},{"number":11,"title":"iris_select_container creates a new IrisConnection but immediately discards it — container switch has no effect"},{"number":10,"title":"iris-dev compile <file>.cls uses file_stem() — strips directory prefix, compiles wrong class name"},{"number":9,"title":"iris-dev compile . passes namespace as CompileAll flags argument — compiles nothing and may error"},{"number":8,"title":"generate.rs Anthropic API path is completely broken: wrong auth header, missing max_tokens, wrong response format"},{"number":7,"title":"do_write ETag conflict retry sends If-None-Match instead of If-Match — completely wrong semantics, retry always fails"},{"number":6,"title":"iris_compile wildcard expansion queries wrong namespace (uses iris.namespace instead of p.namespace)"},{"number":5,"title":"workspace version is 0.2.0 but release tag is v0.3.1 — Cargo.toml never bumped"},{"number":4,"title":"Use detected Atelier API version throughout — don't hardcode v1/v8"},{"number":1,"title":"MCP server doesn't advertise capabilities"}]
+[
+  {
+    "number": 141,
+    "title": "Enhancement: no-plaintext credential for an out-of-process stdio MCP client on Windows (DPAPI / Server Manager) — follow-up to #107"
+  },
+  {
+    "number": 140,
+    "title": "`iris_doc mode=list` fails with HTTP 400 for `category` MAC/INT/INC and for the default `ALL`: Atelier `docnames/:cat` only accepts `*`, `CLS`, `RTN`, `CSP`, `OTH`"
+  },
+  {
+    "number": 139,
+    "title": "`iris_execute` / `iris_doc put` / `iris_production` fail 100% on native Windows IRIS since v1.3.2: `$IO` is lower-cased on Windows, so the `devio'=tmpfile` capture check always trips"
+  },
+  {
+    "number": 138,
+    "title": "iris_execute output capture drops non-ASCII characters — tmpfile Open/Stream translation table isn't UTF-8 (present on 1.4.1)"
+  },
+  {
+    "number": 137,
+    "title": "iris_ws_exec bypasses the non-configurable CODE_EDIT_BLOCKED hard-block (present on 1.3.0 and 1.4.1)"
+  },
+  { "number": 136, "title": "Add a CHANGELOG.md" },
+  {
+    "number": 135,
+    "title": "1.3.0: CodeMode write gate false-positives on comments and string literals"
+  },
+  {
+    "number": 129,
+    "title": "iad-native server registry (servers.json) can't store a web-server path prefix — instances behind a gateway prefix are unreachable"
+  },
+  { "number": 128, "title": "Want to add your plugin to awesome-ai-plugins?" },
+  {
+    "number": 127,
+    "title": "Trust the OS cert store for Atelier TLS, not just bundled roots"
+  },
+  { "number": 125, "title": "Docs: Cursor IDE / Cursor CLI quick start" },
+  {
+    "number": 123,
+    "title": "Operate mode: fleet [instance.*] never joins connection pool when config_file is a toml path"
+  },
+  {
+    "number": 119,
+    "title": "skill_list/skill_search never see synthesized (^SKILLS) skills — synthesized_skills() emits invalid JSON"
+  },
+  {
+    "number": 118,
+    "title": "It’s not exactly a problem. (Support for AntigravitIDE)"
+  },
+  {
+    "number": 117,
+    "title": "initialize echoes client's protocolVersion without checking it's actually implemented — breaks all tool calls under MCP rev 2026-07-28 (missing cache annotation)"
+  },
+  {
+    "number": 115,
+    "title": "Tools with outputSchema must return structuredContent (MCP 2025-06-18 / Cursor -32600)"
+  },
+  {
+    "number": 114,
+    "title": "Operate mode: instance_role() matches host only — shared gateway causes wrong subject role gate"
+  },
+  {
+    "number": 113,
+    "title": "Cursor MCP shows 0 enabled tools when full catalog is advertised (large tools/list + outputSchema)"
+  },
+  {
+    "number": 111,
+    "title": "1.2.0: enabled_tools / disabled_tools are ignored when the config is passed with --config"
+  },
+  {
+    "number": 110,
+    "title": "1.2.0: write_tools_enabled / destructive_tools_enabled in .iris-agentic-dev.toml have no effect"
+  },
+  {
+    "number": 108,
+    "title": "Operate-mode [instance.*] ignores web_port and scheme"
+  },
+  {
+    "number": 107,
+    "title": "External MCP clients (Cursor CLI / Remote SSH) can’t use Server Manager credentials — keychain + Auth Provider gap"
+  },
+  {
+    "number": 105,
+    "title": "Storage-stripping behavior breaks agentic edits and doesn't match the Atelier contract"
+  },
+  { "number": 104, "title": ".iris-agentic-dev.toml isn't loaded on launch" },
+  {
+    "number": 103,
+    "title": "iris_production defaults to USER namespace and cannot be changed"
+  },
+  { "number": 102, "title": "Add Windows installer / winget support" },
+  {
+    "number": 99,
+    "title": "[iris_test] %UnitTest.TestProduction suites can't run — only %UnitTest.TestCase is driven, so every Interoperability test suite reports NO_TESTS_FOUND"
+  },
+  {
+    "number": 98,
+    "title": "[iris_debug] map_int/capture/source_map fail with DOCKER_REQUIRED on HTTP-only connections — the same code runs fine via execute_via_generator"
+  },
+  {
+    "number": 97,
+    "title": "[interop] no way to FIND messages by body content — message search matches header fields only; iris_message_body requires a known id"
+  },
+  {
+    "number": 96,
+    "title": "[namespace] omitting the optional namespace param silently runs in USER — the server's configured IRIS_NAMESPACE is never consulted (~25 param structs)"
+  },
+  {
+    "number": 95,
+    "title": "[mcp] tool failures never set isError — every error path returns CallToolResult::success, so spec-compliant clients see failures as successes"
+  },
+  {
+    "number": 94,
+    "title": "1.0.0: six mutating tools are tagged readOnlyHint: true (iris_doc, iris_query, iris_production, iris_production_item, iris_containers, iris_coverage)"
+  },
+  {
+    "number": 92,
+    "title": "Generated ObjectScript embeds user strings with the wrong escaping (SQL-style '' / C-style \\\") — lookup import always <SYNTAX>, quotes silently corrupt passwords and values"
+  },
+  { "number": 91, "title": "brew install instructions incorrect" },
+  {
+    "number": 90,
+    "title": "docs: CODE_EDIT_BLOCKED guardrail in iris_execute is undocumented (no release note, absent from tools.md)"
+  },
+  {
+    "number": 89,
+    "title": "bug: .iris-agentic-dev.toml 'container' is loaded but not bound to the active connection (container:null in check_config/iris_containers)"
+  },
+  {
+    "number": 88,
+    "title": "bug: iris_doc put silently discards an explicit Storage definition (follow-up to #80)"
+  },
+  {
+    "number": 87,
+    "title": "bug: iris_test(coverage=true) executes the suite twice and returns all-zero coverage"
+  },
+  {
+    "number": 86,
+    "title": "bug: iris_coverage(mode=run) returns success:true with 0/0 while start→test→report→stop measures real coverage"
+  },
+  {
+    "number": 85,
+    "title": "web_prefix not applied — cannot connect to IRIS behind an IIS path prefix (env var ignored; .toml hangs)"
+  },
+  {
+    "number": 83,
+    "title": "iris_test: exact class and wildcard patterns return NO_TESTS_FOUND; error lacks actionable hint"
+  },
+  {
+    "number": 82,
+    "title": "bug: config resolution is cwd-dependent; silent fallback discovery can attach to the wrong IRIS (IDE-launched MCP, cwd=/)"
+  },
+  {
+    "number": 81,
+    "title": "bug: CLI 'tool' exits 0 on tool errors; with no config it prints empty stdout and still exits 0"
+  },
+  {
+    "number": 80,
+    "title": "bug: iris_doc put corrupts a class containing a Storage block — partial strip leaves orphaned XML (#5559)"
+  },
+  { "number": 76, "title": "Writing a CONTRIBUTING.md" },
+  {
+    "number": 75,
+    "title": "Use Server Manager VS Code extension or enhance connection to allow for web server prefix"
+  },
+  {
+    "number": 74,
+    "title": "feat: add the ability to disable tool discovery in config"
+  },
+  {
+    "number": 72,
+    "title": "Transient 'execute_via_generator attempt 1 failed ... retrying in 100ms' WARN right after instance startup (0.8.0)"
+  },
+  {
+    "number": 71,
+    "title": "iris_production start/stop generate invalid ObjectScript syntax"
+  },
+  {
+    "number": 66,
+    "title": "feat: VS Code Server Manager zero-config discovery, per-connection policy gate, audit log"
+  },
+  {
+    "number": 65,
+    "title": "feat: fleet roles, operate mode, and role-gate for multi-instance deployments"
+  },
+  {
+    "number": 64,
+    "title": "bug: vscode-iris-agentic-dev/README.md still refers to old `iris-dev` name in several places"
+  },
+  { "number": 61, "title": "bug: issue with iris_source_control status tool" },
+  {
+    "number": 60,
+    "title": "iris_execute/iris_test leave temp executor classes in the User package (User.IrisDevRun*) — use a dedicated scratch package"
+  },
+  {
+    "number": 59,
+    "title": "iris_test: transport drops on long-running suites (~90s timeout / 'error sending request')"
+  },
+  {
+    "number": 58,
+    "title": "iris_test: failing tests (failed>0) reported as success:false — can't distinguish red tests from a broken tool"
+  },
+  {
+    "number": 57,
+    "title": "iris_doc: non-2xx Atelier responses mislabeled as IRIS_UNREACHABLE; body discarded; concurrent compile reported as success"
+  },
+  {
+    "number": 56,
+    "title": "iris_execute/iris_production/iris_test fail 100% on native Windows IRIS — HTTP exec path hardcodes a Unix /tmp temp file"
+  },
+  {
+    "number": 55,
+    "title": "iris_execute silently drops all write output (returns output:\"\" with success:true)"
+  },
+  {
+    "number": 53,
+    "title": "Do you plan to move the vscode-iris-dev folder to vscode-iris-agentic-dev for consistency?"
+  },
+  { "number": 52, "title": "VSIX: unused `iris-dev.nativePort` property?" },
+  { "number": 51, "title": "VSIX: missing LICENSE and README.md" },
+  { "number": 49, "title": "VSIX: implement IRIS_TLS_VERIFY env variable" },
+  {
+    "number": 48,
+    "title": "`iris_test` apparently fails to load testclasses at start of its run, but does delete them at the end"
+  },
+  { "number": 46, "title": "iris_test tool is hard to use" },
+  {
+    "number": 45,
+    "title": "`iris-dev` MCP server advertises invalid `inputSchema` for 9 dispatcher tools"
+  },
+  {
+    "number": 44,
+    "title": "HTTPS requests fail after successful connection probe on IRIS 2025.1.2"
+  },
+  {
+    "number": 43,
+    "title": "bug: each Atelier REST call creates a new CSP session — license slot exhaustion"
+  },
+  { "number": 42, "title": "objectscript.conn() settings still not honoured" },
+  {
+    "number": 41,
+    "title": "feat: iris_build_constraints — map IRIS build version to known runtime limitations"
+  },
+  {
+    "number": 40,
+    "title": "feat: iris_table_globals — discover backing globals for DDL-created tables"
+  },
+  {
+    "number": 39,
+    "title": "feat: iris_validate_embedded_sql — check SQL compatibility in embedded Python context"
+  },
+  {
+    "number": 38,
+    "title": "feat: iris_table_info — DDL vs class-projection detection with global layout"
+  },
+  { "number": 33, "title": "iris_query: add read-only SQL validation gate" },
+  { "number": 32, "title": "feat: iris_execute use persistant session" },
+  { "number": 31, "title": "Building a UnitTest, and, agent running it." },
+  {
+    "number": 30,
+    "title": "VS Code extension presents nondescript MCP server name `rmcp`"
+  },
+  {
+    "number": 29,
+    "title": "bug: .iris-dev.toml container setting not applied to MCP connection at startup"
+  },
+  {
+    "number": 28,
+    "title": "Misleading 'not found or not reachable' error when container is found but Atelier private web server is absent"
+  },
+  {
+    "number": 26,
+    "title": "feat: environment guard — restrict write/execute tools to DEV instances"
+  },
+  {
+    "number": 25,
+    "title": "feat: execution log resources — UUID-based progressive disclosure for large tool output"
+  },
+  {
+    "number": 24,
+    "title": "feat: MCP sampling for log analysis with progressive disclosure"
+  },
+  {
+    "number": 23,
+    "title": "How can I make MCP server use https for its IRIS connection?"
+  },
+  {
+    "number": 22,
+    "title": "Install one-liner in v0.4.4 release notes 404s on macOS (darwin vs macos)"
+  },
+  {
+    "number": 21,
+    "title": "iris-community container: HTTP auth (401) when started without IRIS_PASSWORD env var"
+  },
+  {
+    "number": 20,
+    "title": "idt container up --port: auto-calculated web port exceeds valid range (>65535)"
+  },
+  {
+    "number": 19,
+    "title": "iris-dev init: container scoring picks wrong container — workspace basename not matched against container name"
+  },
+  {
+    "number": 18,
+    "title": "execute_via_generator: SQL stored proc name uses dots (User.IrisDevRunXXX_Execute) — should use underscores"
+  },
+  {
+    "number": 17,
+    "title": "discover_iris: IRIS_CONTAINER env var ignored — localhost scan latches wrong container"
+  },
+  {
+    "number": 16,
+    "title": "resolve_version() is a non-functional stub — always returns 0.1.0 or 1.0.0, never contacts registry or Git"
+  },
+  {
+    "number": 15,
+    "title": "vscode_config: inline // comments, /* */ block comments, and trailing commas silently swallowed — settings ignored"
+  },
+  {
+    "number": 14,
+    "title": "ObjectScript global-to-JSON builder produces invalid JSON for empty globals (\"]\" instead of \"[]\")"
+  },
+  {
+    "number": 13,
+    "title": "interop tools execute in iris.namespace instead of params.namespace; update/recover/needs_update have no namespace param at all"
+  },
+  {
+    "number": 12,
+    "title": "execute_via_generator: output containing newlines produces invalid ObjectScript — Quit \"line1\\nline2\" is a syntax error"
+  },
+  {
+    "number": 11,
+    "title": "iris_select_container creates a new IrisConnection but immediately discards it — container switch has no effect"
+  },
+  {
+    "number": 10,
+    "title": "iris-dev compile <file>.cls uses file_stem() — strips directory prefix, compiles wrong class name"
+  },
+  {
+    "number": 9,
+    "title": "iris-dev compile . passes namespace as CompileAll flags argument — compiles nothing and may error"
+  },
+  {
+    "number": 8,
+    "title": "generate.rs Anthropic API path is completely broken: wrong auth header, missing max_tokens, wrong response format"
+  },
+  {
+    "number": 7,
+    "title": "do_write ETag conflict retry sends If-None-Match instead of If-Match — completely wrong semantics, retry always fails"
+  },
+  {
+    "number": 6,
+    "title": "iris_compile wildcard expansion queries wrong namespace (uses iris.namespace instead of p.namespace)"
+  },
+  {
+    "number": 5,
+    "title": "workspace version is 0.2.0 but release tag is v0.3.1 — Cargo.toml never bumped"
+  },
+  {
+    "number": 4,
+    "title": "Use detected Atelier API version throughout — don't hardcode v1/v8"
+  },
+  { "number": 1, "title": "MCP server doesn't advertise capabilities" }
+]

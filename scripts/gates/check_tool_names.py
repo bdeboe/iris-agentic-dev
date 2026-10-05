@@ -27,6 +27,8 @@ CLASSIFICATION_RS = ROOT / "crates/iris-agentic-dev-core/src/tools/write_gate.rs
 ALLOWED = {
     # The crate, the binary, and the MCP server share this name.
     "iris_agentic_dev",
+    # The core crate, as code names it (`iris_agentic_dev_core::telemetry::...`).
+    "iris_agentic_dev_core",
     # Env vars and config keys are screaming-snake or lowercase but not tools.
     "iris_agentic_dev_skills_dir",
     # A *response field*, on check_config, iris_info and iris_test_server. Nothing can call it,

@@ -59,7 +59,10 @@ fn iad(dir: &std::path::Path) -> Command {
         .env("IRIS_USERNAME", "_SYSTEM")
         .env("IRIS_PASSWORD", "SYS")
         .env("IRIS_CONTAINER", container())
-        .env("IRIS_NAMESPACE", "USER");
+        .env("IRIS_NAMESPACE", "USER")
+        // `exec` and `iris_execute` are refused with writes off.
+        .env("IRIS_WRITE_TOOLS_ENABLED", "1")
+        .env("IRIS_DESTRUCTIVE_TOOLS_ENABLED", "0");
     cmd
 }
 

@@ -40,7 +40,7 @@ generic came from iad.
 | #   | Tool             | From                | What it did                                                 | Started  | Took  |
 | --- | ---------------- | ------------------- | ----------------------------------------------------------- | -------- | ----- |
 | 1   | `Bash`           | Claude Code         | Check the project IRIS container and docker contexts        | 13:29:14 | 0.3 s |
-| 2   | `ToolSearch`     | Claude Code         | loaded schemas for skill_describe, check_config, iris_quer… | 13:29:15 | 0.1 s |
+| 2   | `ToolSearch`     | Claude Code         | loaded schemas for skill_describe, check_config, iris_query | 13:29:15 | 0.1 s |
 | 3   | `skill_describe` | iad                 | read the `objectscript-guardrails` skill                    | 13:29:20 | 0.2 s |
 | 4   | `check_config`   | iad                 | which IRIS is this session on                               | 13:29:20 | 0.1 s |
 | 5   | `iris_doc`       | iad                 | `put` Demo.Todo.cls + compile                               | 13:30:05 | 0.6 s |

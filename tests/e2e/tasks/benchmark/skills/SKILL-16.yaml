@@ -9,58 +9,58 @@ prompt: |
   The instance runs in the Docker container iris-dev-iris.
 skill: ensemble-production
 fixtures:
-- name: Bench.Prod.Empty
-  content: |
-    Class Bench.Prod.Empty Extends Ens.Production
-    {
+  - name: Bench.Prod.Empty
+    content: |
+      Class Bench.Prod.Empty Extends Ens.Production
+      {
 
-    XData ProductionDefinition
-    {
-    <Production Name="Bench.Prod.Empty">
-    </Production>
-    }
+      XData ProductionDefinition
+      {
+      <Production Name="Bench.Prod.Empty">
+      </Production>
+      }
 
-    }
-- name: Bench.Prod.Ctl
-  content: |
-    Class Bench.Prod.Ctl Extends %RegisteredObject
-    {
+      }
+  - name: Bench.Prod.Ctl
+    content: |
+      Class Bench.Prod.Ctl Extends %RegisteredObject
+      {
 
-    ClassMethod Ensure(pName As %String) As %Status
-    {
-        Quit ##class(Ens.Director).StartProduction(pName)
-    }
+      ClassMethod Ensure(pName As %String) As %Status
+      {
+          Quit ##class(Ens.Director).StartProduction(pName)
+      }
 
-    }
+      }
 check: |
   try { set ok=0 do ##class(Ens.Director).StopProduction(10,1) set s1=##class(Bench.Prod.Ctl).Ensure("Bench.Prod.Empty") set s2=##class(Bench.Prod.Ctl).Ensure("Bench.Prod.Empty") set sc=##class(Ens.Director).GetProductionStatus(.n,.st) set ok=($system.Status.IsOK(s1)&&$system.Status.IsOK(s2)&&(st=1)&&(n="Bench.Prod.Empty")) } catch { set ok=0 } try { do ##class(Ens.Director).StopProduction(10,1) } catch { } write $select(ok:"PASS",1:"FAIL")
 solution:
-- name: Bench.Prod.Empty
-  content: |
-    Class Bench.Prod.Empty Extends Ens.Production
-    {
+  - name: Bench.Prod.Empty
+    content: |
+      Class Bench.Prod.Empty Extends Ens.Production
+      {
 
-    XData ProductionDefinition
-    {
-    <Production Name="Bench.Prod.Empty">
-    </Production>
-    }
+      XData ProductionDefinition
+      {
+      <Production Name="Bench.Prod.Empty">
+      </Production>
+      }
 
-    }
-- name: Bench.Prod.Ctl
-  content: |
-    Class Bench.Prod.Ctl Extends %RegisteredObject
-    {
+      }
+  - name: Bench.Prod.Ctl
+    content: |
+      Class Bench.Prod.Ctl Extends %RegisteredObject
+      {
 
-    ClassMethod Ensure(pName As %String) As %Status
-    {
-        Set tSC = ##class(Ens.Director).GetProductionStatus(.tName, .tState)
-        If $$$ISERR(tSC) { Quit tSC }
-        If (tState = 1) && (tName = pName) { Quit $$$OK }
-        Quit ##class(Ens.Director).StartProduction(pName)
-    }
+      ClassMethod Ensure(pName As %String) As %Status
+      {
+          Set tSC = ##class(Ens.Director).GetProductionStatus(.tName, .tState)
+          If $$$ISERR(tSC) { Quit tSC }
+          If (tState = 1) && (tName = pName) { Quit $$$OK }
+          Quit ##class(Ens.Director).StartProduction(pName)
+      }
 
-    }
+      }
 tags:
-- production
-- director
+  - production
+  - director

@@ -70,7 +70,6 @@ env-pinning	crates/iris-agentic-dev-bin/tests/integration/binary_099_fresh_conta
 env-pinning	crates/iris-agentic-dev-bin/tests/integration/test_attribution_stdio.rs	dd20748b2321	# spawn does not pin IRIS_WRITE_TOOLS_ENABLED, IRIS_DESTRUCTIVE_TOOLS_EN
 env-pinning	crates/iris-agentic-dev-bin/tests/integration/test_attribution_stdio.rs	dd20748b2321	# spawn does not pin IRIS_WRITE_TOOLS_ENABLED, IRIS_DESTRUCTIVE_TOOLS_EN
 env-pinning	crates/iris-agentic-dev-bin/tests/integration/test_attribution_stdio.rs	dd20748b2321	# spawn does not pin IRIS_WRITE_TOOLS_ENABLED, IRIS_DESTRUCTIVE_TOOLS_EN
-env-pinning	crates/iris-agentic-dev-bin/tests/integration/test_attribution_stdio.rs	dd20748b2321	# spawn does not pin IRIS_WRITE_TOOLS_ENABLED, IRIS_DESTRUCTIVE_TOOLS_EN
 env-pinning	crates/iris-agentic-dev-bin/tests/integration/test_compile_live.rs	dd20748b2321	# spawn does not pin IRIS_WRITE_TOOLS_ENABLED, IRIS_DESTRUCTIVE_TOOLS_EN
 env-pinning	crates/iris-agentic-dev-bin/tests/integration/test_doc_live.rs	dd20748b2321	# spawn does not pin IRIS_WRITE_TOOLS_ENABLED, IRIS_DESTRUCTIVE_TOOLS_EN
 env-pinning	crates/iris-agentic-dev-bin/tests/integration/test_exec_live.rs	dd20748b2321	# spawn does not pin IRIS_WRITE_TOOLS_ENABLED, IRIS_DESTRUCTIVE_TOOLS_EN
@@ -132,20 +131,8 @@ mcp-subcommand	crates/iris-agentic-dev-bin/tests/plugin_dispatch_tests.rs	cf7b7f
 mcp-subcommand	crates/iris-agentic-dev-bin/tests/plugin_dispatch_tests.rs	cf7b7f01387d	# spawns the binary with no subcommand. The MCP server is `iris-agentic-
 mcp-subcommand	crates/iris-agentic-dev-bin/tests/plugin_dispatch_tests.rs	cf7b7f01387d	# spawns the binary with no subcommand. The MCP server is `iris-agentic-
 mcp-subcommand	crates/iris-agentic-dev-bin/tests/plugin_dispatch_tests.rs	cf7b7f01387d	# spawns the binary with no subcommand. The MCP server is `iris-agentic-
-tool-name-refs	crates/iris-agentic-dev-bin/src/cmd/benchmark.rs	e60128916b0f	# names `iris_agentic_dev_core`, which is not in tools::write_gate::CLAS
-tool-name-refs	crates/iris-agentic-dev-bin/src/cmd/capability_matrix.rs	e60128916b0f	# names `iris_agentic_dev_core`, which is not in tools::write_gate::CLAS
-tool-name-refs	crates/iris-agentic-dev-bin/src/cmd/check_sm_credential.rs	e60128916b0f	# names `iris_agentic_dev_core`, which is not in tools::write_gate::CLAS
-tool-name-refs	crates/iris-agentic-dev-bin/src/cmd/compile.rs	e60128916b0f	# names `iris_agentic_dev_core`, which is not in tools::write_gate::CLAS
-tool-name-refs	crates/iris-agentic-dev-bin/src/cmd/connection_args.rs	e60128916b0f	# names `iris_agentic_dev_core`, which is not in tools::write_gate::CLAS
-tool-name-refs	crates/iris-agentic-dev-bin/src/cmd/dispatch.rs	e60128916b0f	# names `iris_agentic_dev_core`, which is not in tools::write_gate::CLAS
-tool-name-refs	crates/iris-agentic-dev-bin/src/cmd/init.rs	e60128916b0f	# names `iris_agentic_dev_core`, which is not in tools::write_gate::CLAS
-tool-name-refs	crates/iris-agentic-dev-bin/src/cmd/install.rs	e60128916b0f	# names `iris_agentic_dev_core`, which is not in tools::write_gate::CLAS
 tool-name-refs	crates/iris-agentic-dev-bin/src/cmd/mcp.rs	a61efb98e374	# names `iris_tx`, which is not in tools::write_gate::CLASSIFICATION. Ag
 tool-name-refs	crates/iris-agentic-dev-bin/src/cmd/mcp.rs	57a907251aaa	# names `iris_rx`, which is not in tools::write_gate::CLASSIFICATION. Ag
-tool-name-refs	crates/iris-agentic-dev-bin/src/cmd/mcp.rs	e60128916b0f	# names `iris_agentic_dev_core`, which is not in tools::write_gate::CLAS
-tool-name-refs	crates/iris-agentic-dev-bin/src/cmd/skill.rs	e60128916b0f	# names `iris_agentic_dev_core`, which is not in tools::write_gate::CLAS
-tool-name-refs	crates/iris-agentic-dev-bin/src/cmd/tool.rs	e60128916b0f	# names `iris_agentic_dev_core`, which is not in tools::write_gate::CLAS
-tool-name-refs	crates/iris-agentic-dev-bin/src/main.rs	e60128916b0f	# names `iris_agentic_dev_core`, which is not in tools::write_gate::CLAS
 tool-name-refs	crates/iris-agentic-dev-core/src/iris/connection.rs	3ae84fe32df9	# names `iris_audit`, which is not in tools::write_gate::CLASSIFICATION.
 tool-name-refs	crates/iris-agentic-dev-core/src/iris/connection_pool.rs	b4c4b4830492	# names `iris_host`, which is not in tools::write_gate::CLASSIFICATION. 
 tool-name-refs	crates/iris-agentic-dev-core/src/iris/discovery.rs	ff5e05b9ffc2	# names `iris_http_client`, which is not in tools::write_gate::CLASSIFIC
@@ -158,7 +145,6 @@ tool-name-refs	crates/iris-agentic-dev-core/src/tools/mod.rs	3ae84fe32df9	# name
 tool-name-refs	crates/iris-agentic-dev-core/src/tools/mod.rs	c7c2e2e22847	# names `iris_conn`, which is not in tools::write_gate::CLASSIFICATION. 
 tool-name-refs	crates/iris-agentic-dev-core/src/tools/mod.rs	7432c62fd33a	# names `iris_audit_failures`, which is not in tools::write_gate::CLASSI
 tool-name-refs	crates/iris-agentic-dev-core/src/tools/mod.rs	60917a41ffbb	# names `iris_dictionary`, which is not in tools::write_gate::CLASSIFICA
-tool-name-refs	crates/iris-agentic-dev-core/src/tools/mod.rs	e60128916b0f	# names `iris_agentic_dev_core`, which is not in tools::write_gate::CLAS
 tool-name-refs	crates/iris-agentic-dev-core/src/tools/search.rs	ff5e05b9ffc2	# names `iris_http_client`, which is not in tools::write_gate::CLASSIFIC
 tool-name-refs	docs/connecting.md	7432c62fd33a	# names `iris_audit_failures`, which is not in tools::write_gate::CLASSI
 tool-name-refs	skills/pyprod/SKILL.md	b3a64e5fc5dd	# names `iris_package_name`, which is not in tools::write_gate::CLASSIFI

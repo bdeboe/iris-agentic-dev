@@ -502,6 +502,7 @@ REWARD_DIR="${{REWARD_DIR:-{REWARD_DIR}}}"
 NS="${{IRIS_NAMESPACE:-{task.namespace}}}"
 IAD="${{IAD_BINARY:-iris-agentic-dev}}"
 
+# shellcheck disable=SC2016  # the quoted text is ObjectScript; $classmethod is not a shell expansion
 output="$("$IAD" exec -n "$NS" {_shell_single_quote(task.check)} 2>&1)"
 status=$?
 if [ "$status" -ne 0 ]; then

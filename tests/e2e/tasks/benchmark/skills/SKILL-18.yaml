@@ -20,34 +20,34 @@ prompt: |
   The instance runs in the Docker container iris-dev-iris.
 skill: iris-agentic-dev
 fixtures:
-- name: Bench.Xml.Greeter
-  content: |
-    Class Bench.Xml.Greeter Extends %RegisteredObject
-    {
+  - name: Bench.Xml.Greeter
+    content: |
+      Class Bench.Xml.Greeter Extends %RegisteredObject
+      {
 
-    ClassMethod Hello() As %String
-    {
-        Quit ""
-    }
+      ClassMethod Hello() As %String
+      {
+          Quit ""
+      }
 
-    }
+      }
 check: |
   try { set ok=(##class(Bench.Xml.Greeter).Hello()="greetings from the export") } catch { set ok=0 } write $select(ok:"PASS",1:"FAIL")
 solution:
-- name: Bench.Xml.Greeter
-  content: |
-    <?xml version="1.0" encoding="UTF8"?>
-    <Export generator="IRIS" version="26">
-    <Class name="Bench.Xml.Greeter">
-    <Super>%RegisteredObject</Super>
-    <Method name="Hello">
-    <ClassMethod>1</ClassMethod>
-    <ReturnType>%String</ReturnType>
-    <Implementation><![CDATA[    Quit "greetings from the export"
-    ]]></Implementation>
-    </Method>
-    </Class>
-    </Export>
+  - name: Bench.Xml.Greeter
+    content: |
+      <?xml version="1.0" encoding="UTF8"?>
+      <Export generator="IRIS" version="26">
+      <Class name="Bench.Xml.Greeter">
+      <Super>%RegisteredObject</Super>
+      <Method name="Hello">
+      <ClassMethod>1</ClassMethod>
+      <ReturnType>%String</ReturnType>
+      <Implementation><![CDATA[    Quit "greetings from the export"
+      ]]></Implementation>
+      </Method>
+      </Class>
+      </Export>
 tags:
-- xml
-- export
+  - xml
+  - export
