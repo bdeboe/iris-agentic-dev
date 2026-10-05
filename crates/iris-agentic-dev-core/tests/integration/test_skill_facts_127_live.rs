@@ -610,9 +610,11 @@ fn done_plus_queued(pair: &str) -> i64 {
 #[ignore]
 async fn production_stop_keeps_queued_messages_and_force_stop_requeues() {
     let Some((c, client)) = conn() else { return };
+    // A production an earlier test left troubled (state 3) survives a force stop and refuses the
+    // next start; on the 2025.3 CI runner `IadLive130.EmptyProd` did. `CleanProduction` resets it.
     let _ = c
         .execute_via_generator(
-            " Do ##class(Ens.Director).StopProduction(10,1)",
+            " Do ##class(Ens.Director).StopProduction(10,1)\n Do ##class(Ens.Director).CleanProduction()",
             NS,
             &client,
         )
@@ -624,10 +626,13 @@ async fn production_stop_keeps_queued_messages_and_force_stop_requeues() {
     let started = run(
         &c,
         &client,
-        " Set sc=##class(Ens.Director).StartProduction(\"Test127.Prod\") Write +sc",
+        " Set sc=##class(Ens.Director).StartProduction(\"Test127.Prod\") Write +sc Write:'sc \" \",$System.Status.GetErrorText(sc)",
     )
     .await;
-    assert_eq!(started, "1", "Test127.Prod must start");
+    assert!(
+        started.starts_with('1'),
+        "Test127.Prod must start: {started}"
+    );
 
     let graceful = send_six_then_stop(&c, &client, "2,0").await;
     assert_eq!(

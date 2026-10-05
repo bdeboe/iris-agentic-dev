@@ -348,6 +348,7 @@ def test_the_real_drivers_answer_the_two_attributes_this_reads():
 # against, the corpus commit they were read from, and the item counts the interval was computed over.
 
 
+@pytest.mark.requires_iris
 def test_container_identity_names_the_image_and_its_digest():
     """A tag moves. `intersystemsdc/iris-community:2026.2` in six months is a different image, and a
     number measured against the old one cannot be compared to a number measured against the new one

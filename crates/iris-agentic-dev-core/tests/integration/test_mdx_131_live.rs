@@ -693,7 +693,9 @@ async fn call_info(name: &str) -> serde_json::Value {
 async fn sa_schema_returns_the_grammar_and_refuses_an_unknown_url() {
     let Some(_) = conn() else { return };
     let ok = call_info("http://www.intersystems.com/deepsee").await;
-    let grammar = ok["result"].as_array().expect("grammar lines");
+    let grammar = ok["result"]
+        .as_array()
+        .unwrap_or_else(|| panic!("grammar lines: {ok}"));
     assert!(grammar.len() > 20, "{ok}");
     assert!(
         grammar

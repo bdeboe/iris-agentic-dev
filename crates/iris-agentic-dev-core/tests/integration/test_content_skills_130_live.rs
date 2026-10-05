@@ -288,15 +288,20 @@ Method CheckAdd()
 
 }";
 
-/// RunTest `:<class>` with `/noload/nodelete`, then list the methods it recorded and whether any
-/// assertion failed, as `methods|failed`.
+/// Run one compiled class with `DebugRunTestCase`, then list the methods it recorded and whether
+/// any assertion failed, as `methods|failed`.
+///
+/// This used `RunTest(":<class>","/noload/nodelete")` with `^UnitTestRoot` at `/tmp/`. That still
+/// walks every directory under the root and runs what it finds there, so on the CI container, whose
+/// `/tmp/httest` holds `IrisDevRunTest`, it ran that suite and never this class.
+/// `DebugRunTestCase` passes `/norecursive` and runs the named class on 2025.3 and 2026.2 alike.
 async fn run_unit_test(c: &IrisConnection, client: &reqwest::Client, class: &str) -> String {
     let out = run(
         c,
         client,
         &format!(
             " Set had=$Data(^UnitTestRoot)#2, old=$Get(^UnitTestRoot), ^UnitTestRoot=\"/tmp/\"\n \
-             Set sc=##class(%UnitTest.Manager).RunTest(\":{class}\",\"/noload/nodelete\")\n \
+             Set sc=##class(%UnitTest.Manager).DebugRunTestCase(\"\",\"{class}\")\n \
              If had Set ^UnitTestRoot=old\n Else  Kill ^UnitTestRoot\n \
              Set idx=$Order(^UnitTest.Result(\"\"),-1), ref=$Name(^UnitTest.Result(idx)), m=\"\", bad=0\n \
              For {{ Set ref=$Query(@ref) Quit:ref=\"\"  Quit:$QSubscript(ref,1)'=idx  If $QLength(ref)=4 {{ Set m=m_$QSubscript(ref,4)_\",\" Set:$ListGet(@ref,1)=0 bad=1 }} }}\n \
@@ -658,9 +663,11 @@ XData ProductionDefinition
 #[ignore]
 async fn director_status_calls_match_the_skill() {
     let Some((c, client)) = conn() else { return };
+    // `CleanProduction` clears a production an earlier test left troubled (state 3), which a force
+    // stop does not.
     let _ = c
         .execute_via_generator(
-            " Do ##class(Ens.Director).StopProduction(10,1)",
+            " Do ##class(Ens.Director).StopProduction(10,1)\n Do ##class(Ens.Director).CleanProduction()",
             NS,
             &client,
         )

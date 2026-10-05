@@ -165,11 +165,15 @@ def _credential_report() -> str:
         )
     if os.environ.get("AWS_BEARER_TOKEN_BEDROCK"):
         # Set and still unresolved: the SDK did not read it. anthropic 0.86 does not; 0.96 does.
-        import anthropic
+        try:
+            import anthropic
 
+            sdk = f"anthropic {anthropic.__version__}"
+        except ImportError:
+            sdk = "no anthropic installed"
         lines.append(
-            f"  AWS_BEARER_TOKEN_BEDROCK is set but the SDK did not read it: anthropic "
-            f"{anthropic.__version__} under {sys.executable}; run with an interpreter "
+            f"  AWS_BEARER_TOKEN_BEDROCK is set but the SDK did not read it: {sdk} "
+            f"under {sys.executable}; run with an interpreter "
             "whose anthropic reads bearer tokens (0.96 does, 0.86 does not)"
         )
     else:

@@ -535,7 +535,10 @@ fn test_handle_iris_macro_list() {
 // ── 130 round 3: iris_macro against the real getmacro* routes ─────────────────
 //
 // Round 2 of the 130 ladder lost SKILL-16 because every iris_macro action answered `{}`. These
-// check the values an agent needs, in BENCHMARK, which has the interoperability includes.
+// check the values an agent needs, in USER, which has the interoperability includes on a stock
+// community image. They named BENCHMARK until CI ran them: only `iris-dev-iris` has that namespace,
+// and Atelier answers 404 for one that does not exist.
+const MACRO_NS: &str = "USER";
 
 fn macro_call(
     action: &str,
@@ -550,7 +553,7 @@ fn macro_call(
             name: name.map(str::to_string),
             args,
             includes,
-            namespace: Some("BENCHMARK".to_string()),
+            namespace: Some(MACRO_NS.to_string()),
             server: None,
         };
         result_json(handle_iris_macro(&conn, &client, p).await)
@@ -562,8 +565,15 @@ fn macro_call(
 fn macro_definition_finds_the_include_itself() {
     let v = macro_call("definition", Some("eProductionStateRunning"), vec![], None);
     assert_eq!(v["success"], true, "{v}");
-    assert_eq!(v["document"], "EnsConstants.inc", "{v}");
-    assert_eq!(v["includes"], serde_json::json!(["EnsConstants"]), "{v}");
+    // Both includes define it. On a freshly started 2025.3 the first lookup lands in
+    // `%syInterop`, and `EnsConstants` after that.
+    let doc = v["document"].as_str().unwrap_or("");
+    assert!(["EnsConstants.inc", "%syInterop.inc"].contains(&doc), "{v}");
+    assert_eq!(
+        v["includes"],
+        serde_json::json!([doc.trim_end_matches(".inc")]),
+        "{v}"
+    );
     assert_eq!(
         v["definition"],
         serde_json::json!(["eProductionStateRunning 1"]),
@@ -629,7 +639,7 @@ fn one_broken_include_does_not_hide_the_others() {
                         "iris_doc",
                         serde_json::json!({
                             "mode": "put", "name": name, "content": body,
-                            "namespace": "BENCHMARK", "compile": false
+                            "namespace": MACRO_NS, "compile": false
                         }),
                     )
                     .await,
@@ -643,7 +653,7 @@ fn one_broken_include_does_not_hide_the_others() {
             let _ = tools
                 .call_for_test(
                     "iris_doc",
-                    serde_json::json!({"mode": "delete", "name": name, "namespace": "BENCHMARK"}),
+                    serde_json::json!({"mode": "delete", "name": name, "namespace": MACRO_NS}),
                 )
                 .await;
         })

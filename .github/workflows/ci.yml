@@ -391,6 +391,9 @@ jobs:
       #     environment's IRIS_HOST is set, which causes the handler to attempt a
       #     real IRIS call instead of hitting the mock. They pass fine in the `test`
       #     job (no IRIS_HOST set) and are NOT skipped there.
+      #   - test_aihub_139_live / test_query_stats_139_live / test_csp_logout_132: need
+      #     `iad-aihub-iris`, an IRISHealth AI Hub EAP build with its own license key. Neither
+      #     the image nor the key can be on a runner; they run locally before each release.
       # --test-threads=1: same cross-binary env-var race as the `test` job above (e.g.
       # OBJECTSCRIPT_SKILLMCP_NAMESPACE) — observed here too, intermittently, once in
       # ~5 full runs. The IRIS container startup dominates this job's wall-clock time
@@ -424,7 +427,10 @@ jobs:
             --skip test_scm_execute_action_code_1_via_wiremock \
             --skip test_scm_execute_action_code_7_via_wiremock \
             --skip test_scm_menu_with_actions_via_wiremock \
-            --skip test_search_sync_with_wiremock_null_work_id
+            --skip test_search_sync_with_wiremock_null_work_id \
+            --skip test_aihub_139_live:: \
+            --skip test_query_stats_139_live:: \
+            --skip test_csp_logout_132::
         env:
           IRIS_HOST: ${{ env.IRIS_HOST }}
           IRIS_WEB_PORT: "52773"

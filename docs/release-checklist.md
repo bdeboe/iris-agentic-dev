@@ -31,6 +31,17 @@ All four env vars are required. Without them `admin_e2e_tests` and the `params_b
 assert `IRIS_HOST must be set` and fail, which reads as a regression and is not one. `--no-fail-fast`
 matters too: without it the first failing target aborts the run and you never see the rest.
 
+- [ ] Quality Gates, in a clean worktree so untracked local files do not count:
+      `git worktree add /tmp/gates HEAD && cd /tmp/gates && npm ci && bash .specify/gates/verify.sh --boundary ci`
+- [ ] The CI e2e job's command against a fresh `intersystemsdc/iris-community:2025.3` container, with
+      the job's env (`IRIS_NAMESPACE=USER`, `IRIS_CONTAINER`, both write tiers on) and its `--skip`
+      list copied from `.github/workflows/ci.yml`
+
+The last two exist because 1.5.0 went to `master` red on both. Quality Gates had run only on a PR
+that sat at `action_required`, and a global `core.hooksPath` skips the repo's pre-commit gate. The
+e2e job runs only on `master`, so live tests written against `iris-dev-iris` since August had never
+met a stock container: they named its `BENCHMARK` namespace, or needed `iad-aihub-iris`.
+
 ## 3. Coverage gate (merged/subprocess mode)
 
 - [ ] `IRIS_HOST=localhost IRIS_WEB_PORT=52780 bash scripts/coverage.sh` — overall ≥ 88%

@@ -174,7 +174,8 @@ def test_a_set_bearer_token_that_fails_names_the_sdk_not_the_variable(
     """
     import sys
 
-    import anthropic
+    # The message names the installed SDK's version, so it needs one installed. CI installs none.
+    anthropic = pytest.importorskip("anthropic")
 
     monkeypatch.setattr(
         preflight,
