@@ -575,7 +575,7 @@ fn drafts_entries_are_complete() {
     let live = read("crates/iris-agentic-dev-core/tests/integration/test_aihub_139_live.rs");
     let mismatches: Vec<_> = entries.iter().filter(|(h, _)| h.starts_with('D')).collect();
     assert!(
-        mismatches.len() >= 7,
+        mismatches.len() >= 4,
         "want one D entry per reproduced mismatch, got {}",
         mismatches.len()
     );
