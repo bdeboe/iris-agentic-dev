@@ -174,7 +174,7 @@ fn skill_frontmatter_names_both_sources() {
     let fm = frontmatter(&t);
     for want in [
         "name: iris-ai-hub",
-        "version: 0.2.0",
+        "version: 0.2.1",
         "managed_by: iris-agentic-dev",
     ] {
         assert!(
